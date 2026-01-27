@@ -1,0 +1,19 @@
+# env files
+.env
+.env.*
+!.env.example
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# test/cache
+.pytest_cache/
+.coverage
+
+# OS/editor
+.DS_Store
+.vscode/
+.idea/
