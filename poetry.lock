@@ -56,6 +56,19 @@ files = [
 ]
 
 [[package]]
+name = "async-timeout"
+version = "5.0.1"
+description = "Timeout context manager for asyncio programs"
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+markers = "python_full_version < \"3.11.3\""
+files = [
+    {file = "async_timeout-5.0.1-py3-none-any.whl", hash = "sha256:39e3809566ff85354557ec2398b55e096c8364bacac9405a7a1fa429e77fe76c"},
+    {file = "async_timeout-5.0.1.tar.gz", hash = "sha256:d9321a7a3d5a6a5e187e824d2fa0793ce379a202935782d555d6e9d2735677d3"},
+]
+
+[[package]]
 name = "boto3"
 version = "1.42.36"
 description = "The AWS SDK for Python"
@@ -993,6 +1006,27 @@ files = [
 ]
 
 [[package]]
+name = "redis"
+version = "7.1.0"
+description = "Python client for Redis database and key-value store"
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "redis-7.1.0-py3-none-any.whl", hash = "sha256:23c52b208f92b56103e17c5d06bdc1a6c2c0b3106583985a76a18f83b265de2b"},
+    {file = "redis-7.1.0.tar.gz", hash = "sha256:b1cc3cfa5a2cb9c2ab3ba700864fb0ad75617b41f01352ce5779dabf6d5f9c3c"},
+]
+
+[package.dependencies]
+async-timeout = {version = ">=4.0.3", markers = "python_full_version < \"3.11.3\""}
+
+[package.extras]
+circuit-breaker = ["pybreaker (>=1.4.0)"]
+hiredis = ["hiredis (>=3.2.0)"]
+jwt = ["pyjwt (>=2.9.0)"]
+ocsp = ["cryptography (>=36.0.1)", "pyopenssl (>=20.0.1)", "requests (>=2.31.0)"]
+
+[[package]]
 name = "requests"
 version = "2.32.5"
 description = "Python HTTP for Humans."
@@ -1480,4 +1514,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11"
-content-hash = "d59324274cd758e363d0f71e67eefff9e4409b8b46e460709fd2806b217e9810"
+content-hash = "887a993cc91986a323c90236e4d7650c6f194a630494327d2ecd4a95f7ebdd87"

@@ -22,9 +22,9 @@ class Settings(BaseSettings):
     SNOWFLAKE_ROLE: str | None = Field(default=None, description="Snowflake role (optional)")
 
     # ---- Redis ----
-    REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
-    REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
-    REDIS_DB = int(os.getenv("REDIS_DB", 0))
+    REDIS_HOST: str = "localhost"
+    REDIS_PORT: int = 6379
+    REDIS_DB: int = 0
 
     # ---- AWS / S3 ----
     AWS_ACCESS_KEY_ID: str | None = None

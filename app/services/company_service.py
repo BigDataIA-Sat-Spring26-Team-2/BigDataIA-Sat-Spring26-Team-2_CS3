@@ -6,7 +6,9 @@ from fastapi import HTTPException, status
 from app.config import get_settings
 from app.models.company import CompanyCreate, CompanyResponse
 from app.services import snowflake
-
+from app.services.redis_cache import RedisCache
+cache = RedisCache()
+#cache = RedisCache(host="localhost", port=6379)
 
 def create_company(payload: CompanyCreate) -> CompanyResponse:
     company_id = str(uuid4())
@@ -58,6 +60,12 @@ def create_company(payload: CompanyCreate) -> CompanyResponse:
 
 
 def get_company_by_id(company_id: UUID) -> CompanyResponse:
+    cache_key = f"company:{company_id}"
+
+    
+    cached_company = cache.get(cache_key, CompanyResponse)
+    if cached_company:
+        return cached_company
     sql = """
         SELECT id, name, ticker, industry_id, position_factor,
                created_at, updated_at
@@ -85,7 +93,7 @@ def get_company_by_id(company_id: UUID) -> CompanyResponse:
             detail="Company not found",
         )
 
-    return CompanyResponse(
+    company=CompanyResponse(
         id=UUID(row[0]),
         name=row[1],
         ticker=row[2],
@@ -94,6 +102,10 @@ def get_company_by_id(company_id: UUID) -> CompanyResponse:
         created_at=row[5],
         updated_at=row[6],
     )
+        # 3️⃣ Store in Redis for 5 minutes (Professor step 50–52)
+    cache.set(cache_key, company, ttl_seconds=300)
+
+    return company
 
 
 
@@ -214,6 +226,8 @@ def update_company(company_id: UUID, payload: CompanyCreate) -> CompanyResponse:
     finally:
         cur.close()
         conn.close()
+    # Invalidate cache
+    cache.delete(f"company:{company_id}")
 
     return get_company_by_id(company_id)
 
@@ -246,3 +260,5 @@ def delete_company(company_id: UUID) -> None:
     finally:
         cur.close()
         conn.close()
+    cache.delete(f"company:{company_id}")
+    
