@@ -46,3 +46,46 @@ def list_companies(
             "industry_id": str(industry_id) if industry_id else None
         }
     }
+
+@router.get(
+    "/companies/{company_id}",
+    response_model=CompanyResponse
+)
+def get_company(company_id: UUID):
+    now = datetime.now(timezone.utc)
+
+    return CompanyResponse(
+        id=company_id,
+        name="Demo Company",
+        ticker="DEMO",
+        industry_id=uuid4(),
+        position_factor=0.0,
+        created_at=now,
+        updated_at=now,
+    )
+
+
+@router.put(
+    "/companies/{company_id}",
+    response_model=CompanyResponse
+)
+def update_company(company_id: UUID, payload: CompanyCreate):
+    now = datetime.now(timezone.utc)
+
+    return CompanyResponse(
+        id=company_id,
+        name=payload.name,
+        ticker=payload.ticker,
+        industry_id=payload.industry_id,
+        position_factor=payload.position_factor,
+        created_at=now,
+        updated_at=now,
+    )
+
+
+@router.delete(
+    "/companies/{company_id}",
+    status_code=status.HTTP_204_NO_CONTENT
+)
+def delete_company(company_id: UUID):
+    return None

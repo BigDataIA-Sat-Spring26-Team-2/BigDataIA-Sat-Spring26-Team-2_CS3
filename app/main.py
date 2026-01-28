@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from app.routers import dimension , assessments
+from app.routers import dimension , assessments, companies
 
 app = FastAPI(
     title="PE Org-AI-R Platform Team-2",
@@ -9,6 +9,7 @@ app.include_router(dimension.router, prefix="/api/v1")
 
 app.include_router(dimension.router)
 app.include_router(assessments.router, prefix="/api/v1")
+app.include_router(companies.router, prefix="/api/v1")
 @app.get("/")
 def root():
     return {"message": "PE Org-AI-R Platform is running"}
