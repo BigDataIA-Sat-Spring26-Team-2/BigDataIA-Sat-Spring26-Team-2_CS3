@@ -25,10 +25,9 @@ class Settings(BaseSettings):
     REDIS_PORT: int = Field(6379, description="Redis port")
 
     # ---- AWS / S3 ----
-    AWS_ACCESS_KEY_ID: str = Field(..., description="AWS access key")
-    AWS_SECRET_ACCESS_KEY: str = Field(..., description="AWS secret key")
-    AWS_REGION: str = Field("us-east-1", description="AWS region")
-    S3_BUCKET: str = Field(..., description="S3 bucket name")
+    AWS_ACCESS_KEY_ID: str | None = None
+    AWS_SECRET_ACCESS_KEY: str | None = None
+    S3_BUCKET: str | None = None
 
     # ---- App metadata ----
     APP_ENV: str = Field("local", description="Environment name: local/dev/prod")
