@@ -1,44 +1,37 @@
 from fastapi import APIRouter, HTTPException, status
 from typing import List
-from uuid import UUID
+from uuid import UUID, uuid4
 from datetime import datetime, timezone
 
-from app.models.dimension import (
-    DimensionScoreCreate,
-    DimensionScoreResponse
-)
+from app.models.dimension import DimensionScoreCreate, DimensionScoreResponse
 
-router = APIRouter(
-    tags=["Dimension Scores"]
-)
+router = APIRouter(tags=["Dimension Scores"])
 
-# weight autocaculated if no weight provided else use provided weight until below 1.0 or above 0.0
+
 @router.post(
     "/assessments/{assessment_id}/scores",
     response_model=List[DimensionScoreResponse],
     status_code=status.HTTP_201_CREATED
 )
-def add_dimension_scores(
-    assessment_id: UUID,
-    scores: List[DimensionScoreCreate]
-):
-    created_scores = []
+def add_dimension_scores(assessment_id: UUID, scores: List[DimensionScoreCreate]):
+    created_scores: List[DimensionScoreResponse] = []
 
     for score in scores:
        
         if score.assessment_id != assessment_id:
             raise HTTPException(
-                status_code=400,
+                status_code=status.HTTP_400_BAD_REQUEST,
                 detail="assessment_id in body must match path parameter"
             )
 
+        # ✅ use real UUID per score
         created_scores.append(
             DimensionScoreResponse(
-                id=UUID(int=0),  
+                id=uuid4(),
                 assessment_id=assessment_id,
                 dimension=score.dimension,
                 score=score.score,
-                weight=score.weight,
+                weight=score.weight,  
                 confidence=score.confidence,
                 evidence_count=score.evidence_count,
                 created_at=datetime.now(timezone.utc)
@@ -53,7 +46,7 @@ def add_dimension_scores(
     response_model=List[DimensionScoreResponse]
 )
 def get_dimension_scores(assessment_id: UUID):
-    
+    # Stub for now
     return []
 
 
@@ -61,10 +54,7 @@ def get_dimension_scores(assessment_id: UUID):
     "/scores/{score_id}",
     response_model=DimensionScoreResponse
 )
-def update_dimension_score(
-    score_id: UUID,
-    score: DimensionScoreCreate
-):
+def update_dimension_score(score_id: UUID, score: DimensionScoreCreate):
     return DimensionScoreResponse(
         id=score_id,
         assessment_id=score.assessment_id,

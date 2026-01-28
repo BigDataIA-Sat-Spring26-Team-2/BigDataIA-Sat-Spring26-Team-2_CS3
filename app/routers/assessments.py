@@ -1,9 +1,10 @@
-from fastapi import APIRouter, HTTPException, status, Query
+from fastapi import APIRouter, status, Query
 from typing import Optional, Dict, Any
-from uuid import UUID, uuid4
-from datetime import datetime, timezone
+from uuid import UUID
+
 from app.models.assessment import AssessmentCreate, AssessmentResponse
 from app.models.enums import AssessmentStatus, AssessmentType
+from app.models.pagination import PaginatedResponse
 from app.services import assessments_service
 
 router = APIRouter(tags=["Assessments"])
@@ -12,18 +13,22 @@ router = APIRouter(tags=["Assessments"])
 @router.post(
     "/assessments",
     response_model=AssessmentResponse,
+    status_code=status.HTTP_201_CREATED
 )
 def create_assessment(payload: AssessmentCreate):
     return assessments_service.create_assessment(payload)
 
 
-@router.get("/assessments")
+@router.get(
+    "/assessments",
+    response_model=PaginatedResponse[AssessmentResponse]
+)
 def list_assessments(
-    company_id: UUID = Query(...),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    status_filter: AssessmentStatus | None = Query(None, alias="status"),
-    assessment_type: AssessmentType | None = None,
+    company_id: Optional[UUID] = None,
+    status_filter: Optional[AssessmentStatus] = Query(None, alias="status"),
+    assessment_type: Optional[AssessmentType] = None,
 ):
     return assessments_service.list_assessments(
         company_id=company_id,
