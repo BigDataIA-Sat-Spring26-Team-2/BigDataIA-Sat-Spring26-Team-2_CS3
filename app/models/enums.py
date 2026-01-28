@@ -21,3 +21,12 @@ class Dimension(str, Enum):
     LEADERSHIP_VISION = "leadership_vision"
     USE_CASE_PORTFOLIO = "use_case_portfolio"
     CULTURE_CHANGE = "culture_change"
+class Sector(str, Enum):
+   
+    HEALTHCARE = "Healthcare"
+    FINANCIAL = "Financial"
+    TECHNOLOGY = "Technology"
+    ENERGY = "Energy"
+    RETAIL = "Retail"
+    PROFESSIONAL_SERVICES = "Professional Services"
+    MANUFACTURING = "Manufacturing"
