@@ -1,6 +1,7 @@
 from functools import lru_cache
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
+import os
 
 
 class Settings(BaseSettings):
@@ -21,8 +22,9 @@ class Settings(BaseSettings):
     SNOWFLAKE_ROLE: str | None = Field(default=None, description="Snowflake role (optional)")
 
     # ---- Redis ----
-    REDIS_HOST: str = Field("redis", description="Redis hostname (docker service name or localhost)")
-    REDIS_PORT: int = Field(6379, description="Redis port")
+    REDIS_HOST: str = "localhost"
+    REDIS_PORT: int = 6379
+    REDIS_DB: int = 0
 
     # ---- AWS / S3 ----
     AWS_ACCESS_KEY_ID: str | None = None
