@@ -7,7 +7,9 @@ app = FastAPI(
 )
 
 app.include_router(health.router,prefix="/api/v1")
+
 app.include_router(dimension_scores.router, prefix="/api/v1")
+
 app.include_router(assessments.router, prefix="/api/v1")
 app.include_router(companies.router, prefix="/api/v1")
 app.include_router(industries.router, prefix="/api/v1")
