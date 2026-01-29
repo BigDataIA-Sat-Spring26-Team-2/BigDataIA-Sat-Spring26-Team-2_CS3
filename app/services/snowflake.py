@@ -4,6 +4,7 @@ import snowflake.connector
 def get_connection():
     settings = get_settings()
 
+    print("SNOWFLAKE SETTINGS:", settings.SNOWFLAKE_DATABASE, settings.SNOWFLAKE_SCHEMA, settings.SNOWFLAKE_ROLE)
     conn_kwargs = dict(
         account=settings.SNOWFLAKE_ACCOUNT,
         user=settings.SNOWFLAKE_USER,
@@ -22,6 +23,7 @@ def get_connection():
 
 def test_snowflake_connection():
     conn = get_connection()
+    
     cursor = conn.cursor()
 
     try:
