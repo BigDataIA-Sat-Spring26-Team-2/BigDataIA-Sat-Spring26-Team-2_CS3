@@ -162,6 +162,23 @@ def list_dimension_scores(
         )
         for r in rows
     ]
+
+
+    total_pages = math.ceil(total / page_size) if total > 0 else 0
+
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": total_pages,
+    }
+
+
+# (optional) keep old non-paginated getter for compatibility
+def get_dimension_scores(assessment_id: UUID) -> List[DimensionScoreResponse]:
+    return list_dimension_scores(assessment_id, page=1, page_size=100)["items"]
+
 def get_dimension_weights() -> DimensionWeightsResponse:
     """
     Returns dimension weights.
@@ -184,17 +201,3 @@ def get_dimension_weights() -> DimensionWeightsResponse:
 
     return weights_model
 
-    total_pages = math.ceil(total / page_size) if total > 0 else 0
-
-    return {
-        "items": items,
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "total_pages": total_pages,
-    }
-
-
-# (optional) keep old non-paginated getter for compatibility
-def get_dimension_scores(assessment_id: UUID) -> List[DimensionScoreResponse]:
-    return list_dimension_scores(assessment_id, page=1, page_size=100)["items"]
