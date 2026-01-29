@@ -40,6 +40,15 @@ def add_dimension_scores(assessment_id: UUID, scores: List[DimensionScoreCreate]
     try:
         conn = get_connection()
         cur = conn.cursor()
+        cur.execute(
+            "SELECT 1 FROM PE_ORGAIR.PUBLIC.ASSESSMENTS WHERE id = %s",
+            (str(assessment_id),)
+        )
+        if not cur.fetchone():
+            raise HTTPException(
+                status_code=404,
+                detail="Assessment not found"
+            )
 
         for s in scores:
             if s.assessment_id != assessment_id:
@@ -87,9 +96,15 @@ def add_dimension_scores(assessment_id: UUID, scores: List[DimensionScoreCreate]
     except HTTPException:
         raise
     except Exception as e:
+        msg = str(e).lower()
+        if "unique" in msg or "duplicate" in msg:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="A score for this assessment and dimension already exists"
+            )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to add dimension scores: {str(e)}",
+            detail=f"Failed to add dimension scores"
         )
     finally:
         if cur:
