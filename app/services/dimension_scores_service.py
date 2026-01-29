@@ -1,4 +1,5 @@
 # app/services/dimension_scores_service.py
+
 from uuid import UUID, uuid4
 from datetime import datetime, timezone
 from typing import List
@@ -6,30 +7,43 @@ from typing import List
 from fastapi import HTTPException, status
 
 from app.models.dimension import DimensionScoreCreate, DimensionScoreResponse
-from app.services import snowflake
+from app.services.snowflake import get_connection
+from app.config import get_settings
+
+
+def _fq_table(name: str) -> str:
+    """Fully-qualified table name: DB.SCHEMA.TABLE"""
+    s = get_settings()
+    return f"{s.SNOWFLAKE_DATABASE}.{s.SNOWFLAKE_SCHEMA}.{name}"
+
+
+TABLE = _fq_table("DIMENSION_SCORES")
 
 
 def add_dimension_scores(assessment_id: UUID, scores: List[DimensionScoreCreate]) -> List[DimensionScoreResponse]:
     """
     Inserts multiple dimension score rows into Snowflake.
-    Assumes dimension_scores table already exists.
+    Verifies rows exist immediately after insert.
     """
-    conn = None
-    cur = None
-    created: List[DimensionScoreResponse] = []
-
-    sql = """
-        INSERT INTO dimension_scores (
+    insert_sql = f"""
+        INSERT INTO {TABLE} (
             id, assessment_id, dimension, score, weight, confidence, evidence_count, created_at
         )
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
     """
 
     now = datetime.now(timezone.utc)
+    created: List[DimensionScoreResponse] = []
 
+    conn = None
+    cur = None
     try:
-        conn = snowflake.get_connection()
+        conn = get_connection()
         cur = conn.cursor()
+
+        # Debug: confirm session context
+        cur.execute("SELECT CURRENT_DATABASE(), CURRENT_SCHEMA(), CURRENT_ROLE()")
+        print("DIM_SCORES SESSION:", cur.fetchone())
 
         for s in scores:
             if s.assessment_id != assessment_id:
@@ -40,17 +54,21 @@ def add_dimension_scores(assessment_id: UUID, scores: List[DimensionScoreCreate]
 
             score_id = str(uuid4())
 
-            # weight is already filled by your model validator if None
+           
+            weight = float(s.weight) if s.weight is not None else None
+            confidence = float(s.confidence) if s.confidence is not None else None
+            evidence_count = int(s.evidence_count) if s.evidence_count is not None else 0
+
             cur.execute(
-                sql,
+                insert_sql,
                 (
                     score_id,
                     str(assessment_id),
-                    s.dimension.value,     # store as string
+                    s.dimension.value,
                     float(s.score),
-                    float(s.weight),
-                    float(s.confidence),
-                    int(s.evidence_count),
+                    weight,
+                    confidence,
+                    evidence_count,
                     now,
                 ),
             )
@@ -68,13 +86,36 @@ def add_dimension_scores(assessment_id: UUID, scores: List[DimensionScoreCreate]
                 )
             )
 
+        # ✅ Verify insert before commit (same transaction)
+        cur.execute(
+            f"SELECT COUNT(*) FROM {TABLE} WHERE assessment_id = %s",
+            (str(assessment_id),)
+        )
+        cnt = cur.fetchone()[0]
+        print("DIM_SCORES COUNT BEFORE COMMIT:", cnt)
+
         conn.commit()
+
+        # ✅ Verify after commit too (still same connection)
+        cur.execute(
+            f"SELECT COUNT(*) FROM {TABLE} WHERE assessment_id = %s",
+            (str(assessment_id),)
+        )
+        cnt2 = cur.fetchone()[0]
+        print("DIM_SCORES COUNT AFTER COMMIT:", cnt2)
+
+        # If still 0, something is definitely wrong -> don’t lie with “success”
+        if cnt2 == 0:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Insert executed but no rows found after commit (check table name/schema/permissions)."
+            )
+
         return created
 
     except HTTPException:
         raise
     except Exception as e:
-        # If you have a UNIQUE(assessment_id, dimension), duplicates will come here
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to add dimension scores: {str(e)}",
@@ -87,9 +128,9 @@ def add_dimension_scores(assessment_id: UUID, scores: List[DimensionScoreCreate]
 
 
 def get_dimension_scores(assessment_id: UUID) -> List[DimensionScoreResponse]:
-    sql = """
+    select_sql = f"""
         SELECT id, assessment_id, dimension, score, weight, confidence, evidence_count, created_at
-        FROM dimension_scores
+        FROM {TABLE}
         WHERE assessment_id = %s
         ORDER BY created_at DESC
     """
@@ -97,10 +138,16 @@ def get_dimension_scores(assessment_id: UUID) -> List[DimensionScoreResponse]:
     conn = None
     cur = None
     try:
-        conn = snowflake.get_connection()
+        conn = get_connection()
         cur = conn.cursor()
-        cur.execute(sql, (str(assessment_id),))
+
+        # Debug: confirm session context
+        cur.execute("SELECT CURRENT_DATABASE(), CURRENT_SCHEMA(), CURRENT_ROLE()")
+        print("DIM_SCORES SESSION:", cur.fetchone())
+
+        cur.execute(select_sql, (str(assessment_id),))
         rows = cur.fetchall()
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -112,77 +159,16 @@ def get_dimension_scores(assessment_id: UUID) -> List[DimensionScoreResponse]:
         if conn:
             conn.close()
 
-    results: List[DimensionScoreResponse] = []
-    for r in rows:
-        results.append(
-            DimensionScoreResponse(
-                id=UUID(r[0]),
-                assessment_id=UUID(r[1]),
-                dimension=r[2],  # pydantic will coerce into Dimension enum if your model uses it
-                score=float(r[3]),
-                weight=float(r[4]) if r[4] is not None else None,
-                confidence=float(r[5]) if r[5] is not None else 0.8,
-                evidence_count=int(r[6]) if r[6] is not None else 0,
-                created_at=r[7],
-            )
+    return [
+        DimensionScoreResponse(
+            id=UUID(r[0]),
+            assessment_id=UUID(r[1]),
+            dimension=r[2],  # pydantic will coerce to enum if applicable
+            score=float(r[3]),
+            weight=float(r[4]) if r[4] is not None else None,
+            confidence=float(r[5]) if r[5] is not None else None,
+            evidence_count=int(r[6]) if r[6] is not None else 0,
+            created_at=r[7],
         )
-    return results
-
-
-def update_dimension_score(score_id: UUID, payload: DimensionScoreCreate) -> DimensionScoreResponse:
-    now = datetime.now(timezone.utc)
-
-    sql = """
-        UPDATE dimension_scores
-        SET score = %s,
-            weight = %s,
-            confidence = %s,
-            evidence_count = %s
-        WHERE id = %s
-    """
-
-    conn = None
-    cur = None
-    try:
-        conn = snowflake.get_connection()
-        cur = conn.cursor()
-        cur.execute(
-            sql,
-            (
-                float(payload.score),
-                float(payload.weight),
-                float(payload.confidence),
-                int(payload.evidence_count),
-                str(score_id),
-            ),
-        )
-
-        if cur.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Score not found")
-
-        conn.commit()
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to update dimension score: {str(e)}",
-        )
-    finally:
-        if cur:
-            cur.close()
-        if conn:
-            conn.close()
-
-    # Return updated object (you can also re-select from DB, but this is fine)
-    return DimensionScoreResponse(
-        id=score_id,
-        assessment_id=payload.assessment_id,
-        dimension=payload.dimension,
-        score=payload.score,
-        weight=payload.weight,
-        confidence=payload.confidence,
-        evidence_count=payload.evidence_count,
-        created_at=now,  # optional; if you want real created_at, reselect instead
-    )
+        for r in rows
+    ]

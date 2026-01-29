@@ -10,19 +10,21 @@ router = APIRouter(tags=["Dimension Scores"])
 
 
 @router.post(
-    "/assessments/{assessment_id}/scores",
+    "/{assessment_id}/scores",
     response_model=List[DimensionScoreResponse],
     status_code=status.HTTP_201_CREATED
 )
 def add_dimension_scores(assessment_id: UUID, scores: List[DimensionScoreCreate]):
+ 
     return dimension_scores_service.add_dimension_scores(assessment_id, scores)
 
 
 @router.get(
-    "/assessments/{assessment_id}/scores",
+    "/{assessment_id}/scores",
     response_model=List[DimensionScoreResponse]
 )
 def get_dimension_scores(assessment_id: UUID):
+
     return dimension_scores_service.get_dimension_scores(assessment_id)
 
 
@@ -31,4 +33,5 @@ def get_dimension_scores(assessment_id: UUID):
     response_model=DimensionScoreResponse
 )
 def update_dimension_score(score_id: UUID, score: DimensionScoreCreate):
+    print("🔥 ROUTER HIT: update_dimension_score", flush=True)
     return dimension_scores_service.update_dimension_score(score_id, score)
