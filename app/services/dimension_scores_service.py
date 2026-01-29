@@ -4,6 +4,10 @@ import math
 from uuid import UUID, uuid4
 from datetime import datetime, timezone
 from typing import List
+from app.services.redis_cache import cache
+from app.models.enums import Dimension
+from app.models.dimension import DimensionScoreCreate, DimensionScoreResponse, DIMENSION_WEIGHTS, DimensionWeightsResponse
+
 
 from fastapi import HTTPException, status
 
@@ -158,6 +162,27 @@ def list_dimension_scores(
         )
         for r in rows
     ]
+def get_dimension_weights() -> DimensionWeightsResponse:
+    """
+    Returns dimension weights.
+    Cached for 24 hours as configuration data.
+    """
+    cache_key = "dimension:weights"
+
+    # 1️⃣ Try Redis
+    cached = cache.get(cache_key, DimensionWeightsResponse)
+    if cached:
+        return cached
+
+    # 2️⃣ Source of truth (static config)
+    weights_model = DimensionWeightsResponse(
+        weights={d.value: w for d, w in DIMENSION_WEIGHTS.items()}
+    )
+
+    # 3️⃣ Store in Redis for 24 hours
+    cache.set(cache_key, weights_model, ttl_seconds=60 * 60 * 24)
+
+    return weights_model
 
     total_pages = math.ceil(total / page_size) if total > 0 else 0
 

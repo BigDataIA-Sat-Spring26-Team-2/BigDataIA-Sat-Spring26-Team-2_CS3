@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field, field_validator, model_validator
 from uuid import UUID, uuid4
 from datetime import datetime
-from typing import Optional
+from typing import Dict, Optional
 
 from app.models.enums import Dimension
 
@@ -39,3 +39,5 @@ class DimensionScoreResponse(DimensionScoreBase):
 
     class Config:
         from_attributes = True
+class DimensionWeightsResponse(BaseModel):
+    weights: Dict[str, float]
