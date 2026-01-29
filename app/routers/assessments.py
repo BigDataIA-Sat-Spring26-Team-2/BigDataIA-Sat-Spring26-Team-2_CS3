@@ -16,7 +16,7 @@ router = APIRouter(tags=["Assessments"])
     status_code=status.HTTP_201_CREATED
 )
 def create_assessment(payload: AssessmentCreate):
- 
+
     return assessments_service.create_assessment(payload)
  
  
