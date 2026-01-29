@@ -4,12 +4,10 @@ from fastapi import APIRouter, status, Query
 from typing import List
 from uuid import UUID
 
-<<<<<<< HEAD
-from app.models.dimension import DimensionScoreCreate, DimensionScoreResponse, DimensionWeightsResponse
-=======
 from app.models.dimension import DimensionScoreCreate, DimensionScoreResponse
 from app.models.pagination import PaginatedResponse
->>>>>>> origin
+
+from app.models.dimension import DimensionScoreCreate, DimensionScoreResponse, DimensionWeightsResponse
 from app.services import dimension_scores_service
 
 router = APIRouter(tags=["Dimension Scores"])
@@ -45,7 +43,9 @@ def list_dimension_scores(
     response_model=DimensionScoreResponse
 )
 def update_dimension_score(score_id: UUID, score: DimensionScoreCreate):
-<<<<<<< HEAD
+
+    return dimension_scores_service.update_dimension_score(score_id, score)
+
     print("🔥 ROUTER HIT: update_dimension_score", flush=True)
     return dimension_scores_service.update_dimension_score(score_id, score)
 @router.get(
@@ -54,6 +54,3 @@ def update_dimension_score(score_id: UUID, score: DimensionScoreCreate):
 )
 def get_dimension_weights():
     return dimension_scores_service.get_dimension_weights()
-=======
-    return dimension_scores_service.update_dimension_score(score_id, score)
->>>>>>> origin
