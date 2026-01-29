@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, status
 from typing import List
 from uuid import UUID
 
-from app.models.dimension import DimensionScoreCreate, DimensionScoreResponse
+from app.models.dimension import DimensionScoreCreate, DimensionScoreResponse, DimensionWeightsResponse
 from app.services import dimension_scores_service
 
 router = APIRouter(tags=["Dimension Scores"])
@@ -35,3 +35,9 @@ def get_dimension_scores(assessment_id: UUID):
 def update_dimension_score(score_id: UUID, score: DimensionScoreCreate):
     print("🔥 ROUTER HIT: update_dimension_score", flush=True)
     return dimension_scores_service.update_dimension_score(score_id, score)
+@router.get(
+    "/dimension-weights",
+    response_model=DimensionWeightsResponse
+)
+def get_dimension_weights():
+    return dimension_scores_service.get_dimension_weights()

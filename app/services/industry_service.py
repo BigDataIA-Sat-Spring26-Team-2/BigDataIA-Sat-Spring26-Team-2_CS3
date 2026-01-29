@@ -6,8 +6,11 @@ from fastapi import HTTPException, status
 from app.models.industry import IndustryCreate, IndustryResponse
 from app.models.enums import Sector
 from app.services.snowflake import get_connection
+from app.services.redis_cache import cache
+import json
 
 
+INDUSTRY_LIST_TTL = 3600  # 1 hour
 def create_industry(payload: IndustryCreate) -> IndustryResponse:
     industry_id = str(uuid4())
     now = datetime.now(timezone.utc)
@@ -41,6 +44,7 @@ def create_industry(payload: IndustryCreate) -> IndustryResponse:
     finally:
         cur.close()
         conn.close()
+    cache.delete_pattern("industries:*")
 
     return IndustryResponse(
         id=UUID(industry_id),
@@ -93,8 +97,21 @@ def list_industries(
     sector: Optional[Sector] = None,
     name_contains: Optional[str] = None,
 ):
-    offset = (page - 1) * page_size
+    cache_key = (
+        f"industries:"
+        f"page:{page}:"
+        f"size:{page_size}:"
+        f"sector:{sector.value if sector else 'all'}:"
+        f"name:{name_contains or 'all'}"
+    )
 
+    # 1️⃣ Try Redis first
+    cached = cache.client.get(cache_key)
+    if cached:
+        return json.loads(cached)
+
+    # 2️⃣ Fallback to Snowflake
+    offset = (page - 1) * page_size
     base_where = "WHERE 1=1"
     params = []
 
@@ -146,16 +163,25 @@ def list_industries(
             sector=Sector(r[2]),
             h_r_base=r[3],
             created_at=r[4],
-        )
+        ).model_dump()
         for r in rows
     ]
 
     total_pages = math.ceil(total / page_size) if total > 0 else 0
 
-    return {
+    response = {
         "items": items,
         "total": total,
         "page": page,
         "page_size": page_size,
         "total_pages": total_pages,
     }
+
+    # 3️⃣ Cache for 1 hour
+    cache.client.setex(
+        cache_key,
+        INDUSTRY_LIST_TTL,
+        json.dumps(response, default=str),
+    )
+
+    return response
