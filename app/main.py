@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from app.routers import dimension, assessments, companies, industries, health
+from app.routers import assessments, companies, dimension_scores, industries, health
 
 app = FastAPI(
     title="PE Org-AI-R Platform Team-2",
@@ -7,7 +7,9 @@ app = FastAPI(
 )
 
 app.include_router(health.router,prefix="/api/v1")
-app.include_router(dimension.router, prefix="/api/v1/dimensions_scores")
+
+app.include_router(dimension_scores.router, prefix="/api/v1")
+
 app.include_router(assessments.router, prefix="/api/v1")
 app.include_router(companies.router, prefix="/api/v1")
 app.include_router(industries.router, prefix="/api/v1")

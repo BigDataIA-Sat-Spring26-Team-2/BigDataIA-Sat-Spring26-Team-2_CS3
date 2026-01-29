@@ -3,7 +3,9 @@ import snowflake.connector
 
 def get_connection():
     settings = get_settings()
-    return snowflake.connector.connect(
+
+    print("SNOWFLAKE SETTINGS:", settings.SNOWFLAKE_DATABASE, settings.SNOWFLAKE_SCHEMA, settings.SNOWFLAKE_ROLE)
+    conn_kwargs = dict(
         account=settings.SNOWFLAKE_ACCOUNT,
         user=settings.SNOWFLAKE_USER,
         password=settings.SNOWFLAKE_PASSWORD,
@@ -13,8 +15,15 @@ def get_connection():
         role=settings.SNOWFLAKE_ROLE,
     )
 
+    # Only set role if provided
+    if getattr(settings, "SNOWFLAKE_ROLE", None):
+        conn_kwargs["role"] = settings.SNOWFLAKE_ROLE
+
+    return snowflake.connector.connect(**conn_kwargs)
+
 def test_snowflake_connection():
     conn = get_connection()
+    
     cursor = conn.cursor()
 
     try:

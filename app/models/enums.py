@@ -22,7 +22,7 @@ class Dimension(str, Enum):
     USE_CASE_PORTFOLIO = "use_case_portfolio"
     CULTURE_CHANGE = "culture_change"
 class Sector(str, Enum):
-   
+
     HEALTHCARE = "Healthcare"
     FINANCIAL = "Financial"
     TECHNOLOGY = "Technology"
