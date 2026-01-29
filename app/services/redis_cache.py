@@ -36,6 +36,12 @@ class RedisCache:
     def delete_pattern(self, pattern: str) -> None:
         for key in self.client.scan_iter(match=pattern):
             self.client.delete(key)
+    # Health check method for redis connection
+    def ping(self) -> bool:
+        try:
+            return self.client.ping()
+        except Exception:
+            return False
 
 
 
@@ -44,4 +50,4 @@ cache = RedisCache()
 
 
 async def check_redis() -> str:
-    return "healthy"
+    return "healthy" if cache.ping() else "unhealthy"

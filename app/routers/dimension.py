@@ -5,11 +5,11 @@ from datetime import datetime, timezone
 
 from app.models.dimension import DimensionScoreCreate, DimensionScoreResponse
 
-router = APIRouter(tags=["Dimension Scores"])
+router = APIRouter(tags=["Dimensions"])
 
 
 @router.post(
-    "/assessments/{assessment_id}/scores",
+    "/{assessment_id}/scores",
     response_model=List[DimensionScoreResponse],
     status_code=status.HTTP_201_CREATED
 )
@@ -42,7 +42,7 @@ def add_dimension_scores(assessment_id: UUID, scores: List[DimensionScoreCreate]
 
 
 @router.get(
-    "/assessments/{assessment_id}/scores",
+    "/{assessment_id}/scores",
     response_model=List[DimensionScoreResponse]
 )
 def get_dimension_scores(assessment_id: UUID):
