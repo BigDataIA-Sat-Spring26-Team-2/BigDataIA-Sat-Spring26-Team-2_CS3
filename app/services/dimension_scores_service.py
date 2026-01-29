@@ -1,5 +1,6 @@
 # app/services/dimension_scores_service.py
 
+import math
 from uuid import UUID, uuid4
 from datetime import datetime, timezone
 from typing import List
@@ -12,7 +13,6 @@ from app.config import get_settings
 
 
 def _fq_table(name: str) -> str:
-    """Fully-qualified table name: DB.SCHEMA.TABLE"""
     s = get_settings()
     return f"{s.SNOWFLAKE_DATABASE}.{s.SNOWFLAKE_SCHEMA}.{name}"
 
@@ -21,10 +21,6 @@ TABLE = _fq_table("DIMENSION_SCORES")
 
 
 def add_dimension_scores(assessment_id: UUID, scores: List[DimensionScoreCreate]) -> List[DimensionScoreResponse]:
-    """
-    Inserts multiple dimension score rows into Snowflake.
-    Verifies rows exist immediately after insert.
-    """
     insert_sql = f"""
         INSERT INTO {TABLE} (
             id, assessment_id, dimension, score, weight, confidence, evidence_count, created_at
@@ -41,10 +37,6 @@ def add_dimension_scores(assessment_id: UUID, scores: List[DimensionScoreCreate]
         conn = get_connection()
         cur = conn.cursor()
 
-        # Debug: confirm session context
-        cur.execute("SELECT CURRENT_DATABASE(), CURRENT_SCHEMA(), CURRENT_ROLE()")
-        print("DIM_SCORES SESSION:", cur.fetchone())
-
         for s in scores:
             if s.assessment_id != assessment_id:
                 raise HTTPException(
@@ -54,7 +46,6 @@ def add_dimension_scores(assessment_id: UUID, scores: List[DimensionScoreCreate]
 
             score_id = str(uuid4())
 
-           
             weight = float(s.weight) if s.weight is not None else None
             confidence = float(s.confidence) if s.confidence is not None else None
             evidence_count = int(s.evidence_count) if s.evidence_count is not None else 0
@@ -86,31 +77,7 @@ def add_dimension_scores(assessment_id: UUID, scores: List[DimensionScoreCreate]
                 )
             )
 
-        # ✅ Verify insert before commit (same transaction)
-        cur.execute(
-            f"SELECT COUNT(*) FROM {TABLE} WHERE assessment_id = %s",
-            (str(assessment_id),)
-        )
-        cnt = cur.fetchone()[0]
-        print("DIM_SCORES COUNT BEFORE COMMIT:", cnt)
-
         conn.commit()
-
-        # ✅ Verify after commit too (still same connection)
-        cur.execute(
-            f"SELECT COUNT(*) FROM {TABLE} WHERE assessment_id = %s",
-            (str(assessment_id),)
-        )
-        cnt2 = cur.fetchone()[0]
-        print("DIM_SCORES COUNT AFTER COMMIT:", cnt2)
-
-        # If still 0, something is definitely wrong -> don’t lie with “success”
-        if cnt2 == 0:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Insert executed but no rows found after commit (check table name/schema/permissions)."
-            )
-
         return created
 
     except HTTPException:
@@ -127,12 +94,30 @@ def add_dimension_scores(assessment_id: UUID, scores: List[DimensionScoreCreate]
             conn.close()
 
 
-def get_dimension_scores(assessment_id: UUID) -> List[DimensionScoreResponse]:
-    select_sql = f"""
+# ✅ NEW: paginated list
+def list_dimension_scores(
+    assessment_id: UUID,
+    page: int,
+    page_size: int,
+):
+    """
+    Paginated list of dimension scores for an assessment_id.
+    Returns dict matching PaginatedResponse[DimensionScoreResponse].
+    """
+    offset = (page - 1) * page_size
+
+    count_sql = f"""
+        SELECT COUNT(*)
+        FROM {TABLE}
+        WHERE assessment_id = %s
+    """
+
+    data_sql = f"""
         SELECT id, assessment_id, dimension, score, weight, confidence, evidence_count, created_at
         FROM {TABLE}
         WHERE assessment_id = %s
         ORDER BY created_at DESC
+        LIMIT %s OFFSET %s
     """
 
     conn = None
@@ -141,17 +126,18 @@ def get_dimension_scores(assessment_id: UUID) -> List[DimensionScoreResponse]:
         conn = get_connection()
         cur = conn.cursor()
 
-        # Debug: confirm session context
-        cur.execute("SELECT CURRENT_DATABASE(), CURRENT_SCHEMA(), CURRENT_ROLE()")
-        print("DIM_SCORES SESSION:", cur.fetchone())
+        # total
+        cur.execute(count_sql, (str(assessment_id),))
+        total = cur.fetchone()[0]
 
-        cur.execute(select_sql, (str(assessment_id),))
+        # page data
+        cur.execute(data_sql, (str(assessment_id), page_size, offset))
         rows = cur.fetchall()
 
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to fetch dimension scores: {str(e)}",
+            detail=f"Failed to list dimension scores: {str(e)}",
         )
     finally:
         if cur:
@@ -159,11 +145,11 @@ def get_dimension_scores(assessment_id: UUID) -> List[DimensionScoreResponse]:
         if conn:
             conn.close()
 
-    return [
+    items = [
         DimensionScoreResponse(
             id=UUID(r[0]),
             assessment_id=UUID(r[1]),
-            dimension=r[2],  # pydantic will coerce to enum if applicable
+            dimension=r[2],  # pydantic will coerce to enum if needed
             score=float(r[3]),
             weight=float(r[4]) if r[4] is not None else None,
             confidence=float(r[5]) if r[5] is not None else None,
@@ -172,3 +158,18 @@ def get_dimension_scores(assessment_id: UUID) -> List[DimensionScoreResponse]:
         )
         for r in rows
     ]
+
+    total_pages = math.ceil(total / page_size) if total > 0 else 0
+
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": total_pages,
+    }
+
+
+# (optional) keep old non-paginated getter for compatibility
+def get_dimension_scores(assessment_id: UUID) -> List[DimensionScoreResponse]:
+    return list_dimension_scores(assessment_id, page=1, page_size=100)["items"]
