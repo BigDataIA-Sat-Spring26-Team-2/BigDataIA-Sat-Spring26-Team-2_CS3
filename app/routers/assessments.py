@@ -16,7 +16,7 @@ router = APIRouter(tags=["Assessments"])
     status_code=status.HTTP_201_CREATED
 )
 def create_assessment(payload: AssessmentCreate):
-    print("🔥 ROUTER HIT: add_dimension_scores", flush=True)
+
     return assessments_service.create_assessment(payload)
 
 
