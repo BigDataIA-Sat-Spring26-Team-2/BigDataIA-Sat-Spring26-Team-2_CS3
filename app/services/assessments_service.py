@@ -2,10 +2,10 @@ from uuid import UUID, uuid4
 from datetime import datetime, timezone
 from typing import Optional
 import math
-from app.services.redis_cache import cache
- 
+
 from fastapi import HTTPException, status
- 
+
+from app.services.redis_cache import cache
 from app.models.assessment import AssessmentCreate, AssessmentResponse
 from app.models.enums import AssessmentStatus, AssessmentType
 from app.services.snowflake import get_connection
@@ -24,11 +24,11 @@ DIMENSION_SCORES_TABLE = _fq_table("DIMENSION_SCORES")
 
 ALLOWED_STATUS_TRANSITIONS = build_allowed_transitions()
 
- 
+
 def create_assessment(payload: AssessmentCreate) -> AssessmentResponse:
     assessment_id = str(uuid4())
     now = datetime.now(timezone.utc)
- 
+
     sql = f"""
         INSERT INTO {ASSESSMENTS_TABLE} (
             id,
@@ -45,14 +45,13 @@ def create_assessment(payload: AssessmentCreate) -> AssessmentResponse:
         )
         VALUES (%s, %s, %s, %s, %s, %s, %s, NULL, NULL, NULL, %s)
     """
- 
+
     conn = None
     cur = None
     try:
         conn = get_connection()
         cur = conn.cursor()
 
-        # FK existence: company must exist
         cur.execute(
             f"SELECT 1 FROM {COMPANIES_TABLE} WHERE id = %s AND is_deleted = FALSE",
             (str(payload.company_id),),
@@ -88,6 +87,8 @@ def create_assessment(payload: AssessmentCreate) -> AssessmentResponse:
         if conn:
             conn.close()
 
+    cache.delete(f"assessments:{payload.company_id}")
+
     return AssessmentResponse(
         id=UUID(assessment_id),
         company_id=payload.company_id,
@@ -101,112 +102,21 @@ def create_assessment(payload: AssessmentCreate) -> AssessmentResponse:
         confidence_upper=None,
         created_at=now,
     )
- 
- 
-# def get_assessment_with_scores(assessment_id: UUID):
-#     assessment_sql = """
-#         SELECT id, company_id, assessment_type, assessment_date,
-#                primary_assessor, secondary_assessor, status,
-#                v_r_score, confidence_lower, confidence_upper, created_at
-#         FROM assessments
-#         WHERE id = %s
-#     """
- 
-#     scores_sql = """
-#         SELECT dimension, score, weight, confidence, evidence_count, created_at
-#         FROM dimension_scores
-#         WHERE assessment_id = %s
-#     """
- 
-#     try:
-#         conn = get_connection()
-#         cur = conn.cursor()
- 
-#         cur.execute(assessment_sql, (str(assessment_id),))
-#         assessment = cur.fetchone()
- 
-#         if not assessment:
-#             raise HTTPException(
-#                 status_code=status.HTTP_404_NOT_FOUND,
-#                 detail="Assessment not found",
-#             )
- 
-#         cur.execute(scores_sql, (str(assessment_id),))
-#         scores = cur.fetchall()
- 
-#     except HTTPException:
-#         raise
-#     except Exception as e:
-#         raise HTTPException(
-#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#             detail=f"Failed to fetch assessment: {str(e)}",
-#         )
-#     finally:
-#         cur.close()
-#         conn.close()
- 
-#     assessment_response = AssessmentResponse(
-#         id=UUID(assessment[0]),
-#         company_id=UUID(assessment[1]),
-#         assessment_type=AssessmentType(assessment[2]),
-#         assessment_date=assessment[3],
-#         primary_assessor=assessment[4],
-#         secondary_assessor=assessment[5],
-#         status=AssessmentStatus(assessment[6]),
-#         v_r_score=assessment[7],
-#         confidence_lower=assessment[8],
-#         confidence_upper=assessment[9],
-#         created_at=assessment[10],
-#     )
- 
-#     score_items = [
-#         {
-#             "dimension": s[0],
-#             "score": s[1],
-#             "weight": s[2],
-#             "confidence": s[3],
-#             "evidence_count": s[4],
-#             "created_at": s[5],
-#         }
-#         for s in scores
-#     ]
-#     cache_key = f"assessment:{assessment_id}"
 
-#     cached = cache.get(cache_key)
-#     if cached:
-#         return cached
-#     response = {
-#     "assessment": assessment_response,
-#     "scores": score_items,
-#     }
 
-#     cache.set(cache_key, response, ttl_seconds=120)
-
-#     return response
- 
 def get_assessment_with_scores(assessment_id: UUID):
     cache_key = f"assessment:{assessment_id}"
-
     cached_assessment = cache.get(cache_key, AssessmentResponse)
     if cached_assessment:
-        return {
-            "assessment": cached_assessment,
-            "scores": []  # scores always fetched live
-        }
+        scores = _fetch_scores_for_assessment(assessment_id)
+        return {"assessment": cached_assessment, "scores": scores}
 
-    assessment_sql = """
     assessment_sql = f"""
         SELECT id, company_id, assessment_type, assessment_date,
                primary_assessor, secondary_assessor, status,
                v_r_score, confidence_lower, confidence_upper, created_at
         FROM {ASSESSMENTS_TABLE}
         WHERE id = %s
-    """
-
-    scores_sql = f"""
-        SELECT dimension, score, weight, confidence, evidence_count, created_at
-        FROM {DIMENSION_SCORES_TABLE}
-        WHERE assessment_id = %s
     """
 
     conn = None
@@ -219,9 +129,6 @@ def get_assessment_with_scores(assessment_id: UUID):
         assessment = cur.fetchone()
         if not assessment:
             raise HTTPException(status_code=404, detail="Assessment not found")
-
-    cur.execute(scores_sql, (str(assessment_id),))
-    scores = cur.fetchall()
 
     except HTTPException:
         raise
@@ -250,22 +157,49 @@ def get_assessment_with_scores(assessment_id: UUID):
         created_at=assessment[10],
     )
 
-    score_items = [
-        {
-            "dimension": s[0],
-            "score": s[1],
-            "weight": s[2],
-            "confidence": s[3],
-            "evidence_count": s[4],
-            "created_at": s[5],
-        }
-        for s in scores
-    ]
     cache.set(cache_key, assessment_response, ttl_seconds=120)
-    return {
-        "assessment": assessment_response,
-        "scores": score_items,
-    }
+
+    scores = _fetch_scores_for_assessment(assessment_id)
+    return {"assessment": assessment_response, "scores": scores}
+
+
+def _fetch_scores_for_assessment(assessment_id: UUID):
+    scores_sql = f"""
+        SELECT dimension, score, weight, confidence, evidence_count, created_at
+        FROM {DIMENSION_SCORES_TABLE}
+        WHERE assessment_id = %s
+        ORDER BY created_at DESC
+    """
+
+    conn = None
+    cur = None
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute(scores_sql, (str(assessment_id),))
+        rows = cur.fetchall()
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch dimension scores: {str(e)}",
+        )
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
+
+    return [
+        {
+            "dimension": r[0],
+            "score": r[1],
+            "weight": r[2],
+            "confidence": r[3],
+            "evidence_count": r[4],
+            "created_at": r[5],
+        }
+        for r in rows
+    ]
 
 
 def list_assessments(
@@ -276,7 +210,7 @@ def list_assessments(
     assessment_type: Optional[AssessmentType] = None,
 ):
     offset = (page - 1) * page_size
- 
+
     base_where = "WHERE company_id = %s"
     params = [str(company_id)]
 
@@ -305,13 +239,13 @@ def list_assessments(
     try:
         conn = get_connection()
         cur = conn.cursor()
- 
+
         cur.execute(count_sql, tuple(params))
         total = cur.fetchone()[0]
- 
+
         cur.execute(data_sql, tuple(params + [page_size, offset]))
         rows = cur.fetchall()
- 
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to list assessments: {str(e)}")
     finally:
@@ -336,7 +270,7 @@ def list_assessments(
         )
         for r in rows
     ]
- 
+
     total_pages = math.ceil(total / page_size) if total > 0 else 0
 
     return {"items": items, "total": total, "page": page, "page_size": page_size, "total_pages": total_pages}
@@ -350,7 +284,6 @@ def update_assessment_status(assessment_id: UUID, status_value: AssessmentStatus
         conn = get_connection()
         cur = conn.cursor()
 
-        # Load current status
         cur.execute(f"SELECT status FROM {ASSESSMENTS_TABLE} WHERE id = %s", (str(assessment_id),))
         row = cur.fetchone()
         if not row:
@@ -358,7 +291,6 @@ def update_assessment_status(assessment_id: UUID, status_value: AssessmentStatus
 
         current_status = AssessmentStatus(row[0])
 
-        # Enforce state machine
         if current_status not in ALLOWED_STATUS_TRANSITIONS:
             raise HTTPException(
                 status_code=400,
@@ -377,15 +309,17 @@ def update_assessment_status(assessment_id: UUID, status_value: AssessmentStatus
             (status_value.value, str(assessment_id)),
         )
         conn.commit()
- 
+
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to update assessment status: {str(e)}")
     finally:
-        cur.close()
-        conn.close()
- 
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
+
     cache.delete(f"assessment:{assessment_id}")
 
     return get_assessment_with_scores(assessment_id)["assessment"]
