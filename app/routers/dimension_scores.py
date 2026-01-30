@@ -46,8 +46,7 @@ def update_dimension_score(score_id: UUID, score: DimensionScoreCreate):
 
     return dimension_scores_service.update_dimension_score(score_id, score)
 
-    print("🔥 ROUTER HIT: update_dimension_score", flush=True)
-    return dimension_scores_service.update_dimension_score(score_id, score)
+  
 @router.get(
     "/dimension-weights",
     response_model=DimensionWeightsResponse
