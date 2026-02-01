@@ -10,7 +10,7 @@ from app.errors import (
     snowflake_exception_handler,
 )
 
-# Snowflake exceptions (optional mapping)
+# Optional Snowflake error mapping
 try:
     from snowflake.connector.errors import ProgrammingError, DatabaseError
 except Exception:
@@ -20,27 +20,27 @@ except Exception:
 
 app = FastAPI(
     title="PE Org-AI-R Platform Team-2",
-    description="AI Readiness Platform"
+    description="AI Readiness Platform",
 )
 
-
+# Exception handlers
 app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.add_exception_handler(Exception, unhandled_exception_handler)
-
 
 if ProgrammingError:
     app.add_exception_handler(ProgrammingError, snowflake_exception_handler)
 if DatabaseError:
     app.add_exception_handler(DatabaseError, snowflake_exception_handler)
 
-# ✅ Routers
+# Routers
 app.include_router(health.router, prefix="/api/v1")
-app.include_router(dimension_scores.router, prefix="/api/v1")
-
 app.include_router(assessments.router, prefix="/api/v1")
 app.include_router(companies.router, prefix="/api/v1")
+app.include_router(dimension_scores.router, prefix="/api/v1")
 app.include_router(industries.router, prefix="/api/v1")
+
+# ✅ Option A: SEC endpoints live under documents router
 app.include_router(documents.router, prefix="/api/v1")
 
 
