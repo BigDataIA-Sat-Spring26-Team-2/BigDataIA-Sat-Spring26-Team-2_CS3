@@ -216,3 +216,70 @@ def get_dimension_weights() -> DimensionWeightsResponse:
 
     return weights_model
 
+
+def update_dimension_score(score_id: UUID, score: DimensionScoreCreate) -> DimensionScoreResponse:
+    """Update an existing dimension score"""
+    update_sql = f"""
+        UPDATE {TABLE}
+        SET score = %s,
+            weight = %s,
+            confidence = %s,
+            evidence_count = %s
+        WHERE id = %s
+    """
+    
+    conn = None
+    cur = None
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        
+        # Verify score exists
+        cur.execute(f"SELECT assessment_id, dimension FROM {TABLE} WHERE id = %s", (str(score_id),))
+        existing = cur.fetchone()
+        if not existing:
+            raise HTTPException(status_code=404, detail="Dimension score not found")
+        
+        # Update
+        cur.execute(
+            update_sql,
+            (
+                float(score.score),
+                float(score.weight) if score.weight is not None else None,
+                float(score.confidence),
+                int(score.evidence_count),
+                str(score_id),
+            ),
+        )
+        conn.commit()
+        
+        # Return updated score
+        cur.execute(
+            f"SELECT id, assessment_id, dimension, score, weight, confidence, evidence_count, created_at FROM {TABLE} WHERE id = %s",
+            (str(score_id),)
+        )
+        row = cur.fetchone()
+        
+        return DimensionScoreResponse(
+            id=UUID(row[0]),
+            assessment_id=UUID(row[1]),
+            dimension=row[2],
+            score=float(row[3]),
+            weight=float(row[4]) if row[4] else None,
+            confidence=float(row[5]),
+            evidence_count=int(row[6]),
+            created_at=row[7],
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update dimension score: {str(e)}"
+        )
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
