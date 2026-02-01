@@ -34,7 +34,7 @@ if ProgrammingError:
 if DatabaseError:
     app.add_exception_handler(DatabaseError, snowflake_exception_handler)
 
-# ✅ Routers
+# Routers
 app.include_router(health.router, prefix="/api/v1")
 app.include_router(dimension_scores.router, prefix="/api/v1")
 
