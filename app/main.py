@@ -2,7 +2,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
 
-from app.routers import assessments, companies, dimension_scores, industries, health
+from app.routers import assessments, companies, dimension_scores, industries, health, documents
 from app.errors import (
     http_exception_handler,
     validation_exception_handler,
@@ -41,6 +41,7 @@ app.include_router(dimension_scores.router, prefix="/api/v1")
 app.include_router(assessments.router, prefix="/api/v1")
 app.include_router(companies.router, prefix="/api/v1")
 app.include_router(industries.router, prefix="/api/v1")
+app.include_router(documents.router, prefix="/api/v1")
 
 
 @app.get("/")

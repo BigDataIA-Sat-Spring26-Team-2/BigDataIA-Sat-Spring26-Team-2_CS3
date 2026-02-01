@@ -67,3 +67,43 @@ INSERT INTO industries (id, name, sector, h_r_base) VALUES
     ('550e8400-e29b-41d4-a716-446655440003', 'Business Services', 'Services', 75),
     ('550e8400-e29b-41d4-a716-446655440004', 'Retail', 'Consumer', 70),
     ('550e8400-e29b-41d4-a716-446655440005', 'Financial Services', 'Financial', 80);
+    -- =========================
+-- Case Study 2: Documents
+-- =========================
+CREATE TABLE IF NOT EXISTS documents (
+    id VARCHAR(36) PRIMARY KEY,
+    company_id VARCHAR(36) NOT NULL REFERENCES companies(id),
+    cik VARCHAR(20), -- optional (if you use ticker->CIK mapping later)
+    ticker VARCHAR(10),
+    filing_type VARCHAR(20) NOT NULL,
+    accession_number VARCHAR(30) NOT NULL,
+    source VARCHAR(50) DEFAULT 'sec_edgar', -- helps later when you add other sources
+    source_url VARCHAR(2000),
+    file_path VARCHAR(2000) NOT NULL, -- local path for now
+    filing_date DATE,
+    content_hash VARCHAR(64) NOT NULL, -- sha256 of normalized full text
+    word_count INT DEFAULT 0,
+    created_at TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
+    UNIQUE (content_hash),
+    UNIQUE (company_id, accession_number, filing_type)
+);
+
+CREATE INDEX IF NOT EXISTS idx_documents_company ON documents(company_id);
+CREATE INDEX IF NOT EXISTS idx_documents_filing_type ON documents(filing_type);
+
+-- =========================
+-- Case Study 2: Document Chunks
+-- =========================
+CREATE TABLE IF NOT EXISTS document_chunks (
+    id VARCHAR(36) PRIMARY KEY,
+    document_id VARCHAR(36) NOT NULL REFERENCES documents(id),
+    chunk_index INT NOT NULL,
+    chunk_text TEXT NOT NULL,
+    content_hash VARCHAR(64) NOT NULL, -- sha256 of chunk text
+    word_count INT DEFAULT 0,
+    created_at TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
+    UNIQUE (document_id, chunk_index),
+    UNIQUE (content_hash)
+);
+
+CREATE INDEX IF NOT EXISTS idx_chunks_document ON document_chunks(document_id);
