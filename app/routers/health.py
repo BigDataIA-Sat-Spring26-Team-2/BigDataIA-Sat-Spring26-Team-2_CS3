@@ -7,6 +7,8 @@ from uuid import UUID, uuid4
 from datetime import datetime, timezone
 from pydantic import BaseModel
 from typing import Dict
+from app.services.snowflake import check_snowflake
+from app.services.s3_storage import check_s3
 
 from app.models.dimension import DimensionScoreCreate, DimensionScoreResponse
 from app.services.redis_cache import check_redis
@@ -26,6 +28,8 @@ class HealthResponse(BaseModel):
 async def health_check():
     dependencies = {
         "redis": await check_redis(),
+        "snowflake": await check_snowflake(),
+        "s3": await check_s3(),
     }
 
     all_healthy = all(v == "healthy" for v in dependencies.values())
