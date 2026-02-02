@@ -15,6 +15,10 @@ from app.pipelines.document_parser import DocumentParser
 from app.pipelines.chunker import chunk_text
 
 from app.pipelines.sec_edgar import SECEdgarPipeline
+from app.services.s3_storage import upload_file_to_s3
+import structlog
+
+logger = structlog.get_logger()
 
 def _fq(name: str) -> str:
     s = get_settings()
@@ -184,6 +188,33 @@ def run_sec_download_for_company(
                 ticker=(ticker or ""),
                 filing_type=f.filing_type,
             )
+
+            s3_key = (
+                f"sec/{ticker}/"
+                f"{f.filing_type}/"
+                f"{f.accession_number}/"
+                "full-submission.txt"
+            )
+
+            logger.info(
+                "uploading_sec_filing",
+                ticker=ticker,
+                filing_type=f.filing_type,
+                accession_number=f.accession_number,
+            )
+
+            s3_uri = upload_file_to_s3(
+                local_path=file_path,
+                s3_key=s3_key,
+            )
+
+            if s3_uri and file_path.exists():
+                file_path.unlink()   # deletes the file
+                logger.info(
+                    "local_file_deleted_after_s3_upload",
+                    local_path=str(file_path),
+                    s3_uri=s3_uri,
+                )
 
             # dedupe by content hash
             cur.execute(f"SELECT 1 FROM {DOCS_TABLE} WHERE content_hash=%s", (parsed.content_hash,))
