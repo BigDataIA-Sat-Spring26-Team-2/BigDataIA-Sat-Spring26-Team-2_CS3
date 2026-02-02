@@ -186,7 +186,6 @@ def run_sec_download_for_company(
             parsed = parser.parse_filing(
                 file_path=file_path,
                 ticker=(ticker or ""),
-                filing_type=f.filing_type,
             )
 
             s3_key = (
