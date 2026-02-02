@@ -1,3 +1,4 @@
+# streamlit_app.py
 import os
 import json
 from datetime import date
@@ -32,9 +33,10 @@ def api_post(base: str, path: str, params: Optional[dict] = None, body: Any = No
     return r.json()
 
 
-def api_get_file(base: str, path: str, params: dict) -> requests.Response:
+def api_get(base: str, path: str, params: dict) -> requests.Response:
+    """GET request that returns raw response for binary data"""
     url = f"{base}{path}"
-    return requests.get(url, params=params, timeout=60)
+    return requests.get(url, params=params, timeout=120)
 
 
 def valid_cik(v: str) -> bool:
@@ -91,6 +93,13 @@ limit = st.number_input(
 
 st.divider()
 
+# ✅ ADD PDF OPTION CHECKBOX
+include_pdf = st.checkbox(
+    "Include PDF versions (slower, may take several minutes for large filings)",
+    value=False,
+    help="Generate formatted PDF versions of each filing. This can significantly increase download time."
+)
+
 if st.button("⬇️ Download SEC Filings", type="primary"):
     # ---------- Client-side validation ----------
     if not company_id.strip():
@@ -113,14 +122,16 @@ if st.button("⬇️ Download SEC Filings", type="primary"):
         "company_id": company_id.strip(),
         "after": after_date.isoformat(),
         "limit": int(limit),
-        "filing_types": filing_types,  # FastAPI will accept repeated query args
+        "filing_types": filing_types,
     }
 
     # Prefer ticker if provided
     if ticker:
         params["ticker"] = ticker.upper()
+        resolved_ticker = ticker.upper()
     else:
         params["cik"] = cik
+        resolved_ticker = cik
 
     with st.spinner("Downloading + parsing filings… (this can take some time)"):
         result = api_post(api_base, "/documents/sec-edgar/download", params=params, body=None)
@@ -142,44 +153,95 @@ if st.button("⬇️ Download SEC Filings", type="primary"):
         "skipped_duplicates": result.get("skipped_duplicates"),
     })
 
-    # ---------- Downloaded files ----------
+    # ---------- Download all files as ZIP ----------
+    st.subheader("Download All Files")
+    
     files: List[dict] = result.get("files", [])
-    st.subheader("Downloaded files")
-
-    if not files:
-        st.info("No file list returned. If downloaded_files>0, update backend to include `files` list in response.")
-        st.code(_pretty(result), language="json")
-        st.stop()
-
-    for f in files:
-        filing_type = f.get("filing_type", "")
-        accession = f.get("accession_number", "")
-        file_path = f.get("path", "")
-
-        if not file_path:
-            st.warning(f"Missing path for: {filing_type} | {accession}")
-            continue
-
-        # Try to fetch file from backend
-        resp = api_get_file(api_base, "/documents/file", params={"path": file_path})
-
-        if resp.status_code != 200:
-            st.error(f"Could not fetch file: {filing_type} | {accession}")
+    
+    if files and len(files) > 0:
+        # ✅ UPDATE MESSAGE BASED ON CHECKBOX
+        if include_pdf:
+            st.info(f"📦 {len(files)} file(s) ready for download (includes both .txt and .pdf versions)")
+        else:
+            st.info(f"📦 {len(files)} file(s) ready for download (.txt only)")
+        
+        # Display ticker and filing types
+        st.write(f"**Ticker:** {resolved_ticker}")
+        st.write(f"**Filing Types:** {', '.join(filing_types)}")
+        
+        # Fetch ZIP file from backend IMMEDIATELY
+        spinner_text = "Creating ZIP file from S3..."
+        if include_pdf:
+            spinner_text += " (generating PDFs, this may take a minute)..."
+        
+        with st.spinner(spinner_text):
+            # Construct query string manually for list parameters
+            query_parts = [f"ticker={resolved_ticker}"]
+            for ft in filing_types:
+                query_parts.append(f"filing_types={ft}")
+            # ✅ ADD include_pdf PARAMETER
+            query_parts.append(f"include_pdf={'true' if include_pdf else 'false'}")
+            query_string = "&".join(query_parts)
+            
             try:
-                st.code(_pretty(resp.json()), language="json")
-            except Exception:
-                st.code(resp.text)
-            continue
-
-        # Offer actual download via Streamlit download button
-        filename = Path(file_path).name
-        st.markdown(f"**{filing_type}** | {accession}")
-        st.download_button(
-            label=f"⬇️ Download {filename}",
-            data=resp.content,
-            file_name=filename,
-            mime="text/plain",
-            use_container_width=True,
-            key=f"dl-{filing_type}-{accession}",
-        )
-        st.write("")
+                # Make the API call to get the ZIP
+                zip_response = requests.get(
+                    f"{api_base}/documents/sec-edgar/download-zip?{query_string}",
+                    timeout=300  # 5 minutes max
+                )
+                
+                if zip_response.status_code == 200:
+                    # Show download button with the actual ZIP data
+                    st.download_button(
+                        label="⬇️ Download ZIP",
+                        data=zip_response.content,
+                        file_name=f"{resolved_ticker}_sec_filings.zip",
+                        mime="application/zip",
+                        use_container_width=False,
+                    )
+                    success_msg = "✅ ZIP file ready for download!"
+                    if include_pdf:
+                        success_msg += " Each filing includes both .txt and .pdf versions."
+                    st.success(success_msg)
+                else:
+                    st.error(f"❌ Failed to create ZIP file (Status: {zip_response.status_code})")
+                    try:
+                        error_detail = zip_response.json()
+                        st.code(_pretty(error_detail), language="json")
+                    except:
+                        st.code(zip_response.text)
+            except requests.exceptions.Timeout:
+                st.error("⏱️ Request timed out.")
+                if include_pdf:
+                    st.info("💡 Try again without PDF generation for faster results.")
+                else:
+                    st.info("💡 Try reducing the limit or selecting fewer filing types.")
+            except requests.exceptions.RequestException as e:
+                st.error(f"❌ Network error: {str(e)}")
+        
+        # Show file details in expander
+        with st.expander("📄 View File Details"):
+            if include_pdf:
+                st.caption("Each filing will include both .txt (original) and .pdf (formatted) versions in the ZIP.")
+            else:
+                st.caption("Each filing will include .txt (original) version only.")
+            st.write("")
+            
+            for idx, f in enumerate(files, 1):
+                filing_type = f.get("filing_type", "")
+                accession = f.get("accession_number", "")
+                file_path = f.get("path", "")
+                
+                st.markdown(f"**{idx}. {filing_type}** | {accession}")
+                if file_path:
+                    # Show the S3 path
+                    s3_base = f"s3://your-bucket/sec/{resolved_ticker}/{filing_type}/{accession}/"
+                    if include_pdf:
+                        st.caption(f"Files: `full-submission.txt` and `full-submission.pdf`")
+                    else:
+                        st.caption(f"File: `full-submission.txt`")
+                    st.caption(f"S3 Location: `{s3_base}`")
+                st.write("")
+    else:
+        st.warning("⚠️ No files were downloaded. Try adjusting your search parameters.")
+        st.info("Note: Files might have been skipped as duplicates if they were already processed.")
