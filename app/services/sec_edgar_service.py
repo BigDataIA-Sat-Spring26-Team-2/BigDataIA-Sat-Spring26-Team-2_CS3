@@ -188,6 +188,13 @@ def run_sec_download_for_company(
                 ticker=(ticker or ""),
             )
 
+            logger.info(
+                "After parsing",
+                company_ticker = parsed.company_ticker,
+                sections_found = parsed.sections_found,
+                filing_type = parsed.filing_type,
+            )
+
             s3_key = (
                 f"sec/{ticker}/"
                 f"{f.filing_type}/"
@@ -248,28 +255,28 @@ def run_sec_download_for_company(
             )
             inserted_docs += 1
 
-            # Chunk + insert chunks
-            chunks = chunk_text(parsed.content, chunk_size_words=350, overlap_words=50)
+            # # Chunk + insert chunks
+            # chunks = chunk_text(parsed.content, chunk_size_words=350, overlap_words=50)
 
-            for c in chunks:
-                chunk_id = str(uuid4())
-                cur.execute(
-                    f"""
-                    INSERT INTO {CHUNKS_TABLE} (
-                        id, document_id, chunk_index, chunk_text, content_hash, word_count, created_at
-                    ) VALUES (%s,%s,%s,%s,%s,%s,%s)
-                    """,
-                    (
-                        chunk_id,
-                        doc_id,
-                        c.chunk_index,
-                        c.text,
-                        c.content_hash,
-                        c.word_count,
-                        now,
-                    ),
-                )
-                inserted_chunks += 1
+            # for c in chunks:
+            #     chunk_id = str(uuid4())
+            #     cur.execute(
+            #         f"""
+            #         INSERT INTO {CHUNKS_TABLE} (
+            #             id, document_id, chunk_index, chunk_text, content_hash, word_count, created_at
+            #         ) VALUES (%s,%s,%s,%s,%s,%s,%s)
+            #         """,
+            #         (
+            #             chunk_id,
+            #             doc_id,
+            #             c.chunk_index,
+            #             c.text,
+            #             c.content_hash,
+            #             c.word_count,
+            #             now,
+            #         ),
+            #     )
+            #     inserted_chunks += 1
 
         conn.commit()
 
