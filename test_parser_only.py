@@ -17,7 +17,7 @@ from app.pipelines.document_parser import DocumentParser
 
 def find_sec_files():
     """Find downloaded SEC filing files"""
-    sec_dir = Path("data/raw/sec/sec-edgar-filings")
+    sec_dir = Path("data/raw/sec/sec-edgar-git")
     
     if not sec_dir.exists():
         return []

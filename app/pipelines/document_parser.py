@@ -115,9 +115,16 @@ class DocumentParser:
         # Step 3: Clean text
         clean_text = self._clean_text(raw_text)
         
-        # Step 4: Detect filing type if not provided
-        if not filing_type_hint:
-            filing_type_hint = self._detect_filing_type(clean_text[:10000])
+        # Step 4: Get filing type from path (source of truth)
+        filing_type_from_path = self._extract_filing_type_from_path(file_path)
+        
+        # Use hint if provided, otherwise use path, fallback to detection
+        if filing_type_hint:
+            filing_type = filing_type_hint
+        elif filing_type_from_path != "UNKNOWN":
+            filing_type = filing_type_from_path
+        else:
+            filing_type = self._detect_filing_type(clean_text[:10000])
         
         # Step 5: Extract AI-relevant sections
         sections = self._extract_ai_relevant_sections(clean_text)
@@ -125,7 +132,7 @@ class DocumentParser:
         # Step 6: Build result
         return ParsedDocument(
             company_ticker=ticker,
-            filing_type=filing_type_hint or "UNKNOWN",
+            filing_type=filing_type,
             filing_date=datetime.fromtimestamp(file_path.stat().st_mtime, tz=timezone.utc),
             content=clean_text,
             sections=sections,
@@ -141,6 +148,16 @@ class DocumentParser:
         if file_path.suffix.lower() == ".pdf":
             return DocumentFormat.PDF
         return DocumentFormat.HTML
+    
+    def _extract_filing_type_from_path(self, file_path: Path) -> str:
+        """Extract filing type from file path structure"""
+        # Path structure: .../ticker/filing_type/accession/file
+        # Example: .../AAPL/DEF 14A/0001308179-25-000008/full-submission.txt
+        parts = file_path.parts
+        if len(parts) >= 3:
+            filing_type = parts[-3]  # Get filing type folder name
+            return filing_type
+        return "UNKNOWN"
     
     def _detect_filing_type(self, text: str) -> str:
         """Detect filing type from document content"""
