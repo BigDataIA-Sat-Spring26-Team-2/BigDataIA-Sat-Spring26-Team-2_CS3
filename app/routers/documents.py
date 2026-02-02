@@ -29,11 +29,10 @@ BASE_SEC_DIR = Path("data/raw/sec").resolve()
 
 logger = logging.getLogger(__name__)
 
-# ✅ Initialize limiter for this router
+
 limiter = Limiter(key_func=get_remote_address)
 
 
-# ✅ HELPER FUNCTION: Convert text to PDF
 def create_pdf_from_text(text_content: str, title: str = "SEC Filing") -> bytes:
     """
     Convert text content to a formatted PDF.
@@ -151,9 +150,9 @@ def create_pdf_from_text(text_content: str, title: str = "SEC Filing") -> bytes:
     "/sec-edgar/download",
     status_code=status.HTTP_200_OK,
 )
-@limiter.limit("10/hour")  # ✅ ADDED: Rate limit - 10 downloads per hour per IP
+@limiter.limit("10/hour")  # Rate limit - 10 downloads per hour per IP
 async def download_sec_filings(
-    request: Request,  # ✅ ADDED: Required for rate limiting
+    request: Request,  # Required for rate limiting
     company_id: UUID = Query(...),
     ticker: Optional[str] = Query(None, min_length=1, max_length=10),
     cik: Optional[str] = Query(None, min_length=10, max_length=10),
@@ -183,9 +182,9 @@ async def download_sec_filings(
 
 
 @router.get("/file", response_class=FileResponse, status_code=status.HTTP_200_OK)
-@limiter.limit("100/minute")  # ✅ ADDED: Rate limit - 100 file downloads per minute
+@limiter.limit("100/minute")  #  Rate limit - 100 file downloads per minute
 async def download_local_file(
-    request: Request,  # ✅ ADDED: Required for rate limiting
+    request: Request,  # Required for rate limiting
     path: str = Query(...)
 ):
     """
@@ -206,9 +205,9 @@ async def download_local_file(
 
 
 @router.get("/sec-edgar/download-zip", response_class=StreamingResponse)
-@limiter.limit("5/hour")  # ✅ ADDED: Rate limit - 5 ZIP downloads per hour (stricter)
+@limiter.limit("5/hour")  # Rate limit - 5 ZIP downloads per hour (stricter)
 async def download_filings_as_zip(
-    request: Request,  # ✅ ADDED: Required for rate limiting
+    request: Request,  # Required for rate limiting
     ticker: str = Query(..., min_length=1, max_length=10),
     filing_types: List[str] = Query(default=["10-K", "10-Q", "8-K"]),
     include_pdf: bool = Query(default=False),
@@ -291,13 +290,13 @@ async def download_filings_as_zip(
                             )
                             file_content = response['Body'].read()
                             
-                            # ✅ ALWAYS ADD .TXT VERSION
+                         
                             txt_zip_path = s3_key.replace(f"sec/{ticker}/", "")
                             zip_file.writestr(txt_zip_path, file_content)
                             files_added += 1
                             logger.info(f"Added to ZIP: {txt_zip_path}")
                             
-                            # ✅ ONLY ADD PDF IF REQUESTED
+                          
                             if include_pdf:
                                 try:
                                     # Decode to text for processing

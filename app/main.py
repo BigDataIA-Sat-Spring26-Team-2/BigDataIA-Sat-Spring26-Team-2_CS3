@@ -22,7 +22,7 @@ except Exception:
     DatabaseError = None
 
 
-# ✅ Initialize rate limiter
+# Initialize rate limiter
 limiter = Limiter(key_func=get_remote_address)
 
 app = FastAPI(
@@ -30,10 +30,10 @@ app = FastAPI(
     description="AI Readiness Platform",
 )
 
-# ✅ Add rate limiter to app state
+# Add rate limiter to app state
 app.state.limiter = limiter
 
-# ✅ Custom rate limit error handler
+# Custom rate limit error handler
 @app.exception_handler(RateLimitExceeded)
 async def custom_rate_limit_handler(request: Request, exc: RateLimitExceeded):
     return JSONResponse(
