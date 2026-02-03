@@ -6,7 +6,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
-from app.routers import assessments, companies, dimension_scores, industries, health, documents
+from app.routers import assessments, companies, dimension_scores, industries, health, documents, signal
 from app.errors import (
     http_exception_handler,
     validation_exception_handler,
@@ -62,6 +62,7 @@ app.include_router(companies.router, prefix="/api/v1")
 app.include_router(dimension_scores.router, prefix="/api/v1")
 app.include_router(industries.router, prefix="/api/v1")
 app.include_router(documents.router, prefix="/api/v1")
+app.include_router(signal.router, prefix="/api/v1")
 
 
 @app.get("/")

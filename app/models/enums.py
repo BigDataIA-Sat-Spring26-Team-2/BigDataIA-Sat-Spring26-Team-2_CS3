@@ -30,3 +30,23 @@ class Sector(str, Enum):
     RETAIL = "Retail"
     PROFESSIONAL_SERVICES = "Professional Services"
     MANUFACTURING = "Manufacturing"
+
+class DocumentStatus(str, Enum):
+    PENDING = "pending"
+    DOWNLOADED = "downloaded"
+    PARSED = "parsed"
+    CHUNKED = "chunked"
+    INDEXED = "indexed"
+    FAILED = "failed"
+
+class SignalCategory(str, Enum):
+    TECHNOLOGY_HIRING = "technology_hiring"
+    INNOVATION_ACTIVITY = "innovation_activity"
+    DIGITAL_PRESENCE = "digital_presence"
+    LEADERSHIP_SIGNALS = "leadership_signals"
+
+class SignalSource(str, Enum):
+    LINKEDIN = "linkedin"
+    INDEED = "indeed"
+    GLASSDOOR = "glassdoor"
+    COMPANY_WEBSITE = "company_website"
