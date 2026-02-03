@@ -1,21 +1,23 @@
+# app/services/sec_edgar_service.py
 from __future__ import annotations
 
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 from uuid import UUID, uuid4
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 import hashlib
 
-from fastapi import HTTPException, status
+from fastapi import HTTPException
 
 from app.config import get_settings
 from app.services.snowflake import get_connection
 from app.pipelines.sec_edgar import SECEdgarPipeline
 from app.pipelines.document_parser import DocumentParser
-from app.services.s3_storage import upload_file_to_s3
+from app.services.s3_storage import upload_file_to_s3, s3_object_exists
 import structlog
 
 logger = structlog.get_logger()
+
 
 def _fq(name: str) -> str:
     s = get_settings()
@@ -45,6 +47,16 @@ def _sec_pipeline() -> SECEdgarPipeline:
         email=email,
         download_dir=download_dir,
     )
+
+
+def _after_to_date(after: str) -> date:
+    # Streamlit passes YYYY-MM-DD
+    return datetime.fromisoformat(after).date()
+
+
+def _s3_key_for_filing(ticker: str, filing_type: str, accession_number: str) -> str:
+    # MUST match your upload key exactly
+    return f"sec/{ticker}/{filing_type}/{accession_number}/full-submission.txt"
 
 
 def download_by_cik(
@@ -98,24 +110,14 @@ def run_sec_download_for_company(
     )
 
     if not ticker and not cik:
-        logger.error(
-            "validation_failed",
-            company_id=str(company_id),
-            error="missing_identifier",
-            message="Must provide either ticker or cik",
-        )
         raise HTTPException(status_code=400, detail="Provide either ticker or cik")
 
     if ticker:
         ticker = ticker.upper()
 
-    logger.info(
-        "validating_company",
-        company_id=str(company_id),
-        ticker=ticker,
-        cik=cik,
-    )
-
+    # -------------------------
+    # Resolve ticker from DB if not provided
+    # -------------------------
     conn = None
     cur = None
     db_ticker: Optional[str] = None
@@ -128,10 +130,8 @@ def run_sec_download_for_company(
         )
         row = cur.fetchone()
         if not row:
-            logger.error("company_not_found", company_id=str(company_id))
             raise HTTPException(status_code=404, detail="Company not found")
         db_ticker = row[0]
-        logger.info("company_validated", company_id=str(company_id), db_ticker=db_ticker)
     finally:
         if cur:
             cur.close()
@@ -140,108 +140,148 @@ def run_sec_download_for_company(
 
     if not ticker and db_ticker:
         ticker = str(db_ticker).upper()
-        logger.info("ticker_resolved_from_database", company_id=str(company_id), ticker=ticker)
 
+    # Your S3 key format is sec/{ticker}/..., so ticker must exist
+    if not ticker:
+        raise HTTPException(
+            status_code=400,
+            detail="Ticker is required (provide ticker or ensure company has ticker).",
+        )
+
+    settings = get_settings()
+    after_dt = _after_to_date(after)
+
+    # ============================================================
+    # 1) CACHE PHASE: Snowflake (index) -> S3 head_object (confirm)
+    # ============================================================
+    cached_files: List[Dict[str, Any]] = []
+    cache_hits_by_type: Dict[str, int] = {ft: 0 for ft in filing_types}
+
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        for ft in filing_types:
+            cur.execute(
+                f"""
+                SELECT accession_number, filing_date
+                FROM {DOCS_TABLE}
+                WHERE company_id=%s
+                  AND ticker=%s
+                  AND filing_type=%s
+                  AND filing_date >= %s
+                ORDER BY filing_date DESC
+                LIMIT %s
+                """,
+                (str(company_id), ticker, ft, after_dt, limit),
+            )
+            rows = cur.fetchall() or []
+
+            for accession_number, filing_date in rows:
+                s3_key = _s3_key_for_filing(ticker, ft, accession_number)
+
+                if s3_object_exists(settings.S3_BUCKET, s3_key):
+                    cached_files.append(
+                        {
+                            "filing_type": ft,
+                            "accession_number": accession_number,
+                            "path": f"s3://{settings.S3_BUCKET}/{s3_key}",
+                            "source": "s3_cache",
+                            "filing_date": str(filing_date),
+                        }
+                    )
+                    cache_hits_by_type[ft] += 1
+
+    finally:
+        cur.close()
+        conn.close()
+
+    # Full cache hit: enough cached filings for each filing type
+    if all(cache_hits_by_type.get(ft, 0) >= limit for ft in filing_types):
+        logger.info(
+            "sec_cache_hit_full",
+            ticker=ticker,
+            after=after,
+            limit_per_type=limit,
+            cache_hits_by_type=cache_hits_by_type,
+        )
+        return {
+            "company_id": str(company_id),
+            "ticker": ticker,
+            "cik": cik,
+            "cache_hits": sum(cache_hits_by_type.values()),
+            "cache_hits_by_type": cache_hits_by_type,
+            "downloaded_files": 0,
+            "inserted_documents": 0,
+            "inserted_chunks": 0,
+            "skipped_duplicates": 0,
+            "after": after,
+            "limit": limit,
+            "filing_types": filing_types,
+            "files": cached_files,
+        }
+
+    # ============================================================
+    # 2) MISS PHASE: Download only what’s missing per filing type
+    # ============================================================
     logger.info(
-        "starting_sec_download",
+        "sec_cache_partial_or_miss",
         ticker=ticker,
-        cik=cik,
-        filing_types=filing_types,
-        limit=limit,
-        after=after,
+        cache_hits_by_type=cache_hits_by_type,
+        limit_per_type=limit,
     )
 
     pipeline = _sec_pipeline()
     parser = DocumentParser()
 
-    downloaded = pipeline.download_filings(
-        ticker=ticker,
-        cik=cik,
-        filing_types=filing_types,
-        limit=limit,
-        after=after,
-    )
+    downloaded_all = []
+    for ft in filing_types:
+        remaining = max(0, limit - cache_hits_by_type.get(ft, 0))
+        if remaining == 0:
+            continue
 
-    logger.info(
-        "sec_download_completed",
-        ticker=ticker,
-        cik=cik,
-        downloaded_count=len(downloaded),
-        filing_types=filing_types,
-    )
+        newly_downloaded = pipeline.download_filings(
+            ticker=ticker,
+            cik=cik,
+            filing_types=[ft],
+            limit=remaining,
+            after=after,
+        )
+        downloaded_all.extend(newly_downloaded)
 
     inserted_docs = 0
     inserted_chunks = 0
     skipped_duplicates = 0
 
-    files = [
+    new_files = [
         {"filing_type": f.filing_type, "accession_number": f.accession_number, "path": f.path}
-        for f in downloaded
+        for f in downloaded_all
     ]
-
-    logger.info("starting_document_processing", ticker=ticker, total_filings=len(downloaded))
 
     conn = get_connection()
     cur = conn.cursor()
 
     try:
-        for idx, f in enumerate(downloaded, 1):
+        for f in downloaded_all:
             file_path = Path(f.path)
-
-            logger.info(
-                "processing_filing",
-                ticker=ticker,
-                filing_type=f.filing_type,
-                accession_number=f.accession_number,
-                file_path=str(file_path),
-                file_size_bytes=file_path.stat().st_size,
-                file_size_mb=round(file_path.stat().st_size / (1024 * 1024), 2),
-                progress=f"{idx}/{len(downloaded)}",
-                progress_percent=round((idx / len(downloaded)) * 100, 1),
-            )
 
             parsed = parser.parse_filing(file_path=file_path, ticker=ticker or "")
 
-            logger.info(
-                "filing_parsed",
-                ticker=ticker,
-                filing_type=parsed.filing_type,
-                accession_number=f.accession_number,
-                company_ticker=parsed.company_ticker,
-                filing_date=parsed.filing_date.isoformat(),
-                detected_format=parsed.detected_format.value,
-                word_count=parsed.word_count,
-                content_hash=parsed.content_hash[:16] + "...",
-                sections_found=parsed.sections_found,
-                section_names=list(parsed.sections.keys()) if parsed.sections else [],
-            )
-
-            logger.info(
-                "checking_for_duplicates",
-                ticker=ticker,
-                filing_type=f.filing_type,
-                accession_number=f.accession_number,
-                content_hash=parsed.content_hash[:16] + "...",
-            )
-
+            # Duplicate check by content hash (your existing approach)
             cur.execute(f"SELECT 1 FROM {DOCS_TABLE} WHERE content_hash=%s", (parsed.content_hash,))
             if cur.fetchone():
                 skipped_duplicates += 1
-                logger.info(
-                    "duplicate_filing_skipped",
-                    ticker=ticker,
-                    filing_type=f.filing_type,
-                    accession_number=f.accession_number,
-                )
+                try:
+                    file_path.unlink()
+                except Exception:
+                    pass
                 continue
 
-            s3_key = f"sec/{ticker}/{f.filing_type}/{f.accession_number}/full-submission.txt"
-            s3_uri = upload_file_to_s3(file_path, s3_key)
+            # Upload to S3
+            s3_key = _s3_key_for_filing(ticker, f.filing_type, f.accession_number)
+            upload_file_to_s3(file_path, s3_key)
             file_path.unlink()
 
-            # ==================================================
-            # SECTION-LEVEL DEDUPLICATION + HYBRID CHUNKING
-            # ==================================================
+            # SECTION-LEVEL DEDUP + CHUNKING (unchanged)
             sections_extracted = len(parsed.sections)
             sections_stored = 0
             sections_duplicates = 0
@@ -249,7 +289,7 @@ def run_sec_download_for_company(
 
             chunk_index = 0
 
-            for section_name, section_content in parsed.sections.items():
+            for _, section_content in parsed.sections.items():
                 words = section_content.split()
 
                 if len(words) < 5000:
@@ -272,33 +312,19 @@ def run_sec_download_for_company(
                     chunk_hash = hashlib.sha256(chunk_text.encode("utf-8")).hexdigest()
                     chunk_word_count = len(chunk_text.split())
 
-                    cur.execute(
-                        f"SELECT 1 FROM {CHUNKS_TABLE} WHERE content_hash=%s",
-                        (chunk_hash,),
-                    )
-
+                    cur.execute(f"SELECT 1 FROM {CHUNKS_TABLE} WHERE content_hash=%s", (chunk_hash,))
                     if cur.fetchone():
                         sections_duplicates += 1
                         continue
 
                     section_data.append(
-                        (
-                            str(uuid4()),
-                            None,
-                            idx_c,
-                            chunk_text,
-                            chunk_hash,
-                            chunk_word_count,
-                            None,
-                        )
+                        (str(uuid4()), None, idx_c, chunk_text, chunk_hash, chunk_word_count, None)
                     )
                     sections_stored += 1
 
                 chunk_index = next_index
 
-            # ============================
             # INSERT DOCUMENT
-            # ============================
             doc_id = str(uuid4())
             now = datetime.now(timezone.utc)
 
@@ -336,7 +362,6 @@ def run_sec_download_for_company(
                     (sid, doc_id, idx_c, txt, h, wc, now)
                     for sid, _, idx_c, txt, h, wc, _ in section_data
                 ]
-
                 cur.executemany(
                     f"""
                     INSERT INTO {CHUNKS_TABLE} (
@@ -346,23 +371,11 @@ def run_sec_download_for_company(
                     """,
                     final_sections,
                 )
-
                 inserted_chunks += len(final_sections)
-
-            logger.info(
-                "filing_processed_successfully",
-                ticker=ticker,
-                filing_type=f.filing_type,
-                accession_number=f.accession_number,
-                document_id=doc_id,
-                sections_extracted=sections_extracted,
-                sections_stored=sections_stored,
-                sections_duplicates=sections_duplicates,
-            )
 
         conn.commit()
 
-    except Exception as e:
+    except Exception:
         conn.rollback()
         raise
 
@@ -370,27 +383,28 @@ def run_sec_download_for_company(
         cur.close()
         conn.close()
 
-    logger.info(
-        "sec_pipeline_completed",
-        company_id=str(company_id),
-        ticker=ticker,
-        cik=cik,
-        downloaded_files=len(downloaded),
-        inserted_documents=inserted_docs,
-        inserted_chunks=inserted_chunks,
-        skipped_duplicates=skipped_duplicates,
-    )
+    combined_files = cached_files + [
+        {
+            "filing_type": f.get("filing_type"),
+            "accession_number": f.get("accession_number"),
+            "path": f.get("path"),
+            "source": "downloaded",
+        }
+        for f in new_files
+    ]
 
     return {
         "company_id": str(company_id),
         "ticker": ticker,
         "cik": cik,
-        "downloaded_files": len(downloaded),
+        "cache_hits": sum(cache_hits_by_type.values()),
+        "cache_hits_by_type": cache_hits_by_type,
+        "downloaded_files": len(downloaded_all),
         "inserted_documents": inserted_docs,
         "inserted_chunks": inserted_chunks,
         "skipped_duplicates": skipped_duplicates,
         "after": after,
         "limit": limit,
         "filing_types": filing_types,
-        "files": files,
+        "files": combined_files,
     }
