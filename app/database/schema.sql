@@ -107,3 +107,13 @@ CREATE TABLE IF NOT EXISTS document_chunks (
 );
 
 CREATE INDEX IF NOT EXISTS idx_chunks_document ON document_chunks(document_id);
+
+-- Add section tracking columns to documents table
+ALTER TABLE PE_ORGAIR.PUBLIC.documents 
+ADD COLUMN sections_extracted INT DEFAULT 0;
+
+ALTER TABLE PE_ORGAIR.PUBLIC.documents
+ADD COLUMN sections_stored INT DEFAULT 0;
+
+ALTER TABLE PE_ORGAIR.PUBLIC.documents
+ADD COLUMN sections_duplicates INT DEFAULT 0;
