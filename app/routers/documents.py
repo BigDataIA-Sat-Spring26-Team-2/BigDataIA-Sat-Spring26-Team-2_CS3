@@ -205,7 +205,7 @@ async def download_local_file(
 
 
 @router.get("/sec-edgar/download-zip", response_class=StreamingResponse)
-@limiter.limit("5/hour")  # Rate limit - 5 ZIP downloads per hour (stricter)
+@limiter.limit("10/hour")  # Rate limit - 5 ZIP downloads per hour (stricter)
 async def download_filings_as_zip(
     request: Request,  # Required for rate limiting
     ticker: str = Query(..., min_length=1, max_length=10),
