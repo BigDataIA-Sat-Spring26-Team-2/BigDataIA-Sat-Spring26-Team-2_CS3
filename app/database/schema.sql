@@ -83,7 +83,9 @@ CREATE TABLE IF NOT EXISTS documents (
     filing_date DATE,
     content_hash VARCHAR(64) NOT NULL, -- sha256 of normalized full text
     word_count INT DEFAULT 0,
+    section VARCHAR(50)
     created_at TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
+    
     UNIQUE (content_hash),
     UNIQUE (company_id, accession_number, filing_type)
 );
@@ -117,3 +119,5 @@ ADD COLUMN sections_stored INT DEFAULT 0;
 
 ALTER TABLE PE_ORGAIR.PUBLIC.documents
 ADD COLUMN sections_duplicates INT DEFAULT 0;
+
+CREATE INDEX IF NOT EXISTS idx_chunks_section ON document_chunks(section);
