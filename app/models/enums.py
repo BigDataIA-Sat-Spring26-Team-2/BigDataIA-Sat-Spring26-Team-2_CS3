@@ -50,3 +50,4 @@ class SignalSource(str, Enum):
     INDEED = "indeed"
     GLASSDOOR = "glassdoor"
     COMPANY_WEBSITE = "company_website"
+    MULTIPLE = "LinkedIn_Indeed"
