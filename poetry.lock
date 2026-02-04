@@ -974,6 +974,20 @@ files = [
 ]
 
 [[package]]
+name = "jobspy"
+version = "0.31.0"
+description = "Use Redis as a job input/output coordinator."
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "jobspy-0.31.0.tar.gz", hash = "sha256:13991c2dec91c6a3f489cfb16f801acdbf8e37c43e2d8d41797300bd93c2ed77"},
+]
+
+[package.dependencies]
+redis = ">=3.0.0"
+
+[[package]]
 name = "jsonschema"
 version = "4.26.0"
 description = "An implementation of JSON Schema validation for Python"
@@ -3392,4 +3406,4 @@ dev = ["pytest", "setuptools"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<4.0"
-content-hash = "7adc7d6f52f147c28c7db29ba83a1d9355cb2cd1ed7edcf74411d3021471a457"
+content-hash = "0b8a64c2e33f10ca0c5d66f7c75eb0dd41fdccd5d40869693cf17154a7b7f6d6"

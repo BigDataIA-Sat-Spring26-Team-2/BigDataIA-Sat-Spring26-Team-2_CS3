@@ -2,7 +2,6 @@ from pydantic import BaseModel, Field, model_validator
 from uuid import UUID, uuid4
 from datetime import datetime, timezone
 from typing import Optional, Dict
-
 from app.models.enums import SignalCategory, SignalSource
 
 
