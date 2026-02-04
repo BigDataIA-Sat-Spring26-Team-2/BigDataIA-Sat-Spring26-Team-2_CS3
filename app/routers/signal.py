@@ -1,15 +1,17 @@
 from fastapi import APIRouter, status, Query, BackgroundTasks
 from typing import Optional
 from uuid import UUID
-
+from app.pipelines.tech_signals import TechSignalCollector
 from app.models.signal import (
     ExternalSignal,
     CompanySignalSummary,
     SignalCategory,
 )
 from app.models.pagination import PaginatedResponse
-from app.services import signals_service
+from app.services import signal_service
 from app.pipelines.job_signals import JobSignalCollector
+from app.pipelines.patent_signals import PatentSignalCollector
+
 
 router = APIRouter(prefix="/signals", tags=["Signals"])
 
@@ -66,17 +68,42 @@ async def collect_job_signals(
     signal.company_id = company_id
     
     # Store in database
-    stored_signal = signals_service.store_signal(signal)
+    stored_signal = signal_service.store_signal(signal)
     
     # Update summary in background
     if background_tasks:
         background_tasks.add_task(
-            signals_service.update_signal_summary,
+            signal_service.update_signal_summary,
             company_id
         )
     else:
-        signals_service.update_signal_summary(company_id)
+        signal_service.update_signal_summary(company_id)
     
+    return stored_signal
+
+@router.post(
+    "/collect-tech-signals",
+    response_model=ExternalSignal,
+    status_code=status.HTTP_201_CREATED
+)
+async def collect_tech_signals(
+    company_id: UUID = Query(...),
+    company_name: str = Query(...),
+    ticker: str = Query(..., description="Ticker used to look up hardcoded COMPANY_SOURCES"),
+    background_tasks: BackgroundTasks = None,
+):
+    collector = TechSignalCollector()
+
+    signal = collector.analyze_digital_presence(company_name=company_name, ticker=ticker)
+    signal.company_id = company_id
+
+    stored_signal = signal_service.store_signal(signal)
+
+    if background_tasks:
+        background_tasks.add_task(signal_service.update_signal_summary, company_id)
+    else:
+        signal_service.update_signal_summary(company_id)
+
     return stored_signal
 
 
@@ -90,12 +117,51 @@ def get_company_signals(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
 ):
-    return signals_service.get_signals_for_company(
+    return signal_service.get_signals_for_company(
         company_id=company_id,
         category=category,
         page=page,
         page_size=page_size,
     )
+@router.post(
+    "/collect-patent-signals",
+    response_model=ExternalSignal,
+    status_code=status.HTTP_201_CREATED
+)
+async def collect_patent_signals(
+    company_id: UUID = Query(..., description="Company UUID from DB"),
+    assignee: str = Query(..., description="Assignee name to search on Google Patents"),
+    max_pages: int = Query(default=2, ge=1, le=10, description="How many results pages to scan (100 results each)"),
+    years: int = Query(default=5, ge=1, le=15, description="How many years back to count patents"),
+    background_tasks: BackgroundTasks = None,
+):
+    """
+    Collect AI-related patent signals from Google Patents.
+
+    Flow:
+    - Search Google Patents by assignee
+    - For each result, open patent page
+    - Confirm assignee and extract CPC classifications
+    - Filter by AI CPC list
+    - Score using CS2 rubric and store as INNOVATION_ACTIVITY signal
+    """
+    collector = PatentSignalCollector(concurrency=5)
+    signal = await collector.collect_and_score_google_patents(
+        company_id=company_id,
+        assignee=assignee,
+        max_pages=max_pages,
+        results_per_page=100,
+        years=years,
+    )
+
+    stored_signal = signal_service.store_signal(signal)
+
+    if background_tasks:
+        background_tasks.add_task(signal_service.update_signal_summary, company_id)
+    else:
+        signal_service.update_signal_summary(company_id)
+
+    return stored_signal
 
 
 @router.get(
@@ -114,7 +180,7 @@ def get_company_signal_summary(company_id: UUID):
     Returns:
         CompanySignalSummary with scores by category
     """
-    return signals_service.get_signal_summary(company_id)
+    return signal_service.get_signal_summary(company_id)
 
 
 @router.post(
@@ -133,4 +199,5 @@ def refresh_signal_summary(company_id: UUID):
     Returns:
         Updated CompanySignalSummary
     """
-    return signals_service.update_signal_summary(company_id)
+    return signal_service.update_signal_summary(company_id)
+

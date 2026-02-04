@@ -13,6 +13,8 @@ from app.errors import (
     unhandled_exception_handler,
     snowflake_exception_handler,
 )
+from app.core.event_loop import configure_event_loop_policy
+configure_event_loop_policy()
 
 # Optional Snowflake error mapping
 try:
