@@ -17,8 +17,7 @@ logger = logging.getLogger(__name__)
 
 _SOURCE_TO_JOBSPY_SITE = {
     "linkedin": "linkedin",
-    "indeed": "indeed",
-    "glassdoor": "glassdoor"
+    "indeed": "indeed"
 }
 
 
@@ -34,6 +33,7 @@ class JobPosting:
     is_ai_related: bool = False
     ai_skills: list = field(default_factory=list)
     seniority_level: str = ""
+    ai_relevance_score: float = 0.0 
     
     def __repr__(self):
         return f"JobPosting(title='{self.title}', company='{self.company}', ai_related={self.is_ai_related})"
@@ -100,6 +100,15 @@ class JobSignalCollector:
         "executive": ["director", "vp", "vice president", "chief", "head of", "manager", "cto", "cdo"]
     }
 
+    AI_TITLE_KEYWORDS = [
+        "ai", 
+        "ml", 
+        "machine learning", 
+        "data scientist", 
+        "mlops", 
+        "artificial intelligence"
+    ]
+
     def __init__(self):
         """Initialize the job signal collector."""
         pass
@@ -107,6 +116,35 @@ class JobSignalCollector:
     @staticmethod
     def _safe_str(x) -> str:
         return "" if x is None else str(x)
+    
+    @staticmethod
+    def get_optimized_search_queries(company_name: str) -> List[str]:
+
+        return [
+            # Query 1: Core ML/AI Engineering (most common roles)
+            # Catches: ML Engineer, Machine Learning Engineer, AI Engineer, AI/ML Engineer
+            f"{company_name} (machine learning OR ML OR artificial intelligence OR AI) engineer",
+            
+            # Query 2: Data Science & Research (scientist roles)
+            # Catches: Data Scientist, Research Scientist, Applied Scientist, AI Researcher
+            f"{company_name} (data scientist OR research scientist OR applied scientist OR AI research)",
+            
+            # Query 3: Specialized AI domains (technical specialists)
+            # Catches: Computer Vision Engineer, NLP Engineer, Deep Learning Engineer
+            f"{company_name} (computer vision OR NLP OR natural language processing OR deep learning OR neural network)",
+            
+            # Query 4: Infrastructure & Operations (platform/ops roles)
+            # Catches: MLOps Engineer, ML Infrastructure, AI Platform Engineer
+            f"{company_name} (MLOps OR ML infrastructure OR AI platform OR machine learning operations)",
+            
+            # Query 5: Emerging/Trending (newest AI roles)
+            # Catches: LLM Engineer, GenAI roles, Prompt Engineer
+            f"{company_name} (LLM OR large language model OR generative AI OR gen AI OR prompt engineer)",
+            
+            # Query 6: Data Engineering with AI focus (often has AI components)
+            # Catches: Data Engineer, ML Data Engineer, AI Data Engineer
+            f"{company_name} data engineer (machine learning OR AI OR ML pipeline)",
+        ]
 
     #Normalize date to 'YYYY-MM-DD' format; else current date
     @staticmethod
@@ -239,8 +277,28 @@ class JobSignalCollector:
         
         # Classify seniority
         posting.seniority_level = self._classify_seniority(posting.title)
-        
+
+        # Calculate AI relevance score
+        posting.ai_relevance_score = self.calculate_ai_relevance_score(
+        skills=set(posting.ai_skills),
+        title=posting.title
+        )
+
+        logger.info(
+            "job_classified",
+            title=posting.title,
+            company=posting.company,
+            source=posting.source,
+            is_ai_related=posting.is_ai_related,
+            ai_relevance_score=round(posting.ai_relevance_score, 3),
+            skill_count=len(posting.ai_skills),
+            skills=posting.ai_skills[:5],
+            seniority=posting.seniority_level,
+            location=posting.location
+        )
+
         return posting
+    
 
     def _classify_seniority(self, title: str) -> str:
         title_lower = title.lower()
@@ -265,45 +323,77 @@ class JobSignalCollector:
         company: str,
         postings: List[JobPosting]
     ) -> ExternalSignal:
-        logger.info(f"Analyzing {len(postings)} job postings for {company}")
         
-        total_tech_jobs = len([p for p in postings if self._is_tech_job(p)])
-        ai_jobs = len([p for p in postings if p.is_ai_related])
+        logger.info(f"Analyzing {len(postings)} job postings for {company}")
+
+        tech_jobs = [p for p in postings if self._is_tech_job(p)]
+        total_tech_jobs = len(tech_jobs)
+        
+        highly_ai_relevant_jobs = [p for p in tech_jobs if p.ai_relevance_score >= 0.5]
+        ai_jobs = len(highly_ai_relevant_jobs)
+       
         
         if total_tech_jobs > 0:
+            avg_ai_relevance = sum(p.ai_relevance_score for p in tech_jobs) / total_tech_jobs
             ai_ratio = ai_jobs / total_tech_jobs
         else:
-            ai_ratio = 0
+            avg_ai_relevance = 0.0
+            ai_ratio = 0.0
         
         all_skills = set()
-        for posting in postings:
+        for posting in highly_ai_relevant_jobs:
             all_skills.update(posting.ai_skills)
         
         seniority_dist = {}
-        for posting in [p for p in postings if p.is_ai_related]:
+        for posting in highly_ai_relevant_jobs:
             seniority_dist[posting.seniority_level] = seniority_dist.get(posting.seniority_level, 0) + 1
         
         score = (
             min(ai_ratio * 60, 60) +
             min(len(all_skills) / 10, 1) * 20 +
-            min(ai_jobs / 5, 1) * 20
+            min(avg_ai_relevance, 1.0) * 20
         )
         
         skill_counts = {}
-        for posting in postings:
+        for posting in tech_jobs:  # Include ALL tech jobs for skill analysis
             for skill in posting.ai_skills:
                 skill_counts[skill] = skill_counts.get(skill, 0) + 1
         
         top_skills = sorted(skill_counts.items(), key=lambda x: x[1], reverse=True)[:10]
         
-        logger.info(f"Analysis complete: ai_jobs={ai_jobs}, score={score:.1f}")
+        relevance_buckets = {
+            "high (0.8-1.0)": len([p for p in tech_jobs if p.ai_relevance_score >= 0.8]),
+            "medium (0.5-0.8)": len([p for p in tech_jobs if 0.5 <= p.ai_relevance_score < 0.8]),
+            "low (0.0-0.5)": len([p for p in tech_jobs if p.ai_relevance_score < 0.5]),
+        }
         
+        logger.info( "INFOOOOOO-",
+            f"Analysis complete: ai_jobs={ai_jobs}, "
+            f"avg_relevance={avg_ai_relevance:.2f}, score={score:.1f}"
+        )
+
+        logger.info(
+        "high_relevance_jobs_summary",
+        company=company,
+        count=len(highly_ai_relevant_jobs),
+        jobs=[
+            {
+                "title": job.title,
+                "relevance_score": round(job.ai_relevance_score, 3),
+                "skill_count": len(job.ai_skills),
+                "seniority": job.seniority_level,
+                "source": job.source
+            }
+            for job in sorted(highly_ai_relevant_jobs, key=lambda x: x.ai_relevance_score, reverse=True)[:10]
+            ]
+        )
+    
         return ExternalSignal(
             company_id=None,
             category=SignalCategory.TECHNOLOGY_HIRING,
-            source=SignalSource.LINKEDIN,
+            source=SignalSource.MULTIPLE,
             signal_date=datetime.now(timezone.utc),
-            raw_value=f"{ai_jobs}/{total_tech_jobs} AI jobs",
+            raw_value=f"{ai_jobs}/{total_tech_jobs} highly AI-relevant jobs (avg relevance: {avg_ai_relevance:.2f})",
             normalized_score=round(score, 1),
             confidence=min(0.5 + total_tech_jobs / 100, 0.95),
             metadata={
@@ -311,6 +401,8 @@ class JobSignalCollector:
                 "total_tech_jobs": total_tech_jobs,
                 "ai_jobs": ai_jobs,
                 "ai_ratio": round(ai_ratio, 3),
+                "avg_ai_relevance": round(avg_ai_relevance, 3),
+                "relevance_distribution": relevance_buckets,
                 "skills_found": list(all_skills),
                 "skill_count": len(all_skills),
                 "seniority_distribution": seniority_dist,
@@ -333,3 +425,31 @@ class JobSignalCollector:
         
         logger.info(f"Deduplication: {len(jobs)} -> {len(unique_jobs)} jobs")
         return unique_jobs
+    
+    
+    def calculate_ai_relevance_score(self, skills: set, title: str) -> float:
+
+        skill_count = len(skills)
+        normalized_skill_count = min(skill_count / 5, 1.0)
+        base_score = normalized_skill_count * 0.6
+        
+        title_lower = title.lower()
+        title_has_ai_keywords = any(kw in title_lower for kw in self.AI_TITLE_KEYWORDS)
+        title_boost = 0.4 if title_has_ai_keywords else 0.0
+        
+        # Combine scores, ensuring it doesn't exceed 1.0
+        final_score = min(base_score + title_boost, 1.0)
+        
+        logger.debug(
+            "ai_relevance_score_calculated",
+            title=title,
+            skill_count=skill_count,
+            normalized_skill_count=round(normalized_skill_count, 3),
+            base_score=round(base_score, 3),
+            title_has_ai_keywords=title_has_ai_keywords,
+            title_boost=title_boost,
+            final_score=round(final_score, 3),
+            skills_preview=list(skills)[:3] if skills else []
+        )
+        
+        return final_score
