@@ -1,4 +1,6 @@
 # app/main.py
+
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -33,6 +35,7 @@ app = FastAPI(
 # Add rate limiter to app state
 app.state.limiter = limiter
 
+
 # Custom rate limit error handler
 @app.exception_handler(RateLimitExceeded)
 async def custom_rate_limit_handler(request: Request, exc: RateLimitExceeded):
@@ -45,6 +48,7 @@ async def custom_rate_limit_handler(request: Request, exc: RateLimitExceeded):
         }
     )
 
+
 # Exception handlers
 app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
@@ -54,6 +58,7 @@ if ProgrammingError:
     app.add_exception_handler(ProgrammingError, snowflake_exception_handler)
 if DatabaseError:
     app.add_exception_handler(DatabaseError, snowflake_exception_handler)
+
 
 # Routers
 app.include_router(health.router, prefix="/api/v1")

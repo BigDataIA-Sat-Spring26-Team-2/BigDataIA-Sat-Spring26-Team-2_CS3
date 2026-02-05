@@ -2,6 +2,8 @@ from pydantic import BaseModel, Field, model_validator
 from uuid import UUID, uuid4
 from datetime import datetime, timezone
 from typing import Optional, Dict
+from typing import List
+
 
 from app.models.enums import SignalCategory, SignalSource
 
@@ -71,3 +73,40 @@ class SignalCreate(BaseModel):
 class SignalResponse(ExternalSignal):
     """Response model for signals (same as ExternalSignal)."""
     pass
+
+class LeadershipSignalMetrics(BaseModel):
+    """Detailed metrics for leadership signal analysis."""
+    
+    # Compensation metrics
+    tech_comp_metrics_found: List[str] = Field(default_factory=list)
+    tech_comp_score: float = Field(ge=0, le=100, default=0)
+    
+    # Strategy metrics
+    ai_strategy_statements: List[str] = Field(default_factory=list)
+    ai_strategy_score: float = Field(ge=0, le=100, default=0)
+    
+    # Investment metrics
+    tech_investment_mentions: List[str] = Field(default_factory=list)
+    tech_investment_score: float = Field(ge=0, le=100, default=0)
+    
+    # Risk metrics
+    ai_risk_factors: List[str] = Field(default_factory=list)
+    ai_risk_score: float = Field(ge=0, le=100, default=0)
+    
+    # Overall
+    composite_score: float = Field(ge=0, le=100, default=0)
+    confidence: float = Field(ge=0, le=1, default=0.7)
+    
+    # Evidence tracking
+    filings_analyzed: int = 0
+    total_sections: int = 0
+
+
+class LeadershipEvidence(BaseModel):
+    """A single piece of leadership evidence."""
+    evidence_type: str  # 'compensation', 'strategy', 'investment', 'risk'
+    text_snippet: str
+    filing_type: str
+    section: str
+    confidence: float
+    keywords_matched: List[str]

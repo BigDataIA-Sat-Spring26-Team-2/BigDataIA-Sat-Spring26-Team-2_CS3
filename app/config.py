@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     AWS_REGION: str = Field(default="us-east-1", description="AWS Region")
     S3_BUCKET: str = Field(..., description="S3 Bucket name")  # ← No default
 
+    NEWS_API_KEY: str | None = Field(
+        default=None,
+        description="NewsAPI key (optional, get from https://newsapi.org)"
+    )
+
 
     # ---- App metadata ----
     APP_ENV: str = Field("local", description="Environment name: local/dev/prod")
