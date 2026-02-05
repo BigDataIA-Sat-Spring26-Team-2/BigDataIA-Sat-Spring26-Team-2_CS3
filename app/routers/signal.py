@@ -1,18 +1,26 @@
 from fastapi import APIRouter, status, Query, BackgroundTasks
 from typing import Optional
 from uuid import UUID
+from pathlib import Path
+import subprocess
+from app.schemas.signal_tasks import QueuedTaskResponse
+
 from app.pipelines.tech_signals import TechSignalCollector
 from app.models.signal import (
     ExternalSignal,
     CompanySignalSummary,
     SignalCategory,
 )
+import structlog
+from app.config import get_settings
+from datetime import datetime, timezone, timedelta
 from app.models.pagination import PaginatedResponse
 from app.services import signal_service
 from app.pipelines.job_signals import JobSignalCollector
 
 from app.pipelines.patent_signals import PatentSignalCollector
-
+from app.reports.patent_report import write_patent_report
+from app.services.snowflake import get_connection
 
 from app.pipelines.leadership_signals import LeadershipSignalCollector
 from app.services import snowflake
@@ -20,7 +28,28 @@ from app.services import snowflake
 
 router = APIRouter(prefix="/signals", tags=["Signals"])
 
+router = APIRouter()
+logger = structlog.get_logger()
 
+def _fq_table(name: str) -> str:
+    s = get_settings()
+    return f"{s.SNOWFLAKE_DATABASE}.{s.SNOWFLAKE_SCHEMA}.{name}"
+
+def _get_ticker_for_company(company_id: UUID) -> str:
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            f"SELECT ticker FROM {_fq_table('COMPANIES')} WHERE id = %s AND is_deleted = FALSE",
+            (str(company_id),)
+        )
+        row = cur.fetchone()
+        if not row or not row[0]:
+            raise ValueError(f"Could not find ticker for company_id={company_id}")
+        return row[0]
+    finally:
+        cur.close()
+        conn.close()
 @router.post(
     "/collect-job-signals",
     response_model=ExternalSignal,
@@ -133,41 +162,49 @@ def get_company_signals(
     response_model=ExternalSignal,
     status_code=status.HTTP_201_CREATED
 )
+@router.post(
+    "/signals/collect-patent-signals",
+    response_model=QueuedTaskResponse
+)
 async def collect_patent_signals(
-    company_id: UUID = Query(..., description="Company UUID from DB"),
-    assignee: str = Query(..., description="Assignee name to search on Google Patents"),
-    max_pages: int = Query(default=2, ge=1, le=10, description="How many results pages to scan (100 results each)"),
-    years: int = Query(default=5, ge=1, le=15, description="How many years back to count patents"),
-    background_tasks: BackgroundTasks = None,
+    company_id: UUID = Query(...),
+    assignee: str = Query(...),
+    years: int = Query(5, ge=1, le=20),
 ):
     """
-    Collect AI-related patent signals from Google Patents.
-
-    Flow:
-    - Search Google Patents by assignee
-    - For each result, open patent page
-    - Confirm assignee and extract CPC classifications
-    - Filter by AI CPC list
-    - Score using CS2 rubric and store as INNOVATION_ACTIVITY signal
+    Queue patent signal collection by launching the existing evidence script.
+    (No Playwright inside API — Windows safe.)
     """
-    collector = PatentSignalCollector(concurrency=5)
-    signal = await collector.collect_and_score_google_patents(
-        company_id=company_id,
-        assignee=assignee,
-        max_pages=max_pages,
-        results_per_page=100,
-        years=years,
+    ticker = _get_ticker_for_company(company_id)
+
+    project_root = Path(__file__).resolve().parents[2]
+    script = project_root / "scripts" / "collect_evidence.py"
+
+    # write worker logs so you can debug from UI runs
+    logs_dir = project_root / "reports" / "patent_signals" / ticker
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    out_log = logs_dir / "worker_stdout.log"
+    err_log = logs_dir / "worker_stderr.log"
+
+    cmd = ["poetry", "run", "python", str(script), "--ticker", ticker]
+
+    logger.info("Queueing patent collection", ticker=ticker, company_id=str(company_id), cmd=cmd)
+
+    subprocess.Popen(
+        cmd,
+        cwd=str(project_root),
+        stdout=open(out_log, "a", encoding="utf-8"),
+        stderr=open(err_log, "a", encoding="utf-8"),
+        creationflags=subprocess.CREATE_NEW_CONSOLE if hasattr(subprocess, "CREATE_NEW_CONSOLE") else 0
     )
 
-    stored_signal = signal_service.store_signal(signal)
-
-    if background_tasks:
-        background_tasks.add_task(signal_service.update_signal_summary, company_id)
-    else:
-        signal_service.update_signal_summary(company_id)
-
-    return stored_signal
-
+    return QueuedTaskResponse(
+        status="queued",
+        message="Patent signal collection started",
+        company_id=company_id,
+        ticker=ticker,
+        assignee=assignee,
+    )
 
 @router.get(
     "/companies/{company_id}/summary",
