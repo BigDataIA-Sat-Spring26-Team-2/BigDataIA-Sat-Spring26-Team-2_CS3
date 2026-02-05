@@ -670,7 +670,7 @@ async def main(tickers: list[str], signal_types: list[str]):
                 stats['leadership_signals']['total_ai_executives'] /
                 stats['leadership_signals']['total_executives'] * 100
             )
-            print(f"  AI Penetration Rate: {ai_penetration:.1f}%")
+           
     
     print("="*70)
     

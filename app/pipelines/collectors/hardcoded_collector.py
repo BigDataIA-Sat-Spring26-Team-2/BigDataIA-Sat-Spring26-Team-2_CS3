@@ -22,7 +22,7 @@ def get_hardcoded_executives(ticker: str):
         ],
         
         "HCA": [
-            ("Sam Hazen", "CEO and Director"),
+            ("Sam Hazen", "CEO"),
             ("Bill Rutherford", "CFO"),
             ("Michael McAlevey", "Chief Operations Officer"),
             ("Kathleen Whalen", "Chief Information Officer"),

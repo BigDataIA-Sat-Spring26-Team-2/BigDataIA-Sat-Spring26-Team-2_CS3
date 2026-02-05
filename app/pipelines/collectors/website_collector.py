@@ -1,6 +1,9 @@
-# app/pipelines/collectors/website_collector.py
 
+
+from turtle import title
 from urllib import response
+
+
 import httpx
 import re
 from bs4 import BeautifulSoup
@@ -20,6 +23,7 @@ class CompanyWebsiteCollector(BaseLeadershipCollector):
         'ceo': 1.0, 'chief executive': 1.0, 'chairman': 0.95, 'president': 0.95,
         'chief ai officer': 1.0, 'caio': 1.0,
         'chief technology officer': 0.9, 'cto': 0.9,
+        'chief AI scientist': 0.95,
         'chief information officer': 0.85, 'cio': 0.85,
         'chief digital officer': 0.85, 'cdo': 0.85,
         'chief data officer': 0.85,
@@ -299,22 +303,8 @@ class CompanyWebsiteCollector(BaseLeadershipCollector):
         if role_weight < 0.65:
             return None
         
-        # Detect AI indicators
-        # Detect AI indicators
         indicators = self._detect_ai(title, bio)
 
-# Determine if AI-relevant
-        is_ai_relevant = self._is_ai_relevant_role(title, indicators)
-
-# 🔒 SAFETY NET: AI-relevant roles must have at least one indicator
-        if is_ai_relevant and not indicators:
-            indicators.append(AIIndicator(
-            type=AIIndicatorType.AI_ROLE_TITLE,
-            evidence=title,
-            score=0.6,
-            source='Company Website',
-            confidence=0.8
-    ))
 
         
         # Determine if AI-relevant
@@ -387,8 +377,10 @@ class CompanyWebsiteCollector(BaseLeadershipCollector):
         # Partials for truncated titles
         if 'chief executive' in t: return 1.0
         if 'chief technology' in t or 'chief information' in t: return 0.9
+        if 'ceo' in t: return 1.0
         if 'chief data' in t or 'chief digital' in t: return 0.85
         if 'chief operating' in t: return 0.9
+        if 'chief ai scientist' in t: return 0.95
         if 'president' in t and 'vice' not in t: return 0.95
         if 'vice president' in t: return 0.7
         if 'senior vice president' in t: return 0.75
@@ -417,7 +409,7 @@ class CompanyWebsiteCollector(BaseLeadershipCollector):
         # Tier 1: AI-Specific titles (ALWAYS include)
         ai_titles = [
             'chief ai officer', 'caio',
-            r'\bai\b', 'artificial intelligence', 'machine learning',
+            'chief ai scientist', 'chief artificial intelligence', 'artificial intelligence', 'machine learning',
             'data science', 'chief data', 'chief analytics'
         ]
         
@@ -429,17 +421,17 @@ class CompanyWebsiteCollector(BaseLeadershipCollector):
             'chief technology officer', 'cto',
             'chief information officer', 'cio',
             'chief digital officer', 'cdo',
-            'chief information', 'chief technology'
+            'chief information', 'chief technology','chief digital','chief data'
         ]
         
         if any(kw in title_lower for kw in tech_csuite):
             return True
         
         # Tier 3: AI Company Background (INCLUDE if strong indicator)
-        if indicators:
-            max_score = max(ind.score for ind in indicators)
-            if max_score >= 0.6:
-                return True
+        # if indicators:
+        #     max_score = max(ind.score for ind in indicators)
+        #     if max_score >= 0.6:
+        #         return True
 
         
         # Everything else is NOT AI-relevant
@@ -463,22 +455,22 @@ class CompanyWebsiteCollector(BaseLeadershipCollector):
             )]
         
         # 2. AI/ML in title (0.7)
-        if re.search(r'\bai\b|artificial intelligence|machine learning|ai|data', t):
+        # Only match actual AI terms in title0
+        if re.search(r'artificial intelligence|machine learning|\sai\s|^ai\s|\sai$', t):
             indicators.append(AIIndicator(
-                type=AIIndicatorType.AI_ROLE_TITLE,
-                evidence=title,
-                score=0.65,
-                source='Company Website',
-                confidence=0.85
-            ))
-        
+            type=AIIndicatorType.AI_ROLE_TITLE,
+            evidence=title,
+            score=1.0,
+            source='Company Website',
+            confidence=0.85
+    ))
         # 3. Chief Data & Analytics (0.8 - HIGH)
         if re.search(r'chief data|chief analytics|data.*analytics', t):
             if not indicators:
                 indicators.append(AIIndicator(
                     type=AIIndicatorType.DATA_ANALYTICS_LEADERSHIP,
                     evidence=title,
-                    score=0.8,
+                    score=0.95,
                     source='Company Website',
                     confidence=0.9
                 ))
@@ -489,7 +481,7 @@ class CompanyWebsiteCollector(BaseLeadershipCollector):
                 indicators.append(AIIndicator(
                     type=AIIndicatorType.TECH_LEADERSHIP,
                     evidence=title,
-                    score=0.7,
+                    score=0.8,
                     source='Company Website',
                     confidence=0.85
                 ))
@@ -504,7 +496,7 @@ class CompanyWebsiteCollector(BaseLeadershipCollector):
                     source='Company Website',
                     confidence=0.8
                 ))
-                return indicators  # Strong signal, stop here
+                return indicators  
         
         # 6. PhD (0.8)
         if re.search(r'ph\.?d|doctorate', b):

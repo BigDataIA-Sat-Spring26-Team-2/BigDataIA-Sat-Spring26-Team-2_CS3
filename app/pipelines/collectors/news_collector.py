@@ -27,7 +27,7 @@ class NewsAPICollector(BaseLeadershipCollector):
     def __init__(self):
         super().__init__("NewsAPI", weight=0.10)
     
-    # ✅ FIX: Disable NewsAPI (free tier has 426 errors)
+    
         self.logger.info("NewsAPI disabled - free tier limitations (HTTP 426)")
         self.enabled = False
         self.api_key = None
@@ -40,12 +40,7 @@ class NewsAPICollector(BaseLeadershipCollector):
         company_name: str,
         ticker: str
     ) -> List[Dict]:
-        """
-        Search for AI leadership news about the company.
-        
-        Note: This doesn't discover executives, it validates/enriches them.
-        Returns metadata about company AI activity.
-        """
+      
         
         if not self.enabled:
             self.logger.info("NewsAPI disabled (no API key)")
@@ -107,11 +102,7 @@ class NewsAPICollector(BaseLeadershipCollector):
             return []
     
     def _analyze_articles(self, articles: List[dict], company_name: str) -> Dict:
-        """
-        Analyze articles for AI leadership signals.
         
-        Returns dict with signal metadata.
-        """
         
         if not articles:
             return {
@@ -176,11 +167,7 @@ class NewsAPICollector(BaseLeadershipCollector):
         executive_name: str,
         company_name: str
     ) -> List[AIIndicator]:
-        """
-        Search for news mentions of specific executive in AI context.
         
-        This enriches individual executives with recent activity signals.
-        """
         
         if not self.enabled:
             return []
