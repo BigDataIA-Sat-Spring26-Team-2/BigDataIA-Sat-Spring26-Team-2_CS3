@@ -9,15 +9,11 @@ import requests
 import streamlit as st
 
 
-# =========================
-# Config
-# =========================
+st.set_page_config(page_title="SEC Documents", page_icon="📄", layout="centered")
+
 DEFAULT_API_BASE = os.getenv("API_BASE_URL", "http://127.0.0.1:8000/api/v1")
 
 
-# =========================
-# Helpers
-# =========================
 def _pretty(obj: Any) -> str:
     return json.dumps(obj, indent=2, default=str)
 
@@ -43,9 +39,6 @@ def valid_cik(v: str) -> bool:
     return v.isdigit() and len(v) == 10
 
 
-# =========================
-# UI
-# =========================
 st.set_page_config(page_title="SEC EDGAR Downloader", layout="centered")
 
 st.title("SEC EDGAR Evidence Collector")
@@ -93,7 +86,6 @@ limit = st.number_input(
 
 st.divider()
 
-# ✅ ADD PDF OPTION CHECKBOX
 include_pdf = st.checkbox(
     "Include PDF versions (slower, may take several minutes for large filings)",
     value=False,
@@ -101,7 +93,6 @@ include_pdf = st.checkbox(
 )
 
 if st.button("⬇️ Download SEC Filings", type="primary"):
-    # ---------- Client-side validation ----------
     if not company_id.strip():
         st.error("Company UUID is required.")
         st.stop()
@@ -125,7 +116,6 @@ if st.button("⬇️ Download SEC Filings", type="primary"):
         "filing_types": filing_types,
     }
 
-    # Prefer ticker if provided
     if ticker:
         params["ticker"] = ticker.upper()
         resolved_ticker = ticker.upper()
@@ -136,15 +126,13 @@ if st.button("⬇️ Download SEC Filings", type="primary"):
     with st.spinner("Downloading + parsing filings… (this can take some time)"):
         result = api_post(api_base, "/documents/sec-edgar/download", params=params, body=None)
 
-    # ---------- Error handling ----------
     if "_error" in result:
         st.error(f"Request failed ({result.get('_status')})")
         st.code(_pretty(result["_error"]), language="json")
         st.stop()
 
-    st.success("✅ Pipeline finished")
+    st.success(" Pipeline finished")
 
-    # ---------- Summary ----------
     st.subheader("Summary")
     st.json({
         "downloaded_files": result.get("downloaded_files"),
@@ -153,13 +141,11 @@ if st.button("⬇️ Download SEC Filings", type="primary"):
         "skipped_duplicates": result.get("skipped_duplicates"),
     })
 
-    # ---------- Download all files as ZIP ----------
     st.subheader("Download All Files")
     
     files: List[dict] = result.get("files", [])
     
     if files and len(files) > 0:
-        # ✅ UPDATE MESSAGE BASED ON CHECKBOX
         if include_pdf:
             st.info(f"📦 {len(files)} file(s) ready for download (includes both .txt and .pdf versions)")
         else:
