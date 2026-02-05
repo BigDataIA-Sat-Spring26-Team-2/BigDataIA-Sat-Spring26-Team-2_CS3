@@ -270,7 +270,7 @@ class LeadershipSignalCollector:
         # Scoring tier logic
         if ai_executives:
     # ✅ Use BOTH AI + Generic executives
-            executives_to_score = ai_executives + generic_executives
+            executives_to_score = ai_executives
             penalty_multiplier = 1.0
             tier = "AI Leadership Present"
             self.logger.info(
