@@ -53,5 +53,4 @@ class SignalSource(str, Enum):
     MULTIPLE = "LinkedIn_Indeed"
     TECH_STACK_SCRAPE="tech_stack_scrape"
     # Patent signals
-    USPTO = "uspto"
     GOOGLE_PATENTS = "google_patents"
