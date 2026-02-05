@@ -26,73 +26,218 @@ SUMMARIES_TABLE = _fq_table("COMPANY_SIGNAL_SUMMARIES")
 COMPANIES_TABLE = _fq_table("COMPANIES")
 
 
+# def store_signal(signal: ExternalSignal) -> ExternalSignal:
+#     if signal.id is None:
+#         signal.id = uuid4()
+    
+
+#     sql = f"""
+# INSERT INTO {SIGNALS_TABLE} (
+#     id,
+#     company_id,
+#     category,
+#     source,
+#     signal_date,
+#     raw_value,
+#     normalized_score,
+#     confidence,
+#     metadata,
+#     created_at
+# )
+# SELECT
+#     %s,
+#     %s,
+#     %s,
+#     %s,
+#     %s,
+#     %s,
+#     %s,
+#     %s,
+#     PARSE_JSON(%s),
+#     %s
+# """
+    
+#     conn = None
+#     cur = None
+#     try:
+#         conn = get_connection()
+#         cur = conn.cursor()
+        
+#         cur.execute(
+#             f"SELECT 1 FROM {COMPANIES_TABLE} WHERE id = %s AND is_deleted = FALSE",
+#             (str(signal.company_id),)
+#         )
+#         if not cur.fetchone():
+#             raise HTTPException(
+#                 status_code=status.HTTP_404_NOT_FOUND,
+#                 detail="Company not found"
+#             )
+        
+#         cur.execute(
+#             sql,
+#             (
+#                 str(signal.id),
+#                 str(signal.company_id),
+#                 signal.category.value,
+#                 signal.source.value,
+#                 signal.signal_date.date(),
+#                 signal.raw_value,
+#                 float(signal.normalized_score),
+#                 float(signal.confidence),
+#                 json.dumps(signal.metadata or {}),
+#                 signal.created_at,
+#             )
+#         )
+#         conn.commit()
+        
+#     except HTTPException:
+#         raise
+#     except Exception as e:
+#         raise HTTPException(
+#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#             detail=f"Failed to store signal: {str(e)}"
+#         )
+#     finally:
+#         if cur:
+#             cur.close()
+#         if conn:
+#             conn.close()
+    
+#     return signal
+
 def store_signal(signal: ExternalSignal) -> ExternalSignal:
+    """Store external signal in database"""
+    import structlog
+    logger = structlog.get_logger()
+    
     if signal.id is None:
         signal.id = uuid4()
     
-
+    logger.info(
+        "=== STORE SIGNAL START ===",
+        signal_id=str(signal.id),
+        company_id=str(signal.company_id),
+        category=signal.category.value,
+        source=signal.source.value,
+        score=signal.normalized_score
+    )
+    
+    # Pre-convert metadata to JSON string
+    try:
+        metadata_json = json.dumps(signal.metadata or {})
+        logger.info("Metadata serialized", size=len(metadata_json))
+    except Exception as e:
+        logger.error("FAILED to serialize metadata", error=str(e))
+        raise
+    
+    # ✅ Use SELECT with PARSE_JSON instead of VALUES
     sql = f"""
-INSERT INTO {SIGNALS_TABLE} (
-    id,
-    company_id,
-    category,
-    source,
-    signal_date,
-    raw_value,
-    normalized_score,
-    confidence,
-    metadata,
-    created_at
-)
-SELECT
-    %s,
-    %s,
-    %s,
-    %s,
-    %s,
-    %s,
-    %s,
-    %s,
-    PARSE_JSON(%s),
-    %s
-"""
+    INSERT INTO {SIGNALS_TABLE} (
+        id,
+        company_id,
+        category,
+        source,
+        signal_date,
+        raw_value,
+        normalized_score,
+        confidence,
+        metadata,
+        created_at
+    )
+    SELECT 
+        %s, 
+        %s, 
+        %s, 
+        %s, 
+        %s, 
+        %s, 
+        %s, 
+        %s, 
+        PARSE_JSON(%s), 
+        %s
+    """
     
     conn = None
     cur = None
     try:
+        logger.info("Getting Snowflake connection...")
         conn = get_connection()
         cur = conn.cursor()
+        logger.info("Connection established")
         
+        # Check company exists
+        logger.info("Checking company exists...")
         cur.execute(
             f"SELECT 1 FROM {COMPANIES_TABLE} WHERE id = %s AND is_deleted = FALSE",
             (str(signal.company_id),)
         )
         if not cur.fetchone():
+            logger.error("Company not found", company_id=str(signal.company_id))
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Company not found"
+                detail=f"Company not found: {signal.company_id}"
             )
+        logger.info("Company exists - OK")
         
-        cur.execute(
-            sql,
-            (
-                str(signal.id),
-                str(signal.company_id),
-                signal.category.value,
-                signal.source.value,
-                signal.signal_date.date(),
-                signal.raw_value,
-                float(signal.normalized_score),
-                float(signal.confidence),
-                json.dumps(signal.metadata or {}),
-                signal.created_at,
-            )
+        # Prepare params
+        params = (
+            str(signal.id),
+            str(signal.company_id),
+            signal.category.value,
+            signal.source.value,
+            signal.signal_date.date(),
+            signal.raw_value,
+            float(signal.normalized_score),
+            float(signal.confidence),
+            metadata_json,  # JSON string that will be parsed
+            signal.created_at,
         )
+        
+        logger.info(
+            "Executing INSERT",
+            id=params[0][:8],
+            company_id=params[1][:8],
+            category=params[2],
+            score=params[6]
+        )
+        
+        # Execute insert
+        cur.execute(sql, params)
+        
+        rowcount = cur.rowcount
+        logger.info("Rows affected", rowcount=rowcount)
+        
+        # Commit
         conn.commit()
+        logger.info("Transaction committed")
+        
+        # Verify insertion
+        cur.execute(
+            f"SELECT COUNT(*) FROM {SIGNALS_TABLE} WHERE id = %s",
+            (str(signal.id),)
+        )
+        count = cur.fetchone()[0]
+        logger.info("Verification count", count=count)
+        
+        if count == 0:
+            logger.error("VERIFICATION FAILED - Row not found after commit!")
+            raise Exception("Signal was not inserted (verification failed)")
+        
+        logger.info("=== STORE SIGNAL SUCCESS ===", signal_id=str(signal.id))
         
     except HTTPException:
+        logger.error("HTTPException raised")
+        if conn:
+            conn.rollback()
         raise
     except Exception as e:
+        logger.error(
+            "=== STORE SIGNAL FAILED ===",
+            error=str(e),
+            error_type=type(e).__name__
+        )
+        if conn:
+            conn.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to store signal: {str(e)}"
@@ -102,6 +247,7 @@ SELECT
             cur.close()
         if conn:
             conn.close()
+        logger.info("Database connection closed")
     
     return signal
 

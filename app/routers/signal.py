@@ -10,7 +10,12 @@ from app.models.signal import (
 from app.models.pagination import PaginatedResponse
 from app.services import signal_service
 from app.pipelines.job_signals import JobSignalCollector
+
 from app.pipelines.patent_signals import PatentSignalCollector
+
+
+from app.pipelines.leadership_signals import LeadershipSignalCollector
+from app.services import snowflake
 
 
 router = APIRouter(prefix="/signals", tags=["Signals"])
@@ -199,5 +204,105 @@ def refresh_signal_summary(company_id: UUID):
     Returns:
         Updated CompanySignalSummary
     """
+
     return signal_service.update_signal_summary(company_id)
+
+
+    
+
+# app/routers/signal.py
+# Add this new endpoint to your existing signal.py file
+
+@router.post(
+    "/collect-leadership-signals",
+    response_model=ExternalSignal,
+    status_code=status.HTTP_201_CREATED
+)
+async def collect_leadership_signals(
+    company_id: UUID = Query(...),
+    ticker: str = Query(...),
+    company_name: str = Query(...),
+    background_tasks: BackgroundTasks = None,
+):
+    """
+    Collect leadership commitment signals from external sources.
+    
+    Sources:
+    - Company website (90%): Executive discovery and AI role detection
+    - NewsAPI (10%): Recent AI leadership activity validation
+    
+    Args:
+        company_id: Company UUID from database
+        ticker: Stock ticker (e.g., "JPM")
+        company_name: Full company name (e.g., "JPMorgan Chase")
+        
+    Returns:
+        ExternalSignal with leadership score (0-100)
+        
+    Example:
+        POST /api/v1/signals/collect-leadership-signals?company_id=xxx&ticker=JPM&company_name=JPMorgan%20Chase
+    """
+    import time
+    start_time = time.time()
+    
+    logger.info(
+        "Leadership collection started",
+        ticker=ticker,
+        company=company_name
+    )
+    
+    # Import here to avoid circular dependencies
+    from app.pipelines.leadership_signals import LeadershipSignalCollector
+    
+    try:
+        # Initialize collector
+        collector = LeadershipSignalCollector()
+        
+        # Analyze leadership
+        signal = await collector.analyze_company_leadership(
+            company_id=company_id,
+            ticker=ticker,
+            company_name=company_name
+        )
+        
+        # Store in database
+        stored_signal = signal_service.store_signal(signal)
+        
+        # Update summary in background
+        if background_tasks:
+            background_tasks.add_task(
+                signal_service.update_signal_summary,
+                company_id
+            )
+        else:
+            signal_service.update_signal_summary(company_id)
+        
+        # Cleanup
+        await collector.close()
+        
+        elapsed = time.time() - start_time
+        logger.info(
+            "Leadership collection complete",
+            ticker=ticker,
+            score=signal.normalized_score,
+            elapsed_seconds=round(elapsed, 2)
+        )
+
+        
+
+
+        
+        return stored_signal
+        
+    except Exception as e:
+        logger.error(
+            "Leadership collection failed",
+            ticker=ticker,
+            error=str(e),
+            error_type=type(e).__name__
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Leadership signal collection failed: {str(e)}"
+        )
 

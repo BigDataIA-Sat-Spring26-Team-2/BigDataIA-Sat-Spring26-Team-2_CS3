@@ -389,6 +389,225 @@ def print_final_report(company_results: List[Dict], stats: Dict, tickers: List[s
     print("="*100 + "\n")
 
 
+# if __name__ == "__main__":
+#     parser = argparse.ArgumentParser(
+#         description="Collect evidence for target companies"
+#     )
+#     parser.add_argument(
+#         "--companies",
+#         default="all",
+#         help="Comma-separated tickers or 'all'"
+#     )
+#     parser.add_argument(
+#         "--ticker",
+#         help="Single ticker to process (alternative to --companies)"
+#     )
+    
+#     args = parser.parse_args()
+    
+#     # Determine which companies to process
+#     if args.ticker:
+#         tickers = [args.ticker.strip().upper()]
+#     elif args.companies == "all":
+#         tickers = list(TARGET_COMPANIES.keys())
+#     else:
+#         tickers = [t.strip().upper() for t in args.companies.split(",")]
+    
+
+#     asyncio.run(main(tickers))
+
+
+async def collect_leadership_signals(ticker: str, company_id: UUID, company_name: str):
+    """Collect leadership signals from company website and news"""
+    
+    logger.info("=== LEADERSHIP SIGNALS START ===", ticker=ticker, company_name=company_name)
+    
+    try:
+        from app.pipelines.leadership_signals import LeadershipSignalCollector
+        
+        # Initialize collector
+        collector = LeadershipSignalCollector()
+        
+        # Analyze leadership
+        signal = await collector.analyze_company_leadership(
+            company_id=company_id,
+            ticker=ticker,
+            company_name=company_name
+        )
+        
+        # Store in database
+        signal_service.store_signal(signal)
+        
+        # Cleanup
+        await collector.close()
+        
+        logger.info(
+            "Leadership signal stored",
+            ticker=ticker,
+            score=signal.normalized_score,
+            executives_analyzed=signal.metadata.get('executives_analyzed', 0),
+            ai_executives=signal.metadata.get('ai_executives', 0),
+            tier=signal.metadata.get('tier', 'Unknown')
+        )
+        
+        logger.info("=== LEADERSHIP SIGNALS COMPLETE ===", ticker=ticker)
+        
+        return {
+            "score": signal.normalized_score,
+            "executives": signal.metadata.get('executives_analyzed', 0),
+            "ai_executives": signal.metadata.get('ai_executives', 0),
+            "tier": signal.metadata.get('tier', 'Unknown')
+        }
+        
+    except Exception as e:
+        logger.error(
+            "Leadership signal collection failed",
+            ticker=ticker,
+            error=str(e),
+            error_type=type(e).__name__
+        )
+        raise
+
+
+async def main(tickers: list[str], signal_types: list[str]):
+    """
+    Collect signals for specified companies and signal types.
+    
+    Args:
+        tickers: List of company tickers
+        signal_types: List of signal types to collect ('job', 'leadership', or 'all')
+    """
+    
+    logger.info(
+        "Starting evidence collection",
+        companies=tickers,
+        signal_types=signal_types
+    )
+    
+    stats = {
+        "companies_processed": 0,
+        "job_signals": {
+            "collected": 0,
+            "total_ai_jobs": 0,
+            "errors": 0
+        },
+        "leadership_signals": {
+            "collected": 0,
+            "total_executives": 0,
+            "total_ai_executives": 0,
+            "errors": 0
+        }
+    }
+    
+    collect_job = 'job' in signal_types or 'all' in signal_types
+    collect_leadership = 'leadership' in signal_types or 'all' in signal_types
+    
+    for ticker in tickers:
+        if ticker not in TARGET_COMPANIES:
+            logger.warning("Unknown ticker", ticker=ticker)
+            continue
+        
+        company_info = TARGET_COMPANIES[ticker]
+        company_name = company_info["name"]
+        sector = company_info["sector"]
+        
+        logger.info(
+            "Processing company",
+            ticker=ticker,
+            name=company_name,
+            sector=sector
+        )
+        
+        try:
+            # Get or create company
+            company_id = await get_or_create_company(ticker, company_name, sector)
+            
+            # Collect job signals
+            if collect_job:
+                try:
+                    ai_jobs = await collect_job_signals(ticker, company_id, company_name)
+                    stats["job_signals"]["collected"] += 1
+                    stats["job_signals"]["total_ai_jobs"] += ai_jobs
+                    logger.info("✅ Job signals collected", ticker=ticker, ai_jobs=ai_jobs)
+                except Exception as e:
+                    stats["job_signals"]["errors"] += 1
+                    logger.error("❌ Job signals failed", ticker=ticker, error=str(e))
+            
+            # Collect leadership signals
+            if collect_leadership:
+                try:
+                    leadership_result = await collect_leadership_signals(
+                        ticker, company_id, company_name
+                    )
+                    stats["leadership_signals"]["collected"] += 1
+                    stats["leadership_signals"]["total_executives"] += leadership_result["executives"]
+                    stats["leadership_signals"]["total_ai_executives"] += leadership_result["ai_executives"]
+                    logger.info(
+                        "✅ Leadership signals collected",
+                        ticker=ticker,
+                        score=leadership_result["score"],
+                        tier=leadership_result["tier"]
+                    )
+                except Exception as e:
+                    stats["leadership_signals"]["errors"] += 1
+                    logger.error("❌ Leadership signals failed", ticker=ticker, error=str(e))
+            
+            # Update summary (combines all signal types)
+            try:
+                signal_service.update_signal_summary(company_id)
+                logger.info("Summary updated", ticker=ticker)
+            except Exception as e:
+                logger.error("Summary update failed", ticker=ticker, error=str(e))
+            
+            stats["companies_processed"] += 1
+            
+            logger.info(
+                "Company complete",
+                ticker=ticker,
+                progress=f"{stats['companies_processed']}/{len(tickers)}"
+            )
+            
+        except Exception as e:
+            logger.error(
+                "Company processing failed",
+                ticker=ticker,
+                error=str(e),
+                error_type=type(e).__name__
+            )
+    
+    # Final summary
+    logger.info("Collection complete", **stats)
+    
+    print("\n" + "="*70)
+    print("EVIDENCE COLLECTION SUMMARY")
+    print("="*70)
+    print(f"Companies Processed: {stats['companies_processed']}/{len(tickers)}")
+    
+    if collect_job:
+        print("\nJob Signals:")
+        print(f"  ✅ Collected: {stats['job_signals']['collected']}")
+        print(f"  📊 Total AI Jobs: {stats['job_signals']['total_ai_jobs']}")
+        print(f"  ❌ Errors: {stats['job_signals']['errors']}")
+    
+    if collect_leadership:
+        print("\nLeadership Signals:")
+        print(f"  ✅ Collected: {stats['leadership_signals']['collected']}")
+        print(f"  👥 Total Executives: {stats['leadership_signals']['total_executives']}")
+        print(f"  🎯 AI-Relevant Executives: {stats['leadership_signals']['total_ai_executives']}")
+        print(f"  ❌ Errors: {stats['leadership_signals']['errors']}")
+        
+        if stats['leadership_signals']['total_executives'] > 0:
+            ai_penetration = (
+                stats['leadership_signals']['total_ai_executives'] /
+                stats['leadership_signals']['total_executives'] * 100
+            )
+            print(f"  📈 AI Penetration Rate: {ai_penetration:.1f}%")
+    
+    print("="*70)
+    
+    return stats
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Collect evidence for target companies"
@@ -396,11 +615,17 @@ if __name__ == "__main__":
     parser.add_argument(
         "--companies",
         default="all",
-        help="Comma-separated tickers or 'all'"
+        help="Comma-separated tickers or 'all' (default: all)"
     )
     parser.add_argument(
         "--ticker",
         help="Single ticker to process (alternative to --companies)"
+    )
+    parser.add_argument(
+        "--signals",
+        default="all",
+        choices=["job", "leadership", "all"],
+        help="Signal types to collect: job, leadership, or all (default: all)"
     )
     
     args = parser.parse_args()
@@ -413,5 +638,10 @@ if __name__ == "__main__":
     else:
         tickers = [t.strip().upper() for t in args.companies.split(",")]
     
-
-    asyncio.run(main(tickers))
+    # Determine which signals to collect
+    if args.signals == "all":
+        signal_types = ["job", "leadership"]
+    else:
+        signal_types = [args.signals]
+    
+    asyncio.run(main(tickers, signal_types))

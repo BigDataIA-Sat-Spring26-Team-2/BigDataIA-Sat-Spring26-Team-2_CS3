@@ -281,24 +281,66 @@ def run_sec_download_for_company(
             upload_file_to_s3(file_path, s3_key)
             file_path.unlink()
 
-            # SECTION-LEVEL DEDUP + CHUNKING (unchanged)
+            # SECTION-LEVEL DEDUP + CHUNKING WITH LOGGING
+            # SECTION-LEVEL DEDUP + CHUNKING WITH LOGGING
             sections_extracted = len(parsed.sections)
             sections_stored = 0
             sections_duplicates = 0
             section_data = []
 
             chunk_index = 0
+            
+            # Log what sections were extracted
+            logger.info(
+                "sections_extracted",
+                ticker=ticker,
+                filing_type=f.filing_type,
+                sections_found=list(parsed.sections.keys()),
+                section_count=sections_extracted
+            )
 
-            for _, section_content in parsed.sections.items():
+            # SINGLE LOOP - processes all sections
+            for section_name, section_content in parsed.sections.items():
+                # ✅ FILTER: Skip invalid section/filing combinations
+                if section_name == 'executive_compensation' and f.filing_type == '10-K':
+                    logger.warning(
+                        "skipping_invalid_section",
+                        ticker=ticker,
+                        filing_type=f.filing_type,
+                        section=section_name,
+                        reason="10-K should not have compensation section (likely TOC match)"
+                    )
+                    continue
+                
                 words = section_content.split()
+                section_word_count = len(words)
+                
+                # Log section details
+                logger.info(
+                    "processing_section",
+                    ticker=ticker,
+                    filing_type=f.filing_type,
+                    section=section_name,
+                    word_count=section_word_count,
+                    will_chunk=(section_word_count >= 5000)
+                )
 
+                # Chunking decision
                 if len(words) < 5000:
                     chunks = [(chunk_index, section_content)]
                     next_index = chunk_index + 1
+                    
+                    logger.debug(
+                        "section_stored_whole",
+                        section=section_name,
+                        word_count=section_word_count,
+                        chunk_index=chunk_index
+                    )
                 else:
                     chunks = []
                     start = 0
                     idx_c = chunk_index
+                    
                     while start < len(words):
                         end = min(start + 1000, len(words))
                         chunks.append((idx_c, " ".join(words[start:end])))
@@ -306,8 +348,21 @@ def run_sec_download_for_company(
                         if end == len(words):
                             break
                         start = end - 100
+                    
                     next_index = idx_c
+                    
+                    logger.info(
+                        "section_chunked",
+                        section=section_name,
+                        total_words=section_word_count,
+                        chunks_created=len(chunks),
+                        avg_chunk_size=section_word_count // len(chunks) if len(chunks) > 0 else 0
+                    )
 
+                # Process chunks
+                chunks_added_this_section = 0
+                chunks_skipped_this_section = 0
+                
                 for idx_c, chunk_text in chunks:
                     chunk_hash = hashlib.sha256(chunk_text.encode("utf-8")).hexdigest()
                     chunk_word_count = len(chunk_text.split())
@@ -315,14 +370,35 @@ def run_sec_download_for_company(
                     cur.execute(f"SELECT 1 FROM {CHUNKS_TABLE} WHERE content_hash=%s", (chunk_hash,))
                     if cur.fetchone():
                         sections_duplicates += 1
+                        chunks_skipped_this_section += 1
                         continue
 
                     section_data.append(
-                        (str(uuid4()), None, idx_c, chunk_text, chunk_hash, chunk_word_count, None)
+                        (str(uuid4()), None, idx_c, chunk_text, chunk_hash, chunk_word_count, section_name, None)
                     )
                     sections_stored += 1
+                    chunks_added_this_section += 1
+
+                logger.info(
+                    "section_processed",
+                    section=section_name,
+                    chunks_added=chunks_added_this_section,
+                    chunks_skipped=chunks_skipped_this_section,
+                    total_section_chunks=len(chunks)
+                )
 
                 chunk_index = next_index
+
+            # Summary log
+            logger.info(
+                "chunking_complete",
+                ticker=ticker,
+                filing_type=f.filing_type,
+                sections_extracted=sections_extracted,
+                sections_stored=sections_stored,
+                sections_duplicates=sections_duplicates,
+                total_chunks_to_insert=len(section_data)
+            )
 
             # INSERT DOCUMENT
             doc_id = str(uuid4())
@@ -358,20 +434,30 @@ def run_sec_download_for_company(
             inserted_docs += 1
 
             if section_data:
-                final_sections = [
-                    (sid, doc_id, idx_c, txt, h, wc, now)
-                    for sid, _, idx_c, txt, h, wc, _ in section_data
-                ]
+                final_sections = []
+                for sid, _, idx_c, txt, h, wc, section_name, _ in section_data:
+                    final_sections.append(
+                        (sid, doc_id, idx_c, txt, h, wc, section_name, now)
+                    )
+                
                 cur.executemany(
                     f"""
                     INSERT INTO {CHUNKS_TABLE} (
                         id, document_id, chunk_index, chunk_text,
-                        content_hash, word_count, created_at
-                    ) VALUES (%s,%s,%s,%s,%s,%s,%s)
+                        content_hash, word_count, section, created_at
+                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
                     """,
                     final_sections,
                 )
                 inserted_chunks += len(final_sections)
+                
+                # ✅ ADD: Log successful insert
+                logger.info(
+                    "chunks_inserted",
+                    ticker=ticker,
+                    filing_type=f.filing_type,
+                    chunks_inserted=len(final_sections)
+                )
 
         conn.commit()
 
