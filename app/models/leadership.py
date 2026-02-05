@@ -1,7 +1,16 @@
+# app/models/leadership.py
+
+from pydantic import BaseModel, Field
+from typing import List, Optional
+from datetime import datetime
+from enum import Enum
+
+
 class AIIndicatorType(str, Enum):
     """Types of AI background indicators"""
     CHIEF_AI_OFFICER = "chief_ai_officer"
     AI_COMPANY_VETERAN = "ai_company_veteran"
+    DATA_ANALYTICS_LEADERSHIP = "data_analytics_leadership"
     PHD_AI_ML = "phd_ai_ml"
     AI_ROLE_TITLE = "ai_role_title"
     TECH_LEADERSHIP = "tech_leadership"
@@ -27,12 +36,16 @@ class ExecutiveProfile(BaseModel):
     sources: List[str] = Field(default_factory=list)
     
     def calculate_max_score(self):
-        """Calculate max indicator score"""
         if not self.indicators:
-            self.max_indicator_score = 0.0
-        else:
-            self.max_indicator_score = max(ind.score for ind in self.indicators)
-        return self.max_indicator_score
+        # fallback baseline so scoring never collapses
+            self.max_indicator_score = 0.15
+            return
+
+        scores = [ind.score for ind in self.indicators if ind.score is not None]
+        self.max_indicator_score = max(scores) if scores else 0.0
+
+
+
 
 
 class LeadershipEvidence(BaseModel):
@@ -64,18 +77,11 @@ class LeadershipEvidence(BaseModel):
 class LeadershipSignalMetrics(BaseModel):
     """Detailed metrics for leadership signal analysis"""
     
-    # Website metrics
     executives_found: int = 0
     website_score: float = Field(ge=0, le=100, default=0.0)
-    
-    # News metrics
     news_articles_found: int = 0
     news_bonus: float = Field(ge=0, le=10, default=0.0)
-    
-    # Overall
     composite_score: float = Field(ge=0, le=100, default=0.0)
     confidence: float = Field(ge=0, le=1, default=0.7)
-    
-    # Evidence tracking
     sources_attempted: int = 0
     sources_successful: int = 0

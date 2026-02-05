@@ -1,263 +1,394 @@
+#!/usr/bin/env python
 """
-Leadership Signals Test Script - Quick validation for one company.
+Test leadership signal collection for all 10 companies.
 
 Usage:
     python test_leadership.py
-    
-Before running:
-    1. Update TEST_COMPANY_ID with your company's UUID
-    2. Update TEST_TICKER with the company's ticker
-    3. Ensure FastAPI server is running: uvicorn app.main:app --reload
+    python test_leadership.py --ticker JPM
 """
 
 import asyncio
-import requests
+import argparse
 from uuid import UUID
+import sys
+from pathlib import Path
 
-# =============================================================================
-# CONFIGURATION - UPDATE THESE VALUES
-# =============================================================================
-API_BASE = "http://localhost:8000/api/v1"
+sys.path.insert(0, str(Path(__file__).parent))
 
-# ⚠️ UPDATE THESE WITH YOUR ACTUAL VALUES
-TEST_COMPANY_ID = "7f14d942-775b-4340-966b-42c10e88ee98"  # JPM UUID
-TEST_TICKER = "ADP"  # Company ticker
+from dotenv import load_dotenv
+load_dotenv()
 
-# For testing multiple companies, update these and re-run
-# TEST_COMPANY_ID = "your-other-company-uuid"
-# TEST_TICKER = "WMT"  # or "GS", "CAT", "UNH", etc.
+from app.pipelines.leadership_signals import LeadershipSignalCollector
+from app.services.snowflake import get_connection
+from app.config import get_settings
 
 
-async def test_leadership_signal():
-    """Test leadership signal collection for a company."""
-    
-    print("\n" + "="*60)
-    print("🚀 LEADERSHIP SIGNALS TEST SCRIPT")
-    print("="*60 + "\n")
-    
-    # Validate configuration
-    if TEST_COMPANY_ID == "7f14d942-775b-4340-966b-42c10e88ee98" and TEST_TICKER == "JPM":
-        print("ℹ️  Using default JPM configuration")
-        print("   To test other companies, update TEST_COMPANY_ID and TEST_TICKER\n")
-    
-    print(f"🧪 Testing Leadership Signals for {TEST_TICKER}")
-    print("="*60)
-    print(f"✅ Using company: {TEST_TICKER} ({TEST_COMPANY_ID})")
-    
-    # Check if server is running
-    try:
-        health_check = requests.get(f"{API_BASE}/health", timeout=30)
-        if health_check.status_code == 503:
-            print("\n⚠️  WARNING: Health check shows degraded service")
-            print("   Snowflake connection may be slow")
-            print("   Attempting leadership test anyway...\n")
-            # Don't return - continue with test
-        elif health_check.status_code != 200:
-            print("\n❌ ERROR: API server not responding correctly")
-            print("   Please start the server: uvicorn app.main:app --reload")
-            return
-    except requests.exceptions.ConnectionError:
-        print("\n❌ ERROR: Cannot connect to API server")
-        print("   Please start the server: uvicorn app.main:app --reload")
-        return
-    except requests.exceptions.Timeout:
-        print("\n⏱️  ERROR: Server timeout")
-        return
-    
-    # Collect leadership signals
-    print("\n📊 Collecting leadership signals...")
+TARGET_COMPANIES = {
+    'JPM': {'name': 'JPMorgan Chase', 'sector': 'Financial'},
+    'GS': {'name': 'Goldman Sachs', 'sector': 'Financial'},
+    'WMT': {'name': 'Walmart Inc.', 'sector': 'Retail'},
+    'TGT': {'name': 'Target Corporation', 'sector': 'Retail'},
+    'UNH': {'name': 'UnitedHealth Group', 'sector': 'Healthcare'},
+    'ADP': {'name': 'Automatic Data Processing', 'sector': 'Services'},
+    'PAYX': {'name': 'Paychex Inc.', 'sector': 'Services'},
+    'HCA': {'name': 'HCA Healthcare', 'sector': 'Healthcare'},
+    'CAT': {'name': 'Caterpillar Inc.', 'sector': 'Manufacturing'},
+    'DE': {'name': 'Deere & Company', 'sector': 'Manufacturing'},
+}
+
+
+async def get_company_id(ticker: str) -> UUID:
+    """Get company_id from database by ticker"""
+    settings = get_settings()
+    conn = get_connection()
+    cur = conn.cursor()
     
     try:
-        response = requests.post(
-            f"{API_BASE}/signals/collect-leadership-signals",
-            params={
-                'company_id': TEST_COMPANY_ID,
-                'ticker': TEST_TICKER
-            },
-            timeout=120  # 2 minutes timeout
+        query = f"""
+        SELECT id FROM {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.companies
+        WHERE ticker = %s AND is_deleted = FALSE
+        """
+        cur.execute(query, (ticker,))
+        row = cur.fetchone()
+        
+        if not row:
+            raise ValueError(f"Company not found: {ticker}")
+        
+        return UUID(row[0])
+    finally:
+        cur.close()
+        conn.close()
+
+
+async def test_single_company(ticker: str):
+    """Test leadership signal collection for a single company"""
+    
+    if ticker not in TARGET_COMPANIES:
+        print(f"❌ Unknown ticker: {ticker}")
+        print(f"Available: {', '.join(TARGET_COMPANIES.keys())}")
+        return False
+    
+    company_info = TARGET_COMPANIES[ticker]
+    
+    print("\n" + "="*100)
+    print(f"🧪 LEADERSHIP SIGNAL ANALYSIS: {ticker} - {company_info['name']}")
+    print("="*100 + "\n")
+    
+    try:
+        # Get company_id
+        company_id = await get_company_id(ticker)
+        
+        # Initialize collector
+        collector = LeadershipSignalCollector()
+        
+        # Collect signals
+        signal = await collector.analyze_company_leadership(
+            company_id=company_id,
+            ticker=ticker,
+            company_name=company_info['name']
         )
         
-        if response.status_code == 404:
-            print("\n❌ ERROR: No document chunks found!")
-            print("\n💡 SOLUTION: Download SEC filings first:")
-            print(f"   1. Go to http://localhost:8000/docs")
-            print(f"   2. Find POST /api/v1/documents/sec-edgar/download")
-            print(f"   3. Use these parameters:")
-            print(f"      - company_id: {TEST_COMPANY_ID}")
-            print(f"      - ticker: {TEST_TICKER}")
-            print(f"      - filing_types: ['10-K', 'DEF 14A']")
-            print(f"      - after: '2024-01-01'")
-            print(f"      - limit: 2")
-            return
-        
-        if response.status_code == 500:
-            print(f"\n❌ ERROR: Server error ({response.status_code})")
-            error_detail = response.json()
-            print(f"\nError details:")
-            print(f"   {error_detail.get('message', 'Unknown error')}")
-            if 'details' in error_detail:
-                print(f"   Details: {error_detail['details']}")
-            return
-        
-        if response.status_code != 201:
-            print(f"\n❌ ERROR: Unexpected status code {response.status_code}")
-            try:
-                print(response.json())
-            except:
-                print(response.text)
-            return
-        
-        signal = response.json()
-        
         # Display results
-        print(f"\n✅ Leadership Signal Collected Successfully!")
-        print("="*60)
+        print("\n" + "="*100)
+        print("📊 RESULTS SUMMARY")
+        print("="*100 + "\n")
         
-        print(f"\n📈 OVERALL SCORE: {signal['normalized_score']:.1f}/100")
-        print(f"🎯 CONFIDENCE: {signal['confidence']:.2f}")
-        print(f"📝 EVIDENCE COUNT: {signal['metadata']['evidence_count']}")
+        print(f"Leadership Score:    {signal.normalized_score:.1f}/100")
+        print(f"Confidence:          {signal.confidence:.2f}")
+        print(f"Tier:                {signal.metadata['tier']}")
+        print(f"Penalty Applied:     {signal.metadata['penalty_multiplier']:.0%}")
         
-        print("\n" + "="*60)
-        print("📊 SCORE BREAKDOWN")
-        print("="*60)
+        if signal.metadata['penalty_multiplier'] < 1.0:
+            print(f"Raw Score:           {signal.metadata['raw_score']:.1f}/100 (before penalty)")
         
-        metadata = signal['metadata']
+        print()
+        print(f"Total Executives:    {signal.metadata['executives_analyzed']}")
+        print(f"  ├─ AI-Relevant:    {signal.metadata['ai_executives']}")
+        print(f"  └─ Generic:        {signal.metadata['generic_executives']}")
         
-        print(f"\n💰 Compensation Metrics:  {metadata['tech_comp_score']:.1f}/100")
-        print("   → Measures: Tech-linked executive pay")
-        
-        print(f"\n🎯 AI Strategy:           {metadata['ai_strategy_score']:.1f}/100")
-        print("   → Measures: Strategic AI statements")
-        
-        print(f"\n💵 Tech Investment:       {metadata['tech_investment_score']:.1f}/100")
-        print("   → Measures: Technology spending mentions")
-        
-        print(f"\n⚠️  Risk Awareness:       {metadata['ai_risk_score']:.1f}/100")
-        print("   → Measures: AI/tech risk acknowledgment")
-        
-        print("\n" + "="*60)
-        print("📝 TOP EVIDENCE SAMPLES")
-        print("="*60)
-        
-        if metadata.get('top_evidence'):
-            for i, evidence in enumerate(metadata['top_evidence'][:5], 1):
-                print(f"\n{i}. [{evidence['type'].upper()}]")
-                print(f"   \"{evidence['snippet']}...\"")
-                keywords = evidence.get('keywords', [])
-                if keywords:
-                    print(f"   Keywords: {', '.join(keywords[:3])}")
-                if evidence.get('section'):
-                    print(f"   Section: {evidence['section']}")
+        # Show which executives were used for scoring
+        if signal.metadata['ai_executives'] > 0:
+            print(f"\n💡 Scoring used {signal.metadata['ai_executives']} AI-relevant executive(s) only")
         else:
-            print("\n(No evidence samples available)")
+            print(f"\n⚠️  No AI-relevant executives found - using {signal.metadata['generic_executives']} generic executive(s) with 50% penalty")
         
-        print("\n" + "="*60)
-        print("✅ TEST COMPLETE")
-        print("="*60)
+        # All executives table
+        print("\n" + "="*100)
+        print("👥 ALL EXECUTIVES FOUND")
+        print("="*100 + "\n")
         
-        # Interpretation guide
-        score = signal['normalized_score']
-        print("\n📊 Score Interpretation:")
+        exec_details = signal.metadata['executive_details']
+        
+        if not exec_details:
+            print("No executives found.\n")
+        else:
+            print(f"{'#':<4} {'Name':<28} {'Title':<38} {'Type':<14} {'Role Wt':<9} {'AI Score':<9}")
+            print("-"*100)
+            
+            for i, exec_detail in enumerate(exec_details, 1):
+                name = exec_detail['name'][:27]
+                title = exec_detail['title'][:37]
+                exec_type = '🎯 AI-Relevant' if exec_detail['is_ai_relevant'] else '📋 Generic'
+                role_wt = exec_detail['role_weight']
+                ai_score = exec_detail['ai_score']
+                print(f"{i:<4} {name:<28} {title:<38} {exec_type:<14} {role_wt:<9.2f} {ai_score:<9.2f}")
+        
+        # AI Indicators Detail
+        if exec_details:
+            print("\n" + "="*100)
+            print("🎯 AI INDICATORS BY EXECUTIVE")
+            print("="*100 + "\n")
+            
+            for exec_detail in exec_details:
+                is_ai_relevant = exec_detail['is_ai_relevant']
+                marker = "🎯" if is_ai_relevant else "📋"
+                
+                print(f"{marker} {exec_detail['name']}")
+                print(f"   Title: {exec_detail['title']}")
+                print(f"   Role Weight: {exec_detail['role_weight']:.2f} | AI Score: {exec_detail['ai_score']:.2f}")
+                
+                if exec_detail['indicators']:
+                    print(f"   AI Indicators:")
+                    for ind in exec_detail['indicators']:
+                        print(f"     ✓ {ind['type']}: {ind['score']:.2f}")
+                        print(f"       Evidence: {ind['evidence']}")
+                else:
+                    print(f"   ✗ No AI indicators found")
+                
+                print()
+        
+        # Score calculation breakdown
+        print("="*100)
+        print("📊 SCORE CALCULATION")
+        print("="*100 + "\n")
+        
+        if signal.metadata['ai_executives'] > 0:
+            print(f"Using {signal.metadata['ai_executives']} AI-Relevant Executive(s):\n")
+        else:
+            print(f"Using {signal.metadata['generic_executives']} Generic Executive(s) (No AI leadership found):\n")
+        
+        print(f"{'Executive':<30} {'Role Weight':<12} {'AI Score':<10} {'Contribution':<15}")
+        print("-"*100)
+        
+        total_weighted = 0
+        total_weight = 0
+        
+        for exec_detail in exec_details:
+            name = exec_detail['name'][:29]
+            role = exec_detail['role_weight']
+            ai = exec_detail['ai_score']
+            contrib = role * ai
+            
+            total_weighted += contrib
+            total_weight += role
+            
+            print(f"{name:<30} {role:<12.2f} {ai:<10.2f} {contrib:<15.4f}")
+        
+        print("-"*100)
+        print(f"{'TOTALS':<30} {total_weight:<12.2f} {'':10} {total_weighted:<15.4f}")
+        print()
+        
+        if signal.metadata['penalty_multiplier'] < 1.0:
+            print(f"Raw Score:    {signal.metadata['raw_score']:.1f}/100")
+            print(f"Penalty:      × {signal.metadata['penalty_multiplier']:.0%} (No AI leadership)")
+            print(f"Final Score:  {signal.normalized_score:.1f}/100")
+        else:
+            print(f"Score = {total_weighted:.4f} / {total_weight:.4f} × 100 = {signal.normalized_score:.1f}/100")
+        
+        # Interpretation
+        print("\n" + "="*100)
+        print("💡 INTERPRETATION")
+        print("="*100 + "\n")
+        
+        score = signal.normalized_score
+        
+        if signal.metadata['tier'] == "AI Leadership Present":
+            print(f"✅ {ticker} has dedicated AI leadership")
+        else:
+            print(f"⚠️  {ticker} lacks dedicated AI leadership (penalty applied)")
+        
+        print()
+        
         if score >= 70:
-            print(f"   🌟 AI LEADER: {TEST_TICKER} shows strong AI commitment")
+            print(f"🌟 AI LEADER: Strong AI leadership commitment")
+            print(f"   → Multiple AI-focused executives with technical backgrounds")
         elif score >= 50:
-            print(f"   ✅ AI ADOPTER: {TEST_TICKER} is actively investing in AI")
+            print(f"✅ AI ADOPTER: Active investment in AI leadership")
+            print(f"   → Has CTO/CIO/Chief Data Officer with AI focus")
         elif score >= 30:
-            print(f"   ⚠️  AI EXPLORER: {TEST_TICKER} has limited AI initiatives")
+            print(f"⚠️  AI EXPLORER: Limited AI leadership signals")
+            print(f"   → Some tech roles, but limited AI-specific expertise")
         else:
-            print(f"   ℹ️  TRADITIONAL: {TEST_TICKER} shows minimal AI focus")
+            print(f"ℹ️  TRADITIONAL: Minimal AI leadership focus")
+            print(f"   → Leadership team lacks AI/tech backgrounds")
         
-        # Suggest next steps
-        print("\n🚀 Next Steps:")
-        print(f"   1. Test another company (update TEST_TICKER)")
-        print(f"   2. View signal in Snowflake:")
-        print(f"      SELECT * FROM external_signals WHERE company_id = '{TEST_COMPANY_ID}'")
-        print(f"   3. Check signal summary:")
-        print(f"      GET {API_BASE}/signals/companies/{TEST_COMPANY_ID}/summary")
+        # Key findings
+        print("\n📌 Key Findings:")
         
-    except requests.exceptions.Timeout:
-        print("\n⏱️  Request timed out (>120s)")
-        print("💡 This might mean:")
-        print("   - Too many document chunks to process")
-        print("   - Database query is slow")
-        print("   - Try downloading fewer filings")
-    
+        ai_execs = [e for e in exec_details if e['ai_score'] >= 0.5]
+        if ai_execs:
+            print(f"   ✓ {len(ai_execs)} executive(s) with strong AI signals (score ≥ 0.5):")
+            for e in ai_execs:
+                print(f"     • {e['name']}: {e['title'][:55]}")
+        else:
+            print(f"   ✗ No executives with significant AI backgrounds found")
+        
+        tech_roles = [e for e in exec_details if any(kw in e['title'].lower() 
+                     for kw in ['cto', 'cio', 'cdo', 'technology', 'information', 'data', 'digital'])]
+        if tech_roles:
+            print(f"   ✓ {len(tech_roles)} technology leadership role(s)")
+        else:
+            print(f"   ✗ No dedicated technology leadership roles")
+        
+        # Cleanup
+        await collector.close()
+        
+        print("\n" + "="*100)
+        print("✅ TEST COMPLETE")
+        print("="*100 + "\n")
+        
+        return True
+        
     except Exception as e:
-        print(f"\n❌ Unexpected error: {e}")
+        print(f"\n❌ TEST FAILED: {str(e)}\n")
         import traceback
         traceback.print_exc()
+        return False
 
 
-async def test_multiple_companies():
-    """Test leadership signals for multiple companies."""
+async def test_all_companies():
+    """Test leadership signals for all 10 companies"""
     
-    companies = [
-        ("7f14d942-775b-4340-966b-42c10e88ee98", "JPM"),
-        # Add more companies here
-        # ("uuid2", "WMT"),
-        # ("uuid3", "GS"),
-    ]
-    
-    print("\n" + "="*60)
-    print(f"🚀 TESTING {len(companies)} COMPANIES")
-    print("="*60 + "\n")
+    print("\n" + "="*100)
+    print("🧪 LEADERSHIP SIGNALS - ALL 10 COMPANIES")
+    print("="*100 + "\n")
     
     results = []
     
-    for company_id, ticker in companies:
-        print(f"\n📊 Testing {ticker}...")
+    for ticker, company_info in TARGET_COMPANIES.items():
+        print(f"▶️  {ticker} - {company_info['name']}...", end=' ')
         
         try:
-            response = requests.post(
-                f"{API_BASE}/signals/collect-leadership-signals",
-                params={'company_id': company_id, 'ticker': ticker},
-                timeout=120
+            company_id = await get_company_id(ticker)
+            collector = LeadershipSignalCollector()
+            
+            signal = await collector.analyze_company_leadership(
+                company_id=company_id,
+                ticker=ticker,
+                company_name=company_info['name']
             )
             
-            if response.status_code == 201:
-                signal = response.json()
-                results.append({
-                    'ticker': ticker,
-                    'score': signal['normalized_score'],
-                    'confidence': signal['confidence'],
-                    'evidence': signal['metadata']['evidence_count']
-                })
-                print(f"   ✅ {ticker}: {signal['normalized_score']:.1f}/100")
-            else:
-                print(f"   ❌ {ticker}: Error {response.status_code}")
-                
+            ai_execs = signal.metadata.get('ai_executives', 0)
+            tier = signal.metadata.get('tier', 'Unknown')
+            
+            results.append({
+                'ticker': ticker,
+                'company': company_info['name'][:28],
+                'sector': company_info['sector'],
+                'score': signal.normalized_score,
+                'confidence': signal.confidence,
+                'executives': signal.metadata['executives_analyzed'],
+                'ai_executives': ai_execs,
+                'tier': tier,
+                'status': 'success'
+            })
+            
+            print(f"✅ {signal.normalized_score:.1f}/100 | AI Execs: {ai_execs}")
+            
+            await collector.close()
+            
         except Exception as e:
-            print(f"   ❌ {ticker}: {str(e)}")
+            print(f"❌ {str(e)[:50]}")
+            results.append({
+                'ticker': ticker,
+                'company': company_info['name'][:28],
+                'sector': company_info['sector'],
+                'score': 0,
+                'confidence': 0,
+                'executives': 0,
+                'ai_executives': 0,
+                'tier': 'Failed',
+                'status': 'failed'
+            })
     
     # Summary table
-    if results:
-        print("\n" + "="*60)
-        print("📊 RESULTS SUMMARY")
-        print("="*60)
-        print(f"\n{'Ticker':<8} {'Score':>8} {'Confidence':>12} {'Evidence':>10}")
-        print("-"*40)
-        for r in sorted(results, key=lambda x: x['score'], reverse=True):
-            print(f"{r['ticker']:<8} {r['score']:>7.1f} {r['confidence']:>11.2f} {r['evidence']:>10}")
-
-if __name__ == "__main__":
-    print("\n" + "="*60)
-    print("🚀 LEADERSHIP SIGNALS TEST SCRIPT")
-    print("="*60 + "\n")
+    print("\n" + "="*100)
+    print("📊 FINAL RESULTS - ALL COMPANIES")
+    print("="*100 + "\n")
     
-    # Configuration check - fixed logic
-    if TEST_COMPANY_ID == "YOUR_COMPANY_UUID_HERE":
-        print("⚠️  SETUP REQUIRED:")
-        print("="*60)
-        print("\n1. Get your company UUID from Snowflake:")
-        print("   SELECT id, ticker FROM companies WHERE ticker = 'JPM';")
-        print("\n2. Update test_leadership.py:")
-        print("   TEST_COMPANY_ID = 'your-uuid-here'")
-        print("   TEST_TICKER = 'JPM'")
-        print("\n3. Run again: python test_leadership.py")
-        print("\n" + "="*60)
-    else:
-        # Run single company test
-        asyncio.run(test_leadership_signal())
+    print(f"{'Rank':<6} {'Ticker':<8} {'Company':<29} {'Sector':<13} {'Score':<9} {'AI Execs':<10} {'Tier':<30}")
+    print("-"*100)
+    
+    for rank, r in enumerate(sorted(results, key=lambda x: x['score'], reverse=True), 1):
+        tier_icon = "🎯" if "AI Leadership" in r['tier'] else "⚠️ " if "Penalty" in r['tier'] else "❌"
+        print(f"{rank:<6} {r['ticker']:<8} {r['company']:<29} {r['sector']:<13} "
+              f"{r['score']:<9.1f} {r['ai_executives']:<10} {tier_icon} {r['tier']:<30}")
+    
+    # Statistics by sector
+    print("\n" + "="*100)
+    print("📈 SECTOR ANALYSIS")
+    print("="*100 + "\n")
+    
+    sectors = {}
+    for r in results:
+        if r['status'] == 'success':
+            sector = r['sector']
+            if sector not in sectors:
+                sectors[sector] = {'scores': [], 'ai_execs': [], 'companies': []}
+            sectors[sector]['scores'].append(r['score'])
+            sectors[sector]['ai_execs'].append(r['ai_executives'])
+            sectors[sector]['companies'].append(r['ticker'])
+    
+    print(f"{'Sector':<20} {'Avg Score':<12} {'Avg AI Execs':<15} {'Companies':<40}")
+    print("-"*100)
+    
+    for sector, data in sorted(sectors.items(), key=lambda x: sum(x[1]['scores'])/len(x[1]['scores']), reverse=True):
+        avg_score = sum(data['scores']) / len(data['scores'])
+        avg_ai = sum(data['ai_execs']) / len(data['ai_execs'])
+        companies = ', '.join(data['companies'])
+        print(f"{sector:<20} {avg_score:<12.1f} {avg_ai:<15.1f} {companies:<40}")
+    
+    # Overall statistics
+    successful = [r for r in results if r['status'] == 'success']
+    if successful:
+        print("\n" + "="*100)
+        print("📊 OVERALL STATISTICS")
+        print("="*100 + "\n")
         
-        # Uncomment to test multiple companies:
-        # asyncio.run(test_multiple_companies())
+        avg_score = sum(r['score'] for r in successful) / len(successful)
+        total_executives = sum(r['executives'] for r in successful)
+        total_ai = sum(r['ai_executives'] for r in successful)
+        companies_with_ai = sum(1 for r in successful if r['ai_executives'] > 0)
+        
+        print(f"  Success Rate:              {len(successful)}/10 companies")
+        print(f"  Average Score:             {avg_score:.1f}/100")
+        print(f"  Total Executives Found:    {total_executives}")
+        print(f"  Total AI-Relevant Execs:   {total_ai}")
+        print(f"  Companies with AI Leaders: {companies_with_ai}/10")
+        print(f"  AI Penetration Rate:       {(total_ai/total_executives*100):.1f}%")
+    
+    print("\n" + "="*100)
+    print("✅ ALL TESTS COMPLETE")
+    print("="*100 + "\n")
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Test leadership signal collection"
+    )
+    parser.add_argument(
+        '--ticker',
+        help='Test single company (e.g., JPM)',
+        type=str
+    )
+    
+    args = parser.parse_args()
+    
+    if args.ticker:
+        asyncio.run(test_single_company(args.ticker.upper()))
+    else:
+        asyncio.run(test_all_companies())
+
+
+if __name__ == '__main__':
+    main()

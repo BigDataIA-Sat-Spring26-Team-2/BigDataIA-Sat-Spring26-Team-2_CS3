@@ -210,6 +210,9 @@ def refresh_signal_summary(company_id: UUID):
 
     
 
+# app/routers/signal.py
+# Add this new endpoint to your existing signal.py file
+
 @router.post(
     "/collect-leadership-signals",
     response_model=ExternalSignal,
@@ -218,155 +221,88 @@ def refresh_signal_summary(company_id: UUID):
 async def collect_leadership_signals(
     company_id: UUID = Query(...),
     ticker: str = Query(...),
+    company_name: str = Query(...),
     background_tasks: BackgroundTasks = None,
 ):
     """
-    Collect leadership commitment signals from existing SEC filings.
+    Collect leadership commitment signals from external sources.
+    
+    Sources:
+    - Company website (90%): Executive discovery and AI role detection
+    - NewsAPI (10%): Recent AI leadership activity validation
+    
+    Args:
+        company_id: Company UUID from database
+        ticker: Stock ticker (e.g., "JPM")
+        company_name: Full company name (e.g., "JPMorgan Chase")
+        
+    Returns:
+        ExternalSignal with leadership score (0-100)
+        
+    Example:
+        POST /api/v1/signals/collect-leadership-signals?company_id=xxx&ticker=JPM&company_name=JPMorgan%20Chase
     """
     import time
-    from app.config import get_settings
-    from fastapi import HTTPException
-    
     start_time = time.time()
     
-    print(f"\n{'='*60}")
-    print(f"🔍 Starting leadership collection for {ticker}")
-    print(f"{'='*60}\n")
+    logger.info(
+        "Leadership collection started",
+        ticker=ticker,
+        company=company_name
+    )
     
-    settings = get_settings()
-    
-    # Fetch document chunks from Snowflake
-    print(f"[1] Connecting to Snowflake...")
-    conn = snowflake.get_connection()
-    cur = conn.cursor()
-    print(f"[1] ✅ Connected ({time.time() - start_time:.2f}s)")
+    # Import here to avoid circular dependencies
+    from app.pipelines.leadership_signals import LeadershipSignalCollector
     
     try:
-        # Count total chunks
-        print(f"\n[2] Counting chunks...")
-        count_query = f"""
-        SELECT COUNT(*) 
-        FROM {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.document_chunks dc
-        JOIN {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.documents d
-            ON dc.document_id = d.id
-        WHERE d.company_id = %s AND d.ticker = %s
-        """
-        cur.execute(count_query, (str(company_id), ticker))
-        total_chunks = cur.fetchone()[0]
-        print(f"[2] ✅ Found {total_chunks} total chunks ({time.time() - start_time:.2f}s)")
+        # Initialize collector
+        collector = LeadershipSignalCollector()
         
-        if total_chunks == 0:
-            raise HTTPException(
-                status_code=404,
-                detail=f"No document chunks found for {ticker}. Run SEC EDGAR pipeline first."
-            )
-        
-        # Fetch chunks with section info
-        # COALESCE handles both old chunks (section=NULL) and new chunks (section='item_1_business')
-        print(f"\n[3] Fetching chunks (stratified by filing type)...")
-        query = f"""
-        WITH ranked_chunks AS (
-            SELECT 
-                dc.chunk_text, 
-                d.filing_type,
-                COALESCE(dc.section, 'unknown') as section,
-                d.filing_date,
-                ROW_NUMBER() OVER (PARTITION BY d.filing_type ORDER BY d.filing_date DESC, dc.chunk_index) as rn
-            FROM {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.document_chunks dc
-            JOIN {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.documents d
-                ON dc.document_id = d.id
-            WHERE d.company_id = %s 
-              AND d.ticker = %s
+        # Analyze leadership
+        signal = await collector.analyze_company_leadership(
+            company_id=company_id,
+            ticker=ticker,
+            company_name=company_name
         )
-        SELECT chunk_text, filing_type, section
-        FROM ranked_chunks
-        WHERE rn <= 50
-        ORDER BY filing_type, rn
-        """
         
-        cur.execute(query, (str(company_id), ticker))
-        rows = cur.fetchall()
-        print(f"[3] ✅ Fetched {len(rows)} chunks ({time.time() - start_time:.2f}s)")
+        # Store in database
+        stored_signal = signal_service.store_signal(signal)
         
-        if not rows:
-            raise HTTPException(
-                status_code=404,
-                detail=f"No chunks returned for {ticker}"
+        # Update summary in background
+        if background_tasks:
+            background_tasks.add_task(
+                signal_service.update_signal_summary,
+                company_id
             )
+        else:
+            signal_service.update_signal_summary(company_id)
         
-        chunks = [
-            {
-                'chunk_text': row[0],
-                'filing_type': row[1],
-                'section': row[2]  # Will be actual section or 'unknown'
-            }
-            for row in rows
-        ]
+        # Cleanup
+        await collector.close()
         
-        # Show sample
-        print(f"    Sample:")
-        print(f"    - Filing: {chunks[0]['filing_type']}")
-        print(f"    - Section: {chunks[0]['section']}")
-        print(f"    - Text: {len(chunks[0]['chunk_text'])} chars")
-        
-        # Show section distribution
-        section_counts = {}
-        for chunk in chunks:
-            section = chunk['section']
-            section_counts[section] = section_counts.get(section, 0) + 1
-        
-        print(f"\n    Section distribution:")
-        for section, count in sorted(section_counts.items(), key=lambda x: x[1], reverse=True):
-            print(f"      {section}: {count} chunks")
-        
-        # ✅ ADD THIS - Filing type distribution
-        filing_counts = {}
-        for chunk in chunks:
-            ft = chunk['filing_type']
-            filing_counts[ft] = filing_counts.get(ft, 0) + 1
-        
-        print(f"\n    Filing type distribution:")
-        for ft, count in sorted(filing_counts.items()):
-            print(f"      {ft}: {count} chunks")
-        
-    finally:
-        cur.close()
-        conn.close()
-        print(f"[3] Connection closed ({time.time() - start_time:.2f}s)")
-    
-    # Analyze
-    print(f"\n[4] Analyzing with LeadershipSignalCollector...")
-    collector = LeadershipSignalCollector()
-    signal = await collector.analyze_company_leadership(
-        company_id=company_id,
-        ticker=ticker,
-        document_chunks=chunks
-    )
-    print(f"[4] ✅ Analysis complete ({time.time() - start_time:.2f}s)")
-    print(f"    Score: {signal.normalized_score:.1f}/100")
-    print(f"    Evidence: {signal.metadata.get('evidence_count')} pieces")
-    
-    # Store
-    print(f"\n[5] Storing signal...")
-    stored_signal = signal_service.store_signal(signal)
-    print(f"[5] ✅ Stored ({time.time() - start_time:.2f}s)")
-    
-    # Update summary
-    print(f"\n[6] Updating summary...")
-    if background_tasks:
-        background_tasks.add_task(
-            signal_service.update_signal_summary,
-            company_id
+        elapsed = time.time() - start_time
+        logger.info(
+            "Leadership collection complete",
+            ticker=ticker,
+            score=signal.normalized_score,
+            elapsed_seconds=round(elapsed, 2)
         )
-        print(f"[6] Summary queued (background) ({time.time() - start_time:.2f}s)")
-    else:
-        signal_service.update_signal_summary(company_id)
-        print(f"[6] ✅ Summary updated ({time.time() - start_time:.2f}s)")
-    
-    total_time = time.time() - start_time
-    print(f"\n{'='*60}")
-    print(f"✅ COMPLETE in {total_time:.2f}s")
-    print(f"{'='*60}\n")
-    
-    return stored_signal
+
+        
+
+
+        
+        return stored_signal
+        
+    except Exception as e:
+        logger.error(
+            "Leadership collection failed",
+            ticker=ticker,
+            error=str(e),
+            error_type=type(e).__name__
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Leadership signal collection failed: {str(e)}"
+        )
 
