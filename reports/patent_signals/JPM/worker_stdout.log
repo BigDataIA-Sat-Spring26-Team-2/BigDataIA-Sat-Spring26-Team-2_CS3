@@ -1,0 +1,94 @@
+2026-02-05 02:48:06 [info     ] Starting evidence collection   companies=['JPM'] signal_types=['job', 'leadership']
+2026-02-05 02:48:06 [info     ] Processing company             name='JPMorgan Chase' sector=Financial ticker=JPM
+SNOWFLAKE SETTINGS: PE_ORGAIR PUBLIC None
+2026-02-05 02:48:09 [info     ] Company found                  company_id=0c5c7684-48a4-4e3c-8e24-98c96a18f2f0 ticker=JPM
+2026-02-05 02:48:09 [info     ] Collecting job signals         company_name='JPMorgan Chase' ticker=JPM
+2026-02-05 02:48:09 [info     ] search_queries_generated       num_queries=6 queries=['JPMorgan Chase (machine learning OR ML OR artificial intelligence OR AI) engineer', 'JPMorgan Chase (data scientist OR research scientist OR applied scientist OR AI research)', 'JPMorgan Chase (computer vision OR NLP OR natural language processing OR deep learning OR neural network)', 'JPMorgan Chase (MLOps OR ML infrastructure OR AI platform OR machine learning operations)', 'JPMorgan Chase (LLM OR large language model OR generative AI OR gen AI OR prompt engineer)', 'JPMorgan Chase data engineer (machine learning OR AI OR ML pipeline)'] ticker=JPM
+2026-02-05 02:48:53 [info     ] query_complete                 jobs_found=30 query='JPMorgan Chase (machine learning OR ML OR artificial intelligence OR AI) enginee' ticker=JPM
+2026-02-05 02:49:31 [info     ] query_complete                 jobs_found=60 query='JPMorgan Chase (data scientist OR research scientist OR applied scientist OR AI ' ticker=JPM
+2026-02-05 02:50:14 [info     ] query_complete                 jobs_found=59 query='JPMorgan Chase (computer vision OR NLP OR natural language processing OR deep le' ticker=JPM
+2026-02-05 02:50:58 [info     ] query_complete                 jobs_found=60 query='JPMorgan Chase (MLOps OR ML infrastructure OR AI platform OR machine learning op' ticker=JPM
+2026-02-05 02:51:35 [info     ] query_complete                 jobs_found=60 query='JPMorgan Chase (LLM OR large language model OR generative AI OR gen AI OR prompt' ticker=JPM
+2026-02-05 02:52:15 [info     ] query_complete                 jobs_found=60 query='JPMorgan Chase data engineer (machine learning OR AI OR ML pipeline)' ticker=JPM
+2026-02-05 02:52:15 [info     ] deduplication_complete         after=223 after_by_source={'Linkedin': 94, 'Indeed': 129} before=329 before_by_source={'Linkedin': 180, 'Indeed': 149} duplicates_removed=106 ticker=JPM
+2026-02-05 02:52:15 [info     ] === STORE SIGNAL START ===     category=technology_hiring company_id=0c5c7684-48a4-4e3c-8e24-98c96a18f2f0 score=91.9 signal_id=074e082f-d266-46b9-ba0f-b2863905e631 source=LinkedIn_Indeed
+2026-02-05 02:52:15 [info     ] Metadata serialized            size=1081
+2026-02-05 02:52:15 [info     ] Getting Snowflake connection...
+SNOWFLAKE SETTINGS: PE_ORGAIR PUBLIC None
+2026-02-05 02:52:19 [info     ] Connection established
+2026-02-05 02:52:19 [info     ] Checking company exists...
+2026-02-05 02:52:20 [info     ] Company exists - OK
+2026-02-05 02:52:20 [info     ] Executing INSERT               category=technology_hiring company_id=0c5c7684 id=074e082f score=91.9
+2026-02-05 02:52:21 [info     ] Rows affected                  rowcount=1
+2026-02-05 02:52:21 [info     ] Transaction committed
+2026-02-05 02:52:21 [info     ] Verification count             count=1
+2026-02-05 02:52:21 [info     ] === STORE SIGNAL SUCCESS ===   signal_id=074e082f-d266-46b9-ba0f-b2863905e631
+2026-02-05 02:52:21 [info     ] Database connection closed
+2026-02-05 02:52:21 [info     ] signal_stored                  ai_jobs=132 avg_ai_relevance=0.746 indeed_ai_jobs=0 indeed_avg_relevance=0.0 linkedin_ai_jobs=0 linkedin_avg_relevance=0.0 score=91.9 ticker=JPM
+SNOWFLAKE SETTINGS: PE_ORGAIR PUBLIC None
+2026-02-05 02:52:27 [info     ] Summary updated                ticker=JPM
+2026-02-05 02:52:27 [error    ] Company processing failed      error="'charmap' codec can't encode character '\\u274c' in position 32: character maps to <undefined>" error_type=UnicodeEncodeError ticker=JPM
+2026-02-05 02:52:27 [info     ] Collection complete            companies_processed=0 job_signals={'collected': 1, 'total_ai_jobs': 0, 'errors': 1} leadership_signals={'collected': 0, 'total_executives': 0, 'total_ai_executives': 0, 'errors': 0}
+
+======================================================================
+EVIDENCE COLLECTION SUMMARY
+======================================================================
+Companies Processed: 0/1
+
+Job Signals:
+2026-02-05 03:03:16 [info     ] Starting evidence collection   companies=['JPM'] signal_types=['job', 'leadership']
+2026-02-05 03:03:16 [info     ] Processing company             name='JPMorgan Chase' sector=Financial ticker=JPM
+SNOWFLAKE SETTINGS: PE_ORGAIR PUBLIC None
+2026-02-05 03:03:20 [info     ] Company found                  company_id=0c5c7684-48a4-4e3c-8e24-98c96a18f2f0 ticker=JPM
+2026-02-05 03:03:20 [info     ] Collecting job signals         company_name='JPMorgan Chase' ticker=JPM
+2026-02-05 03:03:20 [info     ] search_queries_generated       num_queries=6 queries=['JPMorgan Chase (machine learning OR ML OR artificial intelligence OR AI) engineer', 'JPMorgan Chase (data scientist OR research scientist OR applied scientist OR AI research)', 'JPMorgan Chase (computer vision OR NLP OR natural language processing OR deep learning OR neural network)', 'JPMorgan Chase (MLOps OR ML infrastructure OR AI platform OR machine learning operations)', 'JPMorgan Chase (LLM OR large language model OR generative AI OR gen AI OR prompt engineer)', 'JPMorgan Chase data engineer (machine learning OR AI OR ML pipeline)'] ticker=JPM
+2026-02-05 03:04:00 [info     ] query_complete                 jobs_found=30 query='JPMorgan Chase (machine learning OR ML OR artificial intelligence OR AI) enginee' ticker=JPM
+2026-02-05 03:04:45 [info     ] query_complete                 jobs_found=60 query='JPMorgan Chase (data scientist OR research scientist OR applied scientist OR AI ' ticker=JPM
+2026-02-05 03:05:27 [info     ] query_complete                 jobs_found=59 query='JPMorgan Chase (computer vision OR NLP OR natural language processing OR deep le' ticker=JPM
+2026-02-05 03:06:10 [info     ] query_complete                 jobs_found=60 query='JPMorgan Chase (MLOps OR ML infrastructure OR AI platform OR machine learning op' ticker=JPM
+2026-02-05 03:06:50 [info     ] query_complete                 jobs_found=60 query='JPMorgan Chase (LLM OR large language model OR generative AI OR gen AI OR prompt' ticker=JPM
+2026-02-05 03:07:29 [info     ] query_complete                 jobs_found=60 query='JPMorgan Chase data engineer (machine learning OR AI OR ML pipeline)' ticker=JPM
+2026-02-05 03:07:29 [info     ] deduplication_complete         after=223 after_by_source={'Linkedin': 94, 'Indeed': 129} before=329 before_by_source={'Linkedin': 180, 'Indeed': 149} duplicates_removed=106 ticker=JPM
+2026-02-05 03:07:29 [info     ] === STORE SIGNAL START ===     category=technology_hiring company_id=0c5c7684-48a4-4e3c-8e24-98c96a18f2f0 score=91.9 signal_id=93b580d4-f48c-4070-801f-5d506f29eb39 source=LinkedIn_Indeed
+2026-02-05 03:07:29 [info     ] Metadata serialized            size=1081
+2026-02-05 03:07:29 [info     ] Getting Snowflake connection...
+SNOWFLAKE SETTINGS: PE_ORGAIR PUBLIC None
+2026-02-05 03:07:32 [info     ] Connection established
+2026-02-05 03:07:32 [info     ] Checking company exists...
+2026-02-05 03:07:32 [info     ] Company exists - OK
+2026-02-05 03:07:32 [info     ] Executing INSERT               category=technology_hiring company_id=0c5c7684 id=93b580d4 score=91.9
+2026-02-05 03:07:33 [info     ] Rows affected                  rowcount=1
+2026-02-05 03:07:33 [info     ] Transaction committed
+2026-02-05 03:07:34 [info     ] Verification count             count=1
+2026-02-05 03:07:34 [info     ] === STORE SIGNAL SUCCESS ===   signal_id=93b580d4-f48c-4070-801f-5d506f29eb39
+2026-02-05 03:07:34 [info     ] Database connection closed
+2026-02-05 03:07:34 [info     ] signal_stored                  ai_jobs=132 avg_ai_relevance=0.746 indeed_ai_jobs=0 indeed_avg_relevance=0.0 linkedin_ai_jobs=0 linkedin_avg_relevance=0.0 score=91.9 ticker=JPM
+SNOWFLAKE SETTINGS: PE_ORGAIR PUBLIC None
+2026-02-05 03:07:40 [info     ] Summary updated                ticker=JPM
+2026-02-05 03:07:40 [error    ] Job signals failed             error="unsupported operand type(s) for +=: 'int' and 'dict'" ticker=JPM
+2026-02-05 03:07:40 [info     ] === LEADERSHIP SIGNALS START === company_name='JPMorgan Chase' ticker=JPM
+2026-02-05 03:07:41 [info     ] NewsAPI disabled - free tier limitations (HTTP 426) collector=NewsAPI
+2026-02-05 03:07:41 [info     ] Starting analysis              collector=leadership_orchestrator company='JPMorgan Chase' ticker=JPM
+2026-02-05 03:07:41 [error    ] Leadership signal collection failed error="'charmap' codec can't encode character '\\U0001f310' in position 32: character maps to <undefined>" error_type=UnicodeEncodeError ticker=JPM
+2026-02-05 03:07:41 [error    ] Leadership signals failed      error="'charmap' codec can't encode character '\\U0001f310' in position 32: character maps to <undefined>" ticker=JPM
+SNOWFLAKE SETTINGS: PE_ORGAIR PUBLIC None
+2026-02-05 03:07:45 [info     ] Summary updated                ticker=JPM
+2026-02-05 03:07:45 [info     ] Company complete               progress=1/1 ticker=JPM
+2026-02-05 03:07:45 [info     ] Collection complete            companies_processed=1 job_signals={'collected': 1, 'total_ai_jobs': 0, 'errors': 1} leadership_signals={'collected': 0, 'total_executives': 0, 'total_ai_executives': 0, 'errors': 1}
+
+======================================================================
+EVIDENCE COLLECTION SUMMARY
+======================================================================
+Companies Processed: 1/1
+
+Job Signals:
+  Collected: 1
+  Total AI Jobs: 0
+  Errors: 1
+
+Leadership Signals:
+  Collected: 0
+  Total Executives: 0
+  AI-Relevant Executives: 0
+  Errors: 1
+======================================================================

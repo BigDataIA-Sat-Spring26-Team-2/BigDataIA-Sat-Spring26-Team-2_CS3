@@ -1,6 +1,6 @@
 import argparse
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Dict, List
 from uuid import UUID
 from pathlib import Path
@@ -10,23 +10,26 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 from app.pipelines.job_signals import JobSignalCollector
 from app.services import signal_service
+from app.pipelines.patent_signals import PatentSignalCollector
+from app.reports.patent_report import write_patent_report
 from app.services.snowflake import get_connection
 from app.config import get_settings
 
 logger = structlog.get_logger()
 
 TARGET_COMPANIES = {
-    "CAT": {"name": "Caterpillar Inc.", "sector": "Manufacturing"},
-    "DE": {"name": "Deere & Company", "sector": "Manufacturing"},
-    "UNH": {"name": "UnitedHealth Group", "sector": "Healthcare"},
-    "HCA": {"name": "HCA Healthcare", "sector": "Healthcare"},
-    "ADP": {"name": "Automatic Data Processing", "sector": "Services"},
-    "PAYX": {"name": "Paychex Inc.", "sector": "Services"},
-    "WMT": {"name": "Walmart Inc.", "sector": "Retail"},
-    "TGT": {"name": "Target Corporation", "sector": "Retail"},
-    "JPM": {"name": "JPMorgan Chase", "sector": "Financial"},
-    "GS": {"name": "Goldman Sachs", "sector": "Financial"},
+    "CAT": {"name": "Caterpillar Inc.", "sector": "Manufacturing", "assignee": "Caterpillar Inc."},
+    "DE": {"name": "Deere & Company", "sector": "Manufacturing", "assignee": "Deere & Company"},
+    "UNH": {"name": "UnitedHealth Group", "sector": "Healthcare", "assignee": "UnitedHealth Group Incorporated"},
+    "HCA": {"name": "HCA Healthcare", "sector": "Healthcare", "assignee": "HCA Healthcare, Inc."},
+    "ADP": {"name": "Automatic Data Processing", "sector": "Services", "assignee": "Automatic Data Processing, Inc."},
+    "PAYX": {"name": "Paychex Inc.", "sector": "Services", "assignee": "Paychex Inc."},
+    "WMT": {"name": "Walmart Inc.", "sector": "Retail", "assignee": "Walmart Apollo Llc"},
+    "TGT": {"name": "Target Corporation", "sector": "Retail", "assignee": "Target Brands, Inc"},
+    "JPM": {"name": "JPMorgan Chase", "sector": "Financial", "assignee": "Jp Morgan Chase Bank, N.A."},
+    "GS": {"name": "Goldman Sachs", "sector": "Financial", "assignee": "Goldman Sachs & Co"},
 }
+
 
 
 def _fq_table(name: str) -> str:
@@ -208,44 +211,114 @@ async def collect_job_signals(ticker: str, company_id: UUID, company_name: str):
         "by_source": by_source
     }
 
+async def collect_patent_signal(ticker: str, company_id, assignee: str):
+    """
+    Collect patent signals using Playwright (JS-rendered),
+    exactly like the notebook.
+    """
+
+    logger = structlog.get_logger()
+    logger.info("Collecting patent signal", ticker=ticker, assignee=assignee)
+
+    collector = PatentSignalCollector()
+
+    # Same 5-year cutoff logic as notebook
+    cutoff = datetime.now(timezone.utc) - timedelta(days=5 * 365)
+    after_date = cutoff.strftime("%Y%m%d")
+
+    # ✅ EXACT SAME URL LOGIC AS NOTEBOOK
+    print("DEBUG calling build_verification_url")
+    print("  assignee arg =", assignee)
+    print("  after_date =", after_date)
+    verification_url = collector.build_verification_url(
+        assignee=assignee,
+        after_yyyymmdd=after_date
+    )
+
+    logger.info("Patent verification URL", url=verification_url)
+
+    # ✅ PLAYWRIGHT-BASED SCRAPE (THIS WAS THE MISSING PIECE)
+    analysis = await collector.analyze(verification_url)
+
+    logger.info(
+        "Patent analysis result",
+        count=analysis.count,
+        recent=analysis.recent,
+        categories=analysis.categories,
+    )
+
+    # Score exactly like notebook
+    signal = collector.score(company_id=company_id, assignee=assignee, analysis=analysis)
+
+
+    # Store + update summary
+    signal_service.store_signal(signal)
+    signal_service.update_signal_summary(company_id)
+
+    # Write report (same pattern as job report)
+    out_dir = Path("reports/patent_signals") / ticker
+    paths = write_patent_report(signal, out_dir)
+
+    logger.info(
+        "Patent signal stored + report written",
+        ticker=ticker,
+        score=signal.normalized_score,
+        report_md=str(paths.md_path),
+        report_csv=str(paths.csv_path),
+    )
+
+    return signal
+
 
 async def main(tickers: list[str]):
 
+    logger = structlog.get_logger()
     logger.info("Starting evidence collection", companies=tickers)
-    
+
     stats = {
         "companies_processed": 0,
-        "total_ai_jobs": 0,
         "errors": 0,
+        "total_ai_jobs": 0,
     }
 
     company_results: List[Dict] = []
-    
+
     for ticker in tickers:
         if ticker not in TARGET_COMPANIES:
             logger.warning("Unknown ticker", ticker=ticker)
             continue
-        
+
         company_info = TARGET_COMPANIES[ticker]
         company_name = company_info["name"]
         sector = company_info["sector"]
-        
-        logger.info("Processing company", 
-                   ticker=ticker, 
-                   name=company_name, 
-                   sector=sector)
-        
+        assignee = company_info.get("assignee") or company_name
+
+        logger.info(
+            "Processing company",
+            ticker=ticker,
+            name=company_name,
+            sector=sector
+        )
+
         try:
-            # Get or create company
-            company_id = await get_or_create_company(ticker, company_name, sector)
-            
-            # Collect job signals (now returns dict with metrics)
-            metrics = await collect_job_signals(ticker, company_id, company_name)
-            
-            stats["companies_processed"] += 1
+            company_id = await get_or_create_company(
+                ticker, company_name, sector
+            )
+
+            # -------- JOB SIGNALS --------
+            metrics = await collect_job_signals(
+                ticker, company_id, company_name
+            )
+
             stats["total_ai_jobs"] += metrics["ai_jobs"]
-            
-            # ✅ NEW: Store company results
+
+            # -------- PATENT SIGNALS (PLAYWRIGHT) --------
+            await collect_patent_signal(
+                ticker, company_id, assignee
+            )
+
+            stats["companies_processed"] += 1
+
             company_results.append({
                 "ticker": ticker,
                 "name": company_name,
@@ -257,41 +330,37 @@ async def main(tickers: list[str]):
                 "normalized_score": metrics["normalized_score"],
                 "status": "success"
             })
-            
-            logger.info("Company complete", 
-                       ticker=ticker, 
-                       ai_jobs=metrics["ai_jobs"],
-                       avg_ai_relevance=metrics["avg_ai_relevance"],
-                       progress=f"{stats['companies_processed']}/{len(tickers)}")
-            
+
+            logger.info(
+                "Company complete",
+                ticker=ticker,
+                ai_jobs=metrics["ai_jobs"],
+                progress=f"{stats['companies_processed']}/{len(tickers)}"
+            )
+
         except Exception as e:
-            logger.error("Company processing failed", 
-                        ticker=ticker, 
-                        error=str(e),
-                        error_type=type(e).__name__)
             stats["errors"] += 1
-            
-            # ✅ NEW: Store failed company
+            logger.error(
+                "Company processing failed",
+                ticker=ticker,
+                error=str(e),
+                error_type=type(e).__name__
+            )
+
             company_results.append({
                 "ticker": ticker,
                 "name": company_name,
                 "sector": sector,
-                "ai_jobs": 0,
-                "total_jobs": 0,
-                "total_tech_jobs": 0,
-                "avg_ai_relevance": 0.0,
-                "normalized_score": 0.0,
                 "status": "failed",
                 "error": str(e)
             })
-    
-    # ✅ NEW: Enhanced final report
+
     print_final_report(company_results, stats, tickers)
-    
-    # Final summary log
+
     logger.info("Collection complete", **stats)
-    
     return stats
+
+
 
 def print_final_report(company_results: List[Dict], stats: Dict, tickers: List[str]):
     """
@@ -528,10 +597,10 @@ async def main(tickers: list[str], signal_types: list[str]):
                     ai_jobs = await collect_job_signals(ticker, company_id, company_name)
                     stats["job_signals"]["collected"] += 1
                     stats["job_signals"]["total_ai_jobs"] += ai_jobs
-                    logger.info("✅ Job signals collected", ticker=ticker, ai_jobs=ai_jobs)
+                    logger.info("Job signals collected", ticker=ticker, ai_jobs=ai_jobs)
                 except Exception as e:
                     stats["job_signals"]["errors"] += 1
-                    logger.error("❌ Job signals failed", ticker=ticker, error=str(e))
+                    logger.error("Job signals failed", ticker=ticker, error=str(e))
             
             # Collect leadership signals
             if collect_leadership:
@@ -543,14 +612,14 @@ async def main(tickers: list[str], signal_types: list[str]):
                     stats["leadership_signals"]["total_executives"] += leadership_result["executives"]
                     stats["leadership_signals"]["total_ai_executives"] += leadership_result["ai_executives"]
                     logger.info(
-                        "✅ Leadership signals collected",
+                        "Leadership signals collected",
                         ticker=ticker,
                         score=leadership_result["score"],
                         tier=leadership_result["tier"]
                     )
                 except Exception as e:
                     stats["leadership_signals"]["errors"] += 1
-                    logger.error("❌ Leadership signals failed", ticker=ticker, error=str(e))
+                    logger.error("Leadership signals failed", ticker=ticker, error=str(e))
             
             # Update summary (combines all signal types)
             try:
@@ -585,23 +654,23 @@ async def main(tickers: list[str], signal_types: list[str]):
     
     if collect_job:
         print("\nJob Signals:")
-        print(f"  ✅ Collected: {stats['job_signals']['collected']}")
-        print(f"  📊 Total AI Jobs: {stats['job_signals']['total_ai_jobs']}")
-        print(f"  ❌ Errors: {stats['job_signals']['errors']}")
+        print(f"  Collected: {stats['job_signals']['collected']}")
+        print(f"  Total AI Jobs: {stats['job_signals']['total_ai_jobs']}")
+        print(f"  Errors: {stats['job_signals']['errors']}")
     
     if collect_leadership:
         print("\nLeadership Signals:")
-        print(f"  ✅ Collected: {stats['leadership_signals']['collected']}")
-        print(f"  👥 Total Executives: {stats['leadership_signals']['total_executives']}")
-        print(f"  🎯 AI-Relevant Executives: {stats['leadership_signals']['total_ai_executives']}")
-        print(f"  ❌ Errors: {stats['leadership_signals']['errors']}")
+        print(f"  Collected: {stats['leadership_signals']['collected']}")
+        print(f"  Total Executives: {stats['leadership_signals']['total_executives']}")
+        print(f"  AI-Relevant Executives: {stats['leadership_signals']['total_ai_executives']}")
+        print(f"  Errors: {stats['leadership_signals']['errors']}")
         
         if stats['leadership_signals']['total_executives'] > 0:
             ai_penetration = (
                 stats['leadership_signals']['total_ai_executives'] /
                 stats['leadership_signals']['total_executives'] * 100
             )
-            print(f"  📈 AI Penetration Rate: {ai_penetration:.1f}%")
+            print(f"  AI Penetration Rate: {ai_penetration:.1f}%")
     
     print("="*70)
     
