@@ -152,59 +152,65 @@ def get_company_signals(
     "/collect-patent-signals",
     response_model=QueuedTaskResponse
 )
+@router.post(
+    "/collect-patent-signals",
+    response_model=ExternalSignal,
+    status_code=status.HTTP_201_CREATED
+)
 async def collect_patent_signals(
     company_id: UUID = Query(...),
     assignee: str = Query(...),
     years: int = Query(5, ge=1, le=20),
+    background_tasks: BackgroundTasks = None,
 ):
     """
-    Queue patent signal collection by launching the existing evidence script.
-    (No Playwright inside API — Windows safe.)
+    Collect patent signals inline (no queue). Returns ExternalSignal like job/tech.
     """
-    ticker = _get_ticker_for_company(company_id)
+    try:
+        collector = PatentSignalCollector()
 
-    project_root = Path(__file__).resolve().parents[2]
-    script = project_root / "scripts" / "collect_evidence.py"
+        # If your collector already supports years, prefer that.
+        # Otherwise keep your existing "5-year cutoff" logic inside the collector.
+        analysis = await collector.analyze_assignee(assignee=assignee, years=years) \
+            if hasattr(collector, "analyze_assignee") else None
 
-    logs_dir = project_root / "reports" / "patent_signals" / ticker
-    logs_dir.mkdir(parents=True, exist_ok=True)
-    out_log = logs_dir / "worker_stdout.log"
-    err_log = logs_dir / "worker_stderr.log"
+        if analysis is None:
+            # Fallback if your collector expects a verification URL
+            verification_url = collector.build_verification_url_for_years(assignee=assignee, years=years) \
+                if hasattr(collector, "build_verification_url_for_years") else None
 
-    # ✅ FIXED: ensure we actually run patent collection
-    cmd = [
-        "poetry", "run", "python", str(script),
-        "--ticker", ticker,
-        "--signals", "patent",
-    ]
+            if verification_url is None:
+                # Minimal fallback: replicate your collect_evidence cutoff logic here
+                from datetime import datetime, timezone, timedelta
+                cutoff = datetime.now(timezone.utc) - timedelta(days=years * 365)
+                after_date = cutoff.strftime("%Y%m%d")
+                verification_url = collector.build_verification_url(
+                    assignee=assignee,
+                    after_yyyymmdd=after_date,
+                )
 
-    # Optional: only add if your collect_evidence.py supports these flags
-    # cmd += ["--assignee", assignee, "--years", str(years)]
+            analysis = await collector.analyze(verification_url)
 
-    logger.info(
-        "Queueing patent collection",
-        ticker=ticker,
-        company_id=str(company_id),
-        assignee=assignee,
-        years=years,
-        cmd=cmd
-    )
+        signal = collector.score(company_id=company_id, assignee=assignee, analysis=analysis)
 
-    subprocess.Popen(
-        cmd,
-        cwd=str(project_root),
-        stdout=open(out_log, "a", encoding="utf-8"),
-        stderr=open(err_log, "a", encoding="utf-8"),
-        creationflags=subprocess.CREATE_NEW_CONSOLE if hasattr(subprocess, "CREATE_NEW_CONSOLE") else 0
-    )
+        stored_signal = signal_service.store_signal(signal)
 
-    return QueuedTaskResponse(
-        status="queued",
-        message="Patent signal collection started",
-        company_id=company_id,
-        ticker=ticker,
-        assignee=assignee,
-    )
+        # write report (optional but consistent with your script)
+        # if your report needs ticker, you can resolve it via _get_ticker_for_company(company_id)
+        out_dir = Path("reports/patent_signals") / str(company_id)
+        write_patent_report(stored_signal, out_dir)
+
+        # Update summary async if background_tasks passed
+        if background_tasks:
+            background_tasks.add_task(signal_service.update_signal_summary, company_id)
+        else:
+            signal_service.update_signal_summary(company_id)
+
+        return stored_signal
+
+    except Exception as e:
+        logger.exception("Patent signal collection failed", error=str(e))
+        raise HTTPException(status_code=500, detail=f"Patent signal collection failed: {str(e)}")
 
 
 @router.get(
