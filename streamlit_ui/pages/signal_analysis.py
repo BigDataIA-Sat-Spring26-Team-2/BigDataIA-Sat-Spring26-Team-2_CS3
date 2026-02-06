@@ -1,4 +1,3 @@
-# streamlit_ui/pages/signal_analysis.py
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -15,7 +14,7 @@ st.set_page_config(page_title="Signal Analysis", page_icon="🔍", layout="wide"
 # Initialize API client
 api = APIClient()
 
-st.title("🔍 Signal Analysis")
+st.title("Signal Analysis")
 st.caption("Analyze AI readiness signals across portfolio companies")
 
 st.divider()
