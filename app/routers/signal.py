@@ -1,39 +1,36 @@
-from fastapi import APIRouter, status, Query, BackgroundTasks
+from fastapi import APIRouter, status, Query, BackgroundTasks, HTTPException
 from typing import Optional
 from uuid import UUID
 from pathlib import Path
-import subprocess
+import structlog
 from app.schemas.signal_tasks import QueuedTaskResponse
-
 from app.pipelines.tech_signals import TechSignalCollector
 from app.models.signal import (
     ExternalSignal,
     CompanySignalSummary,
     SignalCategory,
 )
-import structlog
-from app.config import get_settings
-from datetime import datetime, timezone, timedelta
 from app.models.pagination import PaginatedResponse
 from app.services import signal_service
+
 from app.pipelines.job_signals import JobSignalCollector
 
-from app.pipelines.patent_signals import PatentSignalCollector
+from app.pipelines.patent_signals import PatentSignalCollector  
 from app.reports.patent_report import write_patent_report
 from app.services.snowflake import get_connection
 
 from app.pipelines.leadership_signals import LeadershipSignalCollector
-from app.services import snowflake
 
+from app.config import get_settings
 
 router = APIRouter(prefix="/signals", tags=["Signals"])
-
-router = APIRouter()
 logger = structlog.get_logger()
+
 
 def _fq_table(name: str) -> str:
     s = get_settings()
     return f"{s.SNOWFLAKE_DATABASE}.{s.SNOWFLAKE_SCHEMA}.{name}"
+
 
 def _get_ticker_for_company(company_id: UUID) -> str:
     conn = get_connection()
@@ -41,7 +38,7 @@ def _get_ticker_for_company(company_id: UUID) -> str:
     try:
         cur.execute(
             f"SELECT ticker FROM {_fq_table('COMPANIES')} WHERE id = %s AND is_deleted = FALSE",
-            (str(company_id),)
+            (str(company_id),),
         )
         row = cur.fetchone()
         if not row or not row[0]:
@@ -50,6 +47,8 @@ def _get_ticker_for_company(company_id: UUID) -> str:
     finally:
         cur.close()
         conn.close()
+
+
 @router.post(
     "/collect-job-signals",
     response_model=ExternalSignal,
@@ -63,26 +62,17 @@ async def collect_job_signals(
 ):
     """
     Collect job posting signals for a company.
-    
+
     This scrapes job boards (LinkedIn, Indeed) and calculates AI hiring signal.
-    
-    Args:
-        company_id: Company UUID from database
-        company_name: Company name for job search
-        max_results: Max results per source (default: 20)
-        
-    Returns:
-        ExternalSignal with AI hiring score
     """
     collector = JobSignalCollector()
-    
-    # Search queries
+
     search_queries = [
         f"{company_name} machine learning",
         f"{company_name} data scientist",
         f"{company_name} artificial intelligence",
     ]
-    
+
     all_jobs = []
     for query in search_queries:
         jobs = collector.scrape_jobs_from_multiple_sources(
@@ -93,27 +83,20 @@ async def collect_job_signals(
             hours_old=24 * 30  # Last 30 days
         )
         all_jobs.extend(jobs)
-    
-    # Deduplicate
+
     unique_jobs = collector.deduplicate_jobs(all_jobs)
-    
-    # Analyze and create signal
     signal = collector.analyze_job_postings(company_name, unique_jobs)
     signal.company_id = company_id
-    
-    # Store in database
+
     stored_signal = signal_service.store_signal(signal)
-    
-    # Update summary in background
+
     if background_tasks:
-        background_tasks.add_task(
-            signal_service.update_signal_summary,
-            company_id
-        )
+        background_tasks.add_task(signal_service.update_signal_summary, company_id)
     else:
         signal_service.update_signal_summary(company_id)
-    
+
     return stored_signal
+
 
 @router.post(
     "/collect-tech-signals",
@@ -157,71 +140,67 @@ def get_company_signals(
         page=page,
         page_size=page_size,
     )
+
 @router.post(
     "/collect-patent-signals",
     response_model=ExternalSignal,
     status_code=status.HTTP_201_CREATED
 )
-@router.post(
-    "/signals/collect-patent-signals",
-    response_model=QueuedTaskResponse
-)
 async def collect_patent_signals(
     company_id: UUID = Query(...),
     assignee: str = Query(...),
     years: int = Query(5, ge=1, le=20),
+    background_tasks: BackgroundTasks = None,
 ):
     """
-    Queue patent signal collection by launching the existing evidence script.
-    (No Playwright inside API — Windows safe.)
+    Collect patent signals inline (no queue). Returns ExternalSignal like job/tech.
     """
-    ticker = _get_ticker_for_company(company_id)
+    try:
+        collector = PatentSignalCollector()
 
-    project_root = Path(__file__).resolve().parents[2]
-    script = project_root / "scripts" / "collect_evidence.py"
+        analysis = await collector.analyze_assignee(assignee=assignee, years=years) \
+            if hasattr(collector, "analyze_assignee") else None
 
-    # write worker logs so you can debug from UI runs
-    logs_dir = project_root / "reports" / "patent_signals" / ticker
-    logs_dir.mkdir(parents=True, exist_ok=True)
-    out_log = logs_dir / "worker_stdout.log"
-    err_log = logs_dir / "worker_stderr.log"
+        if analysis is None:
+            # Fallback if your collector expects a verification URL
+            verification_url = collector.build_verification_url_for_years(assignee=assignee, years=years) \
+                if hasattr(collector, "build_verification_url_for_years") else None
 
-    cmd = ["poetry", "run", "python", str(script), "--ticker", ticker]
+            if verification_url is None:
+                # Minimal fallback: replicate your collect_evidence cutoff logic here
+                from datetime import datetime, timezone, timedelta
+                cutoff = datetime.now(timezone.utc) - timedelta(days=years * 365)
+                after_date = cutoff.strftime("%Y%m%d")
+                verification_url = collector.build_verification_url(
+                    assignee=assignee,
+                    after_yyyymmdd=after_date,
+                )
 
-    logger.info("Queueing patent collection", ticker=ticker, company_id=str(company_id), cmd=cmd)
+            analysis = await collector.analyze(verification_url)
 
-    subprocess.Popen(
-        cmd,
-        cwd=str(project_root),
-        stdout=open(out_log, "a", encoding="utf-8"),
-        stderr=open(err_log, "a", encoding="utf-8"),
-        creationflags=subprocess.CREATE_NEW_CONSOLE if hasattr(subprocess, "CREATE_NEW_CONSOLE") else 0
-    )
+        signal = collector.score(company_id=company_id, assignee=assignee, analysis=analysis)
 
-    return QueuedTaskResponse(
-        status="queued",
-        message="Patent signal collection started",
-        company_id=company_id,
-        ticker=ticker,
-        assignee=assignee,
-    )
+        stored_signal = signal_service.store_signal(signal)
+        out_dir = Path("reports/patent_signals") / str(company_id)
+        write_patent_report(stored_signal, out_dir)
+
+        if background_tasks:
+            background_tasks.add_task(signal_service.update_signal_summary, company_id)
+        else:
+            signal_service.update_signal_summary(company_id)
+
+        return stored_signal
+
+    except Exception as e:
+        logger.exception("Patent signal collection failed", error=str(e))
+        raise HTTPException(status_code=500, detail=f"Patent signal collection failed: {str(e)}")
+
 
 @router.get(
     "/companies/{company_id}/summary",
     response_model=CompanySignalSummary
 )
 def get_company_signal_summary(company_id: UUID):
-    """
-    Get aggregated signal summary for a company.
-    
-    Returns composite AI readiness score based on all signal categories.
-    
-    Args:
-        company_id: Company UUID
-        
-    Returns:
-        CompanySignalSummary with scores by category
-    """
     return signal_service.get_signal_summary(company_id)
 
 
@@ -230,25 +209,8 @@ def get_company_signal_summary(company_id: UUID):
     response_model=CompanySignalSummary
 )
 def refresh_signal_summary(company_id: UUID):
-    """
-    Recalculate signal summary for a company.
-    
-    Useful after adding new signals to update the composite score.
-    
-    Args:
-        company_id: Company UUID
-        
-    Returns:
-        Updated CompanySignalSummary
-    """
-
     return signal_service.update_signal_summary(company_id)
 
-
-    
-
-# app/routers/signal.py
-# Add this new endpoint to your existing signal.py file
 
 @router.post(
     "/collect-leadership-signals",
@@ -263,60 +225,30 @@ async def collect_leadership_signals(
 ):
     """
     Collect leadership commitment signals from external sources.
-    
-    Sources:
-    - Company website (90%): Executive discovery and AI role detection
-    - NewsAPI (10%): Recent AI leadership activity validation
-    
-    Args:
-        company_id: Company UUID from database
-        ticker: Stock ticker (e.g., "JPM")
-        company_name: Full company name (e.g., "JPMorgan Chase")
-        
-    Returns:
-        ExternalSignal with leadership score (0-100)
-        
-    Example:
-        POST /api/v1/signals/collect-leadership-signals?company_id=xxx&ticker=JPM&company_name=JPMorgan%20Chase
     """
     import time
     start_time = time.time()
-    
-    logger.info(
-        "Leadership collection started",
-        ticker=ticker,
-        company=company_name
-    )
-    
-    # Import here to avoid circular dependencies
-    from app.pipelines.leadership_signals import LeadershipSignalCollector
-    
+
+    logger.info("Leadership collection started", ticker=ticker, company=company_name)
+
     try:
-        # Initialize collector
         collector = LeadershipSignalCollector()
-        
-        # Analyze leadership
+
         signal = await collector.analyze_company_leadership(
             company_id=company_id,
             ticker=ticker,
             company_name=company_name
         )
-        
-        # Store in database
+
         stored_signal = signal_service.store_signal(signal)
-        
-        # Update summary in background
+
         if background_tasks:
-            background_tasks.add_task(
-                signal_service.update_signal_summary,
-                company_id
-            )
+            background_tasks.add_task(signal_service.update_signal_summary, company_id)
         else:
             signal_service.update_signal_summary(company_id)
-        
-        # Cleanup
+
         await collector.close()
-        
+
         elapsed = time.time() - start_time
         logger.info(
             "Leadership collection complete",
@@ -325,12 +257,8 @@ async def collect_leadership_signals(
             elapsed_seconds=round(elapsed, 2)
         )
 
-        
-
-
-        
         return stored_signal
-        
+
     except Exception as e:
         logger.error(
             "Leadership collection failed",
@@ -342,4 +270,3 @@ async def collect_leadership_signals(
             status_code=500,
             detail=f"Leadership signal collection failed: {str(e)}"
         )
-

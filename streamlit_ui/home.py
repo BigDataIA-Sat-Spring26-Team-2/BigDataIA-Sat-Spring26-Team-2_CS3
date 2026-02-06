@@ -1,4 +1,3 @@
-# streamlit_ui/home.py
 import os
 from dotenv import load_dotenv
 import streamlit as st
@@ -35,19 +34,6 @@ api = APIClient()
 with st.sidebar:
     st.title("PE Org-AI-R")
     st.caption("AI Readiness Assessment Platform")
-    
-    st.divider()
-    
-    # API Configuration
-    with st.expander("API Settings"):
-        api_base = st.text_input(
-            "API Base URL",
-            value=st.session_state.api_base,
-            key="api_base_input"
-        )
-        if st.button("Update API URL"):
-            st.session_state.api_base = api_base
-            st.success("API URL updated!")
     
     st.divider()
     
@@ -133,7 +119,7 @@ metrics = fetch_dashboard_metrics()
 # Quick metrics
 st.subheader("Portfolio Overview")
 
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3 = st.columns(3)
 
 with col1:
     st.metric(
@@ -156,28 +142,6 @@ with col3:
         delta=None
     )
 
-with col4:
-    try:
-        if metrics["last_updated"] != "N/A":
-            last_update = datetime.fromisoformat(metrics["last_updated"].replace('Z', '+00:00'))
-            time_diff = datetime.now(last_update.tzinfo) - last_update
-            if time_diff.days > 0:
-                time_str = f"{time_diff.days}d ago"
-            elif time_diff.seconds > 3600:
-                time_str = f"{time_diff.seconds // 3600}h ago"
-            else:
-                time_str = f"{time_diff.seconds // 60}m ago"
-        else:
-            time_str = "N/A"
-    except:
-        time_str = "N/A"
-    
-    st.metric(
-        label="Last Updated",
-        value=time_str,
-        delta=""
-    )
-
 st.divider()
 
 st.subheader("Recent Activity")
@@ -190,7 +154,7 @@ def fetch_recent_activity():
     try:
         companies = api.get_companies(page_size=10)
         if companies and "items" in companies:
-            for company in companies["items"][:5]:  # Only check first 5
+            for company in companies["items"][:5]:
                 try:
                     signals = api.get_company_signals(company["id"], page_size=1)
                     if signals and "items" in signals and signals["items"]:
@@ -219,24 +183,6 @@ else:
 
 st.divider()
 
-# Quick actions
-st.subheader("Quick Actions")
-
-col1, col2, col3 = st.columns(3)
-
-with col1:
-    if st.button("View Collection Dashboard", use_container_width=True, type="primary"):
-        st.switch_page("pages/collection_dashboard.py")
-
-with col2:
-    if st.button("Analyze Signals", use_container_width=True):
-        st.switch_page("pages/signal_analysis.py")
-
-with col3:
-    if st.button("Company Reports", use_container_width=True):
-        st.switch_page("pages/company_reports.py")
-
-st.divider()
 
 # System status
 st.subheader("System Status")
@@ -274,4 +220,3 @@ with col2:
 
 # Footer
 st.divider()
-st.caption(f"PE Org-AI-R Platform v{health.get('version', '1.0.0')} | Last refreshed: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")

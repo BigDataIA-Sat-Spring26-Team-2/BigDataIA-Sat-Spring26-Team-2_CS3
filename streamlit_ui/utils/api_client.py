@@ -1,4 +1,3 @@
-# streamlit_ui/utils/api_client.py
 import requests
 from typing import Dict, Any, Optional, List
 import streamlit as st
@@ -181,3 +180,79 @@ class APIClient:
             return result["id"]
         
         return None
+    
+    def collect_job_signals(
+        self, 
+        company_id: str, 
+        company_name: str, 
+        max_results: int = 20
+    ) -> Dict[str, Any]:
+        """Trigger job signal collection for a company"""
+        params = {
+            "company_id": company_id,
+            "company_name": company_name,
+            "max_results": max_results
+        }
+        response = requests.post(
+            f"{self.base_url}/signals/collect-job-signals",
+            params=params,
+            timeout=300  # 5 minutes - job scraping can be slow
+        )
+        return self._handle_response(response)
+    
+    def collect_tech_signals(
+        self,
+        company_id: str,
+        company_name: str,
+        ticker: str
+    ) -> Dict[str, Any]:
+        """Trigger tech stack signal collection"""
+        params = {
+            "company_id": company_id,
+            "company_name": company_name,
+            "ticker": ticker
+        }
+        response = requests.post(
+            f"{self.base_url}/signals/collect-tech-signals",
+            params=params,
+            timeout=120  # 2 minutes
+        )
+        return self._handle_response(response)
+    
+    def collect_patent_signals(
+        self,
+        company_id: str,
+        assignee: str,
+        years: int = 5
+    ) -> Dict[str, Any]:
+        """Trigger patent signal collection (queued as background task)"""
+        params = {
+            "company_id": company_id,
+            "assignee": assignee,
+            "years": years
+        }
+        response = requests.post(
+            f"{self.base_url}/signals/collect-patent-signals",
+            params=params,
+            timeout=60  # Quick response (queued)
+        )
+        return self._handle_response(response)
+    
+    def collect_leadership_signals(
+        self,
+        company_id: str,
+        ticker: str,
+        company_name: str
+    ) -> Dict[str, Any]:
+        """Trigger leadership signal collection"""
+        params = {
+            "company_id": company_id,
+            "ticker": ticker,
+            "company_name": company_name
+        }
+        response = requests.post(
+            f"{self.base_url}/signals/collect-leadership-signals",
+            params=params,
+            timeout=120  # 2 minutes
+        )
+        return self._handle_response(response)
