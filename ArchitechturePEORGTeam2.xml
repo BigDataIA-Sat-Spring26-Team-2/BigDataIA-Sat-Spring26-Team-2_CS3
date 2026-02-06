@@ -1,0 +1,52 @@
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36" version="29.3.7">
+  <diagram name="System Architecture" id="0">
+    <mxGraphModel dx="1226" dy="661" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="streamlit" parent="1" style="rounded=1;fillColor=#EAF2FB;strokeColor=#4A90E2;align=center;verticalAlign=middle;fontSize=18;fontStyle=1" value="Streamlit UI&#xa;Home | Dashboard | Signals | Reports | SEC Downloader" vertex="1">
+          <mxGeometry height="90" width="480" x="360" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="fastapi" parent="1" style="rounded=1;fillColor=#F4F6F8;strokeColor=#7B8A8B;fontSize=14;align=center;fontStyle=1" value="" vertex="1">
+          <mxGeometry height="280" width="640" x="280" y="170" as="geometry" />
+        </mxCell>
+        <mxCell id="routers" parent="1" style="rounded=1;fillColor=#FFFFFF;strokeColor=#7B8A8B;fontSize=18;fontStyle=1" value="Routers&#xa;(Endpoints)" vertex="1">
+          <mxGeometry height="70" width="180" x="310" y="220" as="geometry" />
+        </mxCell>
+        <mxCell id="services" parent="1" style="rounded=1;fillColor=#FFFFFF;strokeColor=#7B8A8B;fontSize=18;fontStyle=1" value="Services&#xa;(Business Logic)" vertex="1">
+          <mxGeometry height="70" width="180" x="510" y="220" as="geometry" />
+        </mxCell>
+        <mxCell id="models" parent="1" style="rounded=1;fillColor=#FFFFFF;strokeColor=#7B8A8B;fontSize=18;fontStyle=1" value="Models&#xa;(Pydantic)" vertex="1">
+          <mxGeometry height="70" width="180" x="710" y="220" as="geometry" />
+        </mxCell>
+        <mxCell id="pipelines" parent="1" style="rounded=1;fillColor=#E8EEF3;strokeColor=#7B8A8B;align=center;fontSize=19;fontStyle=1" value="Pipelines&#xa;SEC EDGAR | Jobs | Tech | Patents | Leadership" vertex="1">
+          <mxGeometry height="80" width="580" x="310" y="320" as="geometry" />
+        </mxCell>
+        <mxCell id="snowflake" parent="1" style="rounded=1;fillColor=#EAF2FB;strokeColor=#4A90E2;fontSize=18;fontStyle=1" value="Snowflake&#xa;(Primary)" vertex="1">
+          <mxGeometry height="70" width="160" x="300" y="500" as="geometry" />
+        </mxCell>
+        <mxCell id="redis" parent="1" style="rounded=1;fillColor=#FDEDEC;strokeColor=#C0392B;fontSize=18;fontStyle=1" value="Redis&#xa;(Cache)" vertex="1">
+          <mxGeometry height="70" width="160" x="520" y="500" as="geometry" />
+        </mxCell>
+        <mxCell id="s3" parent="1" style="rounded=1;fillColor=#EBF5FB;strokeColor=#2E86C1;fontSize=18;fontStyle=1" value="AWS S3&#xa;(Docs)" vertex="1">
+          <mxGeometry height="70" width="160" x="740" y="500" as="geometry" />
+        </mxCell>
+        <mxCell id="edge1" edge="1" parent="1" source="streamlit" style="endArrow=block;strokeWidth=2;fontStyle=1" target="fastapi">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge2" edge="1" parent="1" source="fastapi" style="endArrow=block;strokeWidth=2;fontStyle=1" target="snowflake">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge3" edge="1" parent="1" source="fastapi" style="endArrow=block;strokeWidth=2;fontStyle=1" target="redis">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge4" edge="1" parent="1" source="fastapi" style="endArrow=block;strokeWidth=2;fontStyle=1" target="s3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ZWFSk0IYpo8GaJwP0Zmp-1" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontSize=19;fontStyle=1" value="&lt;span style=&quot;text-wrap-mode: nowrap;&quot;&gt;FastAPI Application&lt;/span&gt;" vertex="1">
+          <mxGeometry height="30" width="60" x="570" y="190" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

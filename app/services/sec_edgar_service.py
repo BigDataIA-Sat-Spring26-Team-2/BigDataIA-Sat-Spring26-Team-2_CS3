@@ -116,36 +116,59 @@ def run_sec_download_for_company(
         ticker = ticker.upper()
 
     # -------------------------
-    # Resolve ticker from DB if not provided
+    # ✅ Look up correct company_id by ticker
     # -------------------------
     conn = None
     cur = None
     db_ticker: Optional[str] = None
+    
     try:
         conn = get_connection()
         cur = conn.cursor()
-        cur.execute(
-            f"SELECT ticker FROM {COMPANIES_TABLE} WHERE id=%s AND is_deleted=FALSE",
-            (str(company_id),),
-        )
-        row = cur.fetchone()
-        if not row:
-            raise HTTPException(status_code=404, detail="Company not found")
-        db_ticker = row[0]
+        
+        if ticker:
+            # Look up company by ticker
+            cur.execute(
+                f"SELECT id, ticker FROM {COMPANIES_TABLE} WHERE ticker=%s AND is_deleted=FALSE",
+                 (ticker,),
+            )
+            row = cur.fetchone()
+            
+            if not row:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Company with ticker '{ticker}' not found"
+                )
+            
+            # Use the company_id from database (correct one for this ticker)
+            correct_company_id = row[0]
+            company_id = UUID(correct_company_id)
+            db_ticker = row[1]
+            
+        else:
+            # No ticker provided, look up by company_id
+            cur.execute(
+                f"SELECT id, ticker FROM {COMPANIES_TABLE} WHERE id=%s AND is_deleted=FALSE",
+                (str(company_id),),
+            )
+            row = cur.fetchone()
+            
+            if not row:
+                raise HTTPException(status_code=404, detail="Company not found")
+            
+            db_ticker = row[1]
+            ticker = db_ticker
+            
     finally:
         if cur:
             cur.close()
         if conn:
             conn.close()
 
-    if not ticker and db_ticker:
-        ticker = str(db_ticker).upper()
-
-    # Your S3 key format is sec/{ticker}/..., so ticker must exist
-    if not ticker:
-        raise HTTPException(
-            status_code=400,
-            detail="Ticker is required (provide ticker or ensure company has ticker).",
+        if not ticker:
+            raise HTTPException(
+                status_code=400,
+                detail="Ticker is required (provide ticker or ensure company has ticker).",
         )
 
     settings = get_settings()
@@ -266,7 +289,7 @@ def run_sec_download_for_company(
 
             parsed = parser.parse_filing(file_path=file_path, ticker=ticker or "")
 
-            # Duplicate check by content hash (your existing approach)
+            # Duplicate check by content hash 
             cur.execute(f"SELECT 1 FROM {DOCS_TABLE} WHERE content_hash=%s", (parsed.content_hash,))
             if cur.fetchone():
                 skipped_duplicates += 1
@@ -280,9 +303,10 @@ def run_sec_download_for_company(
             s3_key = _s3_key_for_filing(ticker, f.filing_type, f.accession_number)
             upload_file_to_s3(file_path, s3_key)
             file_path.unlink()
-
+            doc_id = str(uuid4())
+            now = datetime.now(timezone.utc)
             # SECTION-LEVEL DEDUP + CHUNKING WITH LOGGING
-            # SECTION-LEVEL DEDUP + CHUNKING WITH LOGGING
+            
             sections_extracted = len(parsed.sections)
             sections_stored = 0
             sections_duplicates = 0
@@ -374,7 +398,7 @@ def run_sec_download_for_company(
                         continue
 
                     section_data.append(
-                        (str(uuid4()), None, idx_c, chunk_text, chunk_hash, chunk_word_count, section_name, None)
+                        (str(uuid4()), doc_id, idx_c, chunk_text, chunk_hash, chunk_word_count, section_name, None)
                     )
                     sections_stored += 1
                     chunks_added_this_section += 1
@@ -401,8 +425,8 @@ def run_sec_download_for_company(
             )
 
             # INSERT DOCUMENT
-            doc_id = str(uuid4())
-            now = datetime.now(timezone.utc)
+            # doc_id = str(uuid4())
+            # now = datetime.now(timezone.utc)
 
             cur.execute(
                 f"""
