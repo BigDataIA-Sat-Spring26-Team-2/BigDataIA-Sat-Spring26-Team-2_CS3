@@ -229,5 +229,5 @@ if st.button("⬇️ Download SEC Filings", type="primary"):
                     st.caption(f"S3 Location: `{s3_base}`")
                 st.write("")
     else:
-        st.warning("⚠️ No files were downloaded. Try adjusting your search parameters.")
+        st.warning("No files were downloaded. Try adjusting your search parameters.")
         st.info("Note: Files might have been skipped as duplicates if they were already processed.")
