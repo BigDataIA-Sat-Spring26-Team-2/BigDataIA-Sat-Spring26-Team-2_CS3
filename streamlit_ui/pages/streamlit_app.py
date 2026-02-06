@@ -147,9 +147,9 @@ if st.button("⬇️ Download SEC Filings", type="primary"):
     
     if files and len(files) > 0:
         if include_pdf:
-            st.info(f"📦 {len(files)} file(s) ready for download (includes both .txt and .pdf versions)")
+            st.info(f" {len(files)} file(s) ready for download (includes both .txt and .pdf versions)")
         else:
-            st.info(f"📦 {len(files)} file(s) ready for download (.txt only)")
+            st.info(f" {len(files)} file(s) ready for download (.txt only)")
         
         # Display ticker and filing types
         st.write(f"**Ticker:** {resolved_ticker}")
@@ -179,7 +179,7 @@ if st.button("⬇️ Download SEC Filings", type="primary"):
                 if zip_response.status_code == 200:
                     # Show download button with the actual ZIP data
                     st.download_button(
-                        label="⬇️ Download ZIP",
+                        label="Download ZIP",
                         data=zip_response.content,
                         file_name=f"{resolved_ticker}_sec_filings.zip",
                         mime="application/zip",
@@ -206,7 +206,7 @@ if st.button("⬇️ Download SEC Filings", type="primary"):
                 st.error(f"❌ Network error: {str(e)}")
         
         # Show file details in expander
-        with st.expander("📄 View File Details"):
+        with st.expander(" View File Details"):
             if include_pdf:
                 st.caption("Each filing will include both .txt (original) and .pdf (formatted) versions in the ZIP.")
             else:

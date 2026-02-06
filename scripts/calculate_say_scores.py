@@ -1,5 +1,3 @@
-# scripts/calculate_say_scores.py
-
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -26,7 +24,7 @@ def main():
             
             # Debug: Check what type is returned
             if not isinstance(say_score, (int, float)):
-                print(f"⚠️  {ticker}: Unexpected type returned: {type(say_score)}")
+                print(f"  {ticker}: Unexpected type returned: {type(say_score)}")
                 print(f"   Value: {say_score}")
                 say_score = 0.0
             
@@ -34,7 +32,7 @@ def main():
             print(f"{ticker:6} | Say Score: {say_score:5.1f}")
             
         except Exception as e:
-            print(f"❌ {ticker}: Error - {str(e)}")
+            print(f" {ticker}: Error - {str(e)}")
             results.append((ticker, 0.0))
     
     if results:

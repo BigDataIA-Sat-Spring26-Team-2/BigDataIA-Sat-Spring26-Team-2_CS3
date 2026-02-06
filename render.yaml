@@ -1,0 +1,91 @@
+services:
+  - type: redis
+    name: pe-orgair-redis
+    plan: free
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []
+
+  - type: web
+    name: pe-orgair-api
+    env: python
+    region: oregon
+    plan: free
+
+    buildCommand: |
+      pip install --upgrade pip
+      pip install poetry
+      poetry config virtualenvs.create false
+      poetry install --no-interaction --no-ansi --only main
+
+    startCommand: poetry run uvicorn app.main:app --host 0.0.0.0 --port $PORT
+
+    healthCheckPath: /health
+
+    envVars:
+      # Snowflake
+      - key: SNOWFLAKE_ACCOUNT
+        sync: false
+      - key: SNOWFLAKE_USER
+        sync: false
+      - key: SNOWFLAKE_PASSWORD
+        sync: false
+      - key: SNOWFLAKE_DATABASE
+        value: PE_ORGAIR
+      - key: SNOWFLAKE_SCHEMA
+        value: PUBLIC
+      - key: SNOWFLAKE_WAREHOUSE
+        sync: false
+      - key: SNOWFLAKE_ROLE
+        value: ""
+
+      # AWS S3
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_REGION
+        value: us-east-1
+      - key: S3_BUCKET
+        sync: false
+
+      # Redis (auto-wired)
+      - key: REDIS_HOST
+        fromService:
+          type: redis
+          name: pe-orgair-redis
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          type: redis
+          name: pe-orgair-redis
+          property: port
+      - key: REDIS_DB
+        value: "0"
+
+      # App
+      - key: APP_ENV
+        value: production
+      - key: APP_VERSION
+        value: 1.0.0
+
+  - type: web
+    name: pe-orgair-ui
+    env: python
+    region: oregon
+    plan: free
+
+    buildCommand: |
+      pip install --upgrade pip
+      pip install poetry
+      poetry config virtualenvs.create false
+      poetry install --no-interaction --no-ansi --only main
+
+    startCommand: poetry run streamlit run streamlit_ui/home.py \
+      --server.port $PORT \
+      --server.address 0.0.0.0 \
+      --server.headless true \
+      --server.enableCORS false
+
+    envVars:
+      - key: API_BASE_URL
+        value: https://pe-orgair-api.onrender.com/api/v1

@@ -1,9 +1,3 @@
-
-
-from turtle import title
-from urllib import response
-
-
 import httpx
 import re
 from bs4 import BeautifulSoup
