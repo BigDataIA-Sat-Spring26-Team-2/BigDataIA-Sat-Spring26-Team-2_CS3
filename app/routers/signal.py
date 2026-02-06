@@ -143,10 +143,6 @@ def get_company_signals(
 
 @router.post(
     "/collect-patent-signals",
-    response_model=QueuedTaskResponse
-)
-@router.post(
-    "/collect-patent-signals",
     response_model=ExternalSignal,
     status_code=status.HTTP_201_CREATED
 )
