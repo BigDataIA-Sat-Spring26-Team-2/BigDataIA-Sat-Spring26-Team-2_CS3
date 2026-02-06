@@ -88,6 +88,7 @@ services:
 
     envVars:
       - key: API_BASE_URL
+        value: ${RENDER_EXTERNAL_URL}/api/v1
         fromService:
           type: web
           name: pe-orgair-api
