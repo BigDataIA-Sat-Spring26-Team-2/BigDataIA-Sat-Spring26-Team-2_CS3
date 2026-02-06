@@ -1,13 +1,28 @@
 services:
-  # Backend: FastAPI
+  - type: redis
+    name: pe-orgair-redis
+    plan: free
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []
+
   - type: web
     name: pe-orgair-api
     env: python
     region: oregon
     plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+
+    buildCommand: |
+      pip install --upgrade pip
+      pip install poetry
+      poetry config virtualenvs.create false
+      poetry install --no-interaction --no-ansi --only main
+
+    startCommand: poetry run uvicorn app.main:app --host 0.0.0.0 --port $PORT
+
+    healthCheckPath: /health
+
     envVars:
+      # Snowflake
       - key: SNOWFLAKE_ACCOUNT
         sync: false
       - key: SNOWFLAKE_USER
@@ -20,6 +35,10 @@ services:
         value: PUBLIC
       - key: SNOWFLAKE_WAREHOUSE
         sync: false
+      - key: SNOWFLAKE_ROLE
+        value: ""
+
+      # AWS S3
       - key: AWS_ACCESS_KEY_ID
         sync: false
       - key: AWS_SECRET_ACCESS_KEY
@@ -28,6 +47,8 @@ services:
         value: us-east-1
       - key: S3_BUCKET
         sync: false
+
+      # Redis (auto-wired)
       - key: REDIS_HOST
         fromService:
           type: redis
@@ -38,24 +59,36 @@ services:
           type: redis
           name: pe-orgair-redis
           property: port
-  
-  # Frontend: Streamlit
+      - key: REDIS_DB
+        value: "0"
+
+      # App
+      - key: APP_ENV
+        value: production
+      - key: APP_VERSION
+        value: 1.0.0
+
   - type: web
     name: pe-orgair-ui
     env: python
     region: oregon
     plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: streamlit run streamlit_ui/home.py --server.port $PORT --server.address 0.0.0.0
+
+    buildCommand: |
+      pip install --upgrade pip
+      pip install poetry
+      poetry config virtualenvs.create false
+      poetry install --no-interaction --no-ansi --only main
+
+    startCommand: poetry run streamlit run streamlit_ui/home.py \
+      --server.port $PORT \
+      --server.address 0.0.0.0 \
+      --server.headless true \
+      --server.enableCORS false
+
     envVars:
       - key: API_BASE_URL
         fromService:
           type: web
           name: pe-orgair-api
           envVarKey: RENDER_EXTERNAL_URL
-
-# Redis cache
-databases:
-  - name: pe-orgair-redis
-    plan: free
-    ipAllowList: []
