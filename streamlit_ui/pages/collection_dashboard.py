@@ -1,5 +1,3 @@
-# streamlit_ui/pages/collection_dashboard.py
-
 import streamlit as st
 from datetime import datetime, timezone
 import pandas as pd
@@ -62,7 +60,7 @@ with col1:
 with col2:
     st.write("") 
     
-    if st.button("🚀 Start", type="primary", use_container_width=True):
+    if st.button("Start", type="primary", use_container_width=True):
         if selected_tickers:
             st.session_state.collection_running = True
             st.session_state.selected_tickers = selected_tickers
@@ -72,29 +70,28 @@ with col2:
 
 st.divider()
 
-# Signal category information (no checkboxes - all always enabled)
-st.subheader("📡 Signal Categories Collected")
+st.subheader("Signal Categories Collected")
 
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
     st.markdown("**Technology Hiring**")
-    st.caption("⚖️ Weight: 30%")
+    st.caption(" Weight: 30%")
     st.caption("✓ Job postings analysis")
 
 with col2:
     st.markdown("**Innovation Activity**")
-    st.caption("⚖️ Weight: 25%")
+    st.caption(" Weight: 25%")
     st.caption("✓ Patent filings (Google Patents)")
 
 with col3:
     st.markdown("**Digital Presence**")
-    st.caption("⚖️ Weight: 25%")
+    st.caption(" Weight: 25%")
     st.caption("✓ Tech stack scraping")
 
 with col4:
     st.markdown("**Leadership Signals**")
-    st.caption("⚖️ Weight: 20%")
+    st.caption(" Weight: 20%")
     st.caption("✓ Executive AI backgrounds")
 
 st.divider()
@@ -154,12 +151,6 @@ if st.session_state.get("collection_running"):
             'data_source': 'database'
         }
         
-        # ===========================================
-        # DATABASE-FIRST APPROACH (Using existing GET endpoint)
-        # ===========================================
-        
-
-            # FAST PATH: Load from COMPANY_SIGNAL_SUMMARIES table
         current_task += 1
         progress_bar.progress(int((current_task / total_tasks) * 100))
         
@@ -271,7 +262,7 @@ if st.session_state.get("collection_running"):
     
     # Summary statistics
     st.divider()
-    st.subheader("📈 Collection Summary")
+    st.subheader("Collection Summary")
     
     col1, col2, col3, col4 = st.columns(4)
     
@@ -296,7 +287,7 @@ if st.session_state.get("collection_running"):
     
     # Show logs
     st.divider()
-    with st.expander("📜 View Collection Logs", expanded=False):
+    with st.expander("View Collection Logs", expanded=False):
         for log in st.session_state.collection_logs:
             # Color code logs
             if '✅' in log:
