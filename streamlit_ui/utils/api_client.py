@@ -1,4 +1,3 @@
-# streamlit_ui/utils/api_client.py
 import requests
 from typing import Dict, Any, Optional, List
 import streamlit as st
@@ -182,7 +181,6 @@ class APIClient:
         
         return None
     
-
     def collect_job_signals(
         self, 
         company_id: str, 

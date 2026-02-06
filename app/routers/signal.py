@@ -2,12 +2,8 @@ from fastapi import APIRouter, status, Query, BackgroundTasks, HTTPException
 from typing import Optional
 from uuid import UUID
 from pathlib import Path
-import subprocess
 import structlog
-from datetime import datetime, timezone, timedelta  # (kept; used elsewhere in file)
-
 from app.schemas.signal_tasks import QueuedTaskResponse
-
 from app.pipelines.tech_signals import TechSignalCollector
 from app.models.signal import (
     ExternalSignal,
@@ -19,12 +15,12 @@ from app.services import signal_service
 
 from app.pipelines.job_signals import JobSignalCollector
 
-from app.pipelines.patent_signals import PatentSignalCollector  # (kept; might be used elsewhere)
-from app.reports.patent_report import write_patent_report       # (kept; might be used elsewhere)
+from app.pipelines.patent_signals import PatentSignalCollector  
+from app.reports.patent_report import write_patent_report
 from app.services.snowflake import get_connection
 
 from app.pipelines.leadership_signals import LeadershipSignalCollector
-from app.services import snowflake
+
 from app.config import get_settings
 
 router = APIRouter(prefix="/signals", tags=["Signals"])
@@ -145,9 +141,6 @@ def get_company_signals(
         page_size=page_size,
     )
 
-
-# ✅ FIXED: route path is "/collect-patent-signals" (NOT "/signals/collect-patent-signals")
-# because router already has prefix="/signals"
 @router.post(
     "/collect-patent-signals",
     response_model=QueuedTaskResponse
@@ -169,8 +162,6 @@ async def collect_patent_signals(
     try:
         collector = PatentSignalCollector()
 
-        # If your collector already supports years, prefer that.
-        # Otherwise keep your existing "5-year cutoff" logic inside the collector.
         analysis = await collector.analyze_assignee(assignee=assignee, years=years) \
             if hasattr(collector, "analyze_assignee") else None
 
@@ -194,13 +185,9 @@ async def collect_patent_signals(
         signal = collector.score(company_id=company_id, assignee=assignee, analysis=analysis)
 
         stored_signal = signal_service.store_signal(signal)
-
-        # write report (optional but consistent with your script)
-        # if your report needs ticker, you can resolve it via _get_ticker_for_company(company_id)
         out_dir = Path("reports/patent_signals") / str(company_id)
         write_patent_report(stored_signal, out_dir)
 
-        # Update summary async if background_tasks passed
         if background_tasks:
             background_tasks.add_task(signal_service.update_signal_summary, company_id)
         else:
