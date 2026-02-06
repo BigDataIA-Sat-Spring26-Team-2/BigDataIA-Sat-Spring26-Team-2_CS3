@@ -6,11 +6,11 @@ A production-grade API system designed to assess and score the AI-readiness of p
 
 **Authors:** Prachi Pradhan, Samiksh Gupta, Siddharth Shukla  
 **Course:** Big Data and Intelligent Analytics  
-**Codelab Link** https://codelabs-preview.appspot.com/?file_id=1JvR76bJ4wraYiLsfH8YzLDftXFJsoL5hjIfpnsIzi5s#9
-🎥 **Video Presentation:** [Watch here](https://northeastern-my.sharepoint.com/personal/shukla_sid_northeastern_edu/_layouts/15/stream.aspx?id=%2Fpersonal%2Fshukla%5Fsid%5Fnortheastern%5Fedu%2FDocuments%2FRecordings%2FMeeting%20in%20Big%20Data%2D20260206%5F052700%2DMeeting%20Recording%2Emp4)
+**Codelab Link** https://codelabs-preview.appspot.com/?file_id=1M1qy9K_uIb4iEWX_q6jUartn6D3v5NVLpBwZ-TPpm9c#10
+**Video Presentation:** [Watch here](https://northeastern-my.sharepoint.com/personal/shukla_sid_northeastern_edu/_layouts/15/stream.aspx?id=%2Fpersonal%2Fshukla%5Fsid%5Fnortheastern%5Fedu%2FDocuments%2FRecordings%2FMeeting%20in%20Big%20Data%2D20260206%5F052700%2DMeeting%20Recording%2Emp4)
 **Deployed Applicatiom**: https://pe-orgair-ui.onrender.com/ 
 (If you get API disconnected error, kindly refresh the webpage)
-
+**Swagger API** https://pe-orgair-api.onrender.com/docs 
 
 
 ## Table of Contents
