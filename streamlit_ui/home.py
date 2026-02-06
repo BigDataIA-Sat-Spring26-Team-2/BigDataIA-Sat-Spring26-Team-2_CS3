@@ -38,19 +38,6 @@ with st.sidebar:
     
     st.divider()
     
-    # API Configuration
-    with st.expander("API Settings"):
-        api_base = st.text_input(
-            "API Base URL",
-            value=st.session_state.api_base,
-            key="api_base_input"
-        )
-        if st.button("Update API URL"):
-            st.session_state.api_base = api_base
-            st.success("API URL updated!")
-    
-    st.divider()
-    
     # Quick stats from real API
     st.subheader("Quick Stats")
     
