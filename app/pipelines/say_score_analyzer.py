@@ -1,5 +1,6 @@
 # app/pipelines/say_score_analyzer.py
 
+import math
 import re
 from typing import List
 from app.services.snowflake import get_connection
@@ -204,8 +205,9 @@ class SayScoreAnalyzer:
         mention_density = (weighted_mentions / total_words) * 1000
         
         # Convert to 0-100 scale
-        # Benchmark: 5+ weighted mentions per 1000 words = 100 points
-        raw_score = min(mention_density / 5.0, 1.0) * 100
+        # Benchmark: 1 weighted mentions per 1000 words = 100 points
+        import math
+        raw_score = min(math.sqrt(mention_density) * 95, 100)
         
         print(f"  📊 {ticker}: {total_words:,} words, {total_mentions} mentions ({weighted_mentions:.1f} weighted), density={mention_density:.2f}, score={raw_score:.1f}")
         
