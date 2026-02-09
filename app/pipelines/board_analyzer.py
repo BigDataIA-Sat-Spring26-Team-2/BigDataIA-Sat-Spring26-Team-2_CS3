@@ -39,7 +39,8 @@ class BoardCompositionAnalyzer:
         "chief digital officer", "chief data officer", "chief ai officer",
         "chief analytics officer", "chief innovation officer",
         "vp technology", "vp engineering", "vp data",
-        "head of technology", "head of ai", "head of data"
+        "head of technology", "head of ai", "head of data",'Chief Digital Officer', 'Chief Data Officer', 'Chief AI Officer', 'Chief Analytics Officer', 'Chief Innovation Officer', 'VP Technology', 'VP Engineering',
+          'Chief Information Security Officer', 'CISO', 'Director of Technology', 'Director of Data Science', 'Director of AI', 'Director of Analytics', 'Director of Innovation', 'Head of Technology'
     ]
     
     EXCLUDE_COMMITTEES = [

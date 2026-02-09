@@ -30,6 +30,14 @@ def validate_jpm_detailed():
     settings = get_settings()
     conn = get_connection()
     cur = conn.cursor()
+    analyzer = BoardCompositionAnalyzer()
+    result = analyzer.analyze_company_governance("DE")
+    
+    if not result:
+        print("❌ No data found for JPM")
+        cur.close()
+        conn.close()
+        return
     
     try:
         cur.execute(f"""
@@ -37,7 +45,7 @@ def validate_jpm_detailed():
             FROM {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.document_chunks dc
             JOIN {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.documents d
                 ON dc.document_id = d.id
-            WHERE d.ticker = 'JPM'
+            WHERE d.ticker = 'DE'
                 AND d.filing_type = 'DEF 14A'
             ORDER BY d.filing_date DESC, dc.chunk_index
         """)
