@@ -270,3 +270,39 @@ async def collect_leadership_signals(
             status_code=500,
             detail=f"Leadership signal collection failed: {str(e)}"
         )
+@router.post("/collect-board-signals")
+async def collect_board_signals(
+    company_id: UUID = Query(...),
+    ticker: str = Query(...),
+):
+    from app.pipelines.board_analyzer import BoardCompositionAnalyzer
+    
+    analyzer = BoardCompositionAnalyzer()
+    result = analyzer.analyze_company_governance(ticker)
+    
+    if not result:
+        raise HTTPException(404, "No board data found")
+    
+    # Convert to ExternalSignal
+    signal = ExternalSignal(
+        company_id=company_id,
+        category=SignalCategory.AI_GOVERNANCE,  # Maps to AI_GOVERNANCE dimension
+        source=SignalSource.COMPANY_WEBSITE,
+        signal_date=datetime.now(timezone.utc),
+        raw_value=f"Board governance analysis: {result.governance_score:.1f}/100",
+        normalized_score=float(result.governance_score),
+        confidence=float(result.confidence),
+        metadata={
+            "has_tech_committee": result.has_tech_committee,
+            "has_ai_expertise": result.has_ai_expertise,
+            "has_data_officer": result.has_data_officer,
+            "independent_ratio": result.independent_ratio,
+            "board_members": len(result.board_members),
+            "ai_experts": result.ai_experts,
+        }
+    )
+    
+    stored = signal_service.store_signal(signal)
+    signal_service.update_signal_summary(company_id)
+    
+    return stored
