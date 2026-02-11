@@ -11,6 +11,21 @@ def get_hardcoded_executives(ticker: str):
         "UNH": [
             ("Michael Pencina", "Chief AI Scientist"),
             ("Sandeep Dadlani", "CEO, Optum Insight"),
+            ("Andrew P. Witty", "Chief Executive Officer, Director"),
+            ("John Rex", "President and Chief Financial Officer"),
+            ("Tom Roos", "Senior Vice President and Chief Accounting Officer"),
+            ("Patricia L. Lewis", "Executive Vice President, Chief Sustainability Officer"),
+            ("Richard Mattera", "Senior Vice President and Chief Development Officer"),
+            ("Dan Schumacher", "Chief Strategy and Growth Officer"),
+            ("Erin McSweeney", "Executive Vice President and Chief People Officer"),
+            ("Jennifer Smoter", "Senior Vice President and Chief Communications Officer"),
+            ("Margaret-Mary Wilson", "Executive Vice President and Chief Medical Officer"),
+            ("Rupert Bondy", "Senior Counsel and Executive Vice President, Governance, Compliance and Security"),
+            ("Sandeep Dadlani", "Executive Vice President"),
+            ("Joy Fitzgerald", "Senior Vice President, Chief Diversity, Equity & Inclusion Officer"),
+            ("Terry M. Clark", "Chief Marketing Officer"),
+            ("Brian Thompson", "Chief Executive Officer of UnitedHealthcare"),
+            ("Heather Cianfrocco", "Chief Executive Officer of Optum"),
         ],
         
         "GS": [
