@@ -1,0 +1,4 @@
+# file: C:\Users\siddh\Documents\My_Projects\BigData\CaseStudy3\BigDataIA-Sat-Spring26-Team-2_CS3\app\scoring\talent_concentration.py
+# hypothesis_version: 6.151.6
+
+[0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 1.0, "(\\w+)'s the expert", '0.0001', 'Data Scientist', 'Job Analysis:', 'Junior ML Engineer', 'Senior ML Engineer', 'Staff Data Scientist', '__main__', 'ai_skills', 'associate', 'aws sagemaker', 'azure ml', 'chief', 'computer vision', 'deep learning', 'description', 'director', 'distinguished', 'docker', 'early career', 'entry', 'entry-level', 'fellow', 'gcp vertex', 'graduate', 'hadoop', 'head', 'huggingface', 'if (\\w+) leaves', 'intern', 'is_ai_related', 'junior', 'kubernetes', 'langchain', 'lead', 'lead scientist', 'llm', 'manager', 'mlflow', 'nlp', 'only (\\w+) knows', 'openai', 'pandas', 'principal', 'python', 'pytorch', 'scikit-learn', 'senior', 'spark', 'specialist', 'staff', 'tensorflow', 'title', 'transformers', 'vp']
