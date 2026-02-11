@@ -44,6 +44,7 @@ class SignalCategory(str, Enum):
     INNOVATION_ACTIVITY = "innovation_activity"
     DIGITAL_PRESENCE = "digital_presence"
     LEADERSHIP_SIGNALS = "leadership_signals"
+    AI_GOVERNANCE = "ai_governance"
 
 class SignalSource(str, Enum):
     LINKEDIN = "linkedin"
