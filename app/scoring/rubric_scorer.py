@@ -47,6 +47,7 @@ class RubricScorer:
     def __init__(self):
         self.dimension_scorers = {
             'data_infrastructure': self._score_data_infrastructure,
+            'ai_governance': self._score_ai_governance,
             #add other dimensions
         }
     
@@ -104,7 +105,6 @@ class RubricScorer:
         elif dimension == "technology_stack":
             return metrics.get("mlops_maturity", 0) >= threshold
         
-        # Other dimensions may not have quantitative thresholds
         return True
     
     def _evaluate_rubric(
@@ -256,3 +256,74 @@ class RubricScorer:
         return result
     
 
+    # Dimension 2 : AI GOVERNANCE
+    def _score_ai_governance(
+        self,
+        evidence_text: str,
+        quantitative_metrics: Dict[str, float]
+    ) -> RubricResult:
+        rubric = self._get_ai_governance_rubric()
+        
+        return self._evaluate_rubric(
+            dimension="ai_governance",
+            rubric=rubric,
+            evidence_text=evidence_text,
+            quantitative_metrics=quantitative_metrics
+        )
+   
+    def _get_ai_governance_rubric(self) -> Dict[ScoreLevel, RubricCriteria]:
+        return {
+            ScoreLevel.LEVEL_5: RubricCriteria(
+                level=ScoreLevel.LEVEL_5,
+                keywords=[
+                    "caio", "cdo", "board committee", "model risk",
+                    "chief ai officer", "chief data officer",
+                    "ai governance framework", "board ai committee",
+                    "comprehensive framework", "model risk management",
+                    "ai ethics board", "responsible ai"
+                ],
+                min_keyword_matches=3,
+                quantitative_threshold=0.0,
+            ),
+            ScoreLevel.LEVEL_4: RubricCriteria(
+                level=ScoreLevel.LEVEL_4,
+                keywords=[
+                    "vp data", "ai policy", "risk framework",
+                    "documented policies", "risk assessment",
+                    "vp ai", "ai governance", "model governance",
+                    "data governance", "compliance framework"
+                ],
+                min_keyword_matches=2,
+                quantitative_threshold=0.0,
+            ),
+            ScoreLevel.LEVEL_3: RubricCriteria(
+                level=ScoreLevel.LEVEL_3,
+                keywords=[
+                    "director", "guidelines", "it governance",
+                    "basic policies", "director level ownership",
+                    "policy exists", "it-led governance"
+                ],
+                min_keyword_matches=2,
+                quantitative_threshold=0.0,
+            ),
+            ScoreLevel.LEVEL_2: RubricCriteria(
+                level=ScoreLevel.LEVEL_2,
+                keywords=[
+                    "informal", "no policy", "ad-hoc",
+                    "informal governance", "ad-hoc oversight",
+                    "no documented"
+                ],
+                min_keyword_matches=1,
+                quantitative_threshold=0.0,
+            ),
+            ScoreLevel.LEVEL_1: RubricCriteria(
+                level=ScoreLevel.LEVEL_1,
+                keywords=[
+                    "none", "no oversight", "unmanaged",
+                    "no governance", "no ai oversight",
+                    "unmanaged risk"
+                ],
+                min_keyword_matches=1,
+                quantitative_threshold=0.0,
+            ),
+        }
