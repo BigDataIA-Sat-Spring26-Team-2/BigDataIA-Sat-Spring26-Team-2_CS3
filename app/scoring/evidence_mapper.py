@@ -31,6 +31,11 @@ class SignalSource(str, Enum):
     INNOVATION_ACTIVITY = "innovation_activity"
     DIGITAL_PRESENCE = "digital_presence"
     LEADERSHIP_SIGNALS = "leadership_signals"
+    SEC_ITEM_1 = "sec_item_1_business"
+    SEC_ITEM_1A = "sec_item_1a_risk_factors"
+    SEC_ITEM_7 = "sec_item_7_mda"
+    GLASSDOOR_REVIEWS = "glassdoor_reviews"
+    BOARD_COMPOSITION = "board_composition"
 
 
 @dataclass
@@ -146,6 +151,59 @@ class EvidenceMapper:
             },
             reliability=Decimal("0.85"),
         ),
+
+    SignalSource.SEC_ITEM_1: DimensionMapping(
+        source=SignalSource.SEC_ITEM_1,
+        primary_dimension=Dimension.USE_CASE_PORTFOLIO,  # Bold: 0.70
+        primary_weight=Decimal("0.70"),
+        secondary_mappings={
+            Dimension.TECHNOLOGY_STACK: Decimal("0.30"),
+        },
+        reliability=Decimal("0.90"),
+    ),
+    
+
+    SignalSource.SEC_ITEM_1A: DimensionMapping(
+        source=SignalSource.SEC_ITEM_1A,
+        primary_dimension=Dimension.AI_GOVERNANCE,  # Bold: 0.80
+        primary_weight=Decimal("0.80"),
+        secondary_mappings={
+            Dimension.DATA_INFRASTRUCTURE: Decimal("0.20"),
+        },
+        reliability=Decimal("0.90"),
+    ),
+    
+    SignalSource.SEC_ITEM_7: DimensionMapping(
+        source=SignalSource.SEC_ITEM_7,
+        primary_dimension=Dimension.LEADERSHIP,  # Bold: 0.50
+        primary_weight=Decimal("0.50"),
+        secondary_mappings={
+            Dimension.USE_CASE_PORTFOLIO: Decimal("0.30"),
+            Dimension.DATA_INFRASTRUCTURE: Decimal("0.20"),
+        },
+        reliability=Decimal("0.85"),
+    ),
+        SignalSource.GLASSDOOR_REVIEWS: DimensionMapping(
+        source=SignalSource.GLASSDOOR_REVIEWS,
+        primary_dimension=Dimension.CULTURE,  # Bold: 0.80
+        primary_weight=Decimal("0.80"),
+        secondary_mappings={
+            Dimension.TALENT: Decimal("0.10"),
+            Dimension.LEADERSHIP: Decimal("0.10"),
+        },
+        reliability=Decimal("0.70"),
+    ),
+    
+   
+    SignalSource.BOARD_COMPOSITION: DimensionMapping(
+        source=SignalSource.BOARD_COMPOSITION,
+        primary_dimension=Dimension.AI_GOVERNANCE,  # Bold: 0.70
+        primary_weight=Decimal("0.70"),
+        secondary_mappings={
+            Dimension.LEADERSHIP: Decimal("0.30"),
+        },
+        reliability=Decimal("0.85"),
+    ),
     }
     
     DEFAULT_SCORE = Decimal("50.0")
