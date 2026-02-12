@@ -326,8 +326,12 @@ class RubricScorer:
                 min_keyword_matches=1,
                 quantitative_threshold=0.0,
             ),
-        }# DIMENSION 4: TALENT
-    # ========================================
+        }
+   
+   # ========================================
+    # DIMENSION 4: Talent
+    # =======================================
+
     
     def _get_talent_rubric(self) -> Dict[ScoreLevel, RubricCriteria]:
         """
@@ -420,6 +424,10 @@ class RubricScorer:
         )
     
 
+
+   # ========================================
+    # DIMENSION 6: USE CASE PORTFOLIO
+    # =======================================
 
 def _get_use_case_portfolio_rubric(self) -> Dict[ScoreLevel, RubricCriteria]:
         """
