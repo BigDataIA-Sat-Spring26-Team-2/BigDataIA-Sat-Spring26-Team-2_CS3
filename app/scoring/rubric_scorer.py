@@ -327,3 +327,278 @@ class RubricScorer:
                 quantitative_threshold=0.0,
             ),
         }
+   
+   # ========================================
+    # DIMENSION 4: Talent
+    # =======================================
+
+    
+    def _get_talent_rubric(self) -> Dict[ScoreLevel, RubricCriteria]:
+        """
+        Rubric for Talent dimension.
+        
+        Evaluates:
+        - AI/ML team size (>20 specialists = excellent)
+        - Retention and turnover (<10% = excellent)
+        - Hiring pipeline (active recruiting)
+        - Technical depth (senior/principal engineers)
+        """
+        return {
+            ScoreLevel.LEVEL_5: RubricCriteria(
+                level=ScoreLevel.LEVEL_5,
+                keywords=[
+                    "ml platform", "ai research", "large team",
+                    ">20 specialists", "ai leadership", "principal ml",
+                    "staff ml", "research capability", "ml platform team",
+                    "internal research", "principal engineer", "staff engineer",
+                    "low turnover", "ml research"
+                ],
+                min_keyword_matches=3,
+                quantitative_threshold=0.40,  # >40% AI job ratio
+            ),
+            ScoreLevel.LEVEL_4: RubricCriteria(
+                level=ScoreLevel.LEVEL_4,
+                keywords=[
+                    "data science team", "ml engineers", "10-20 professionals",
+                    "active hiring", "retention programs", "established team",
+                    "senior ml", "lead data scientist", "growing team",
+                    "hiring pipeline", "senior data scientist"
+                ],
+                min_keyword_matches=2,
+                quantitative_threshold=0.25,
+            ),
+            ScoreLevel.LEVEL_3: RubricCriteria(
+                level=ScoreLevel.LEVEL_3,
+                keywords=[
+                    "data scientist", "growing team", "small team",
+                    "3-10 data scientists", "building capability",
+                    "some turnover", "developing team", "ml engineer"
+                ],
+                min_keyword_matches=2,
+                quantitative_threshold=0.15,
+            ),
+            ScoreLevel.LEVEL_2: RubricCriteria(
+                level=ScoreLevel.LEVEL_2,
+                keywords=[
+                    "junior", "contractor", "turnover",
+                    "1-2 data scientists", "high turnover",
+                    "limited depth", "contract workers"
+                ],
+                min_keyword_matches=1,
+                quantitative_threshold=0.05,
+            ),
+            ScoreLevel.LEVEL_1: RubricCriteria(
+                level=ScoreLevel.LEVEL_1,
+                keywords=[
+                    "no data scientist", "vendor only", "outsourced",
+                    "no ai talent", "consultants only"
+                ],
+                min_keyword_matches=1,
+                quantitative_threshold=0.0,
+            ),
+        }
+    
+    def _score_talent(
+        self,
+        evidence_text: str,
+        quantitative_metrics: Dict[str, float]
+    ) -> RubricResult:
+        """
+        Score Talent dimension.
+        
+        Evidence sources:
+        - technology_hiring (70% weight) - job postings
+        - glassdoor_reviews (10% weight) - employee feedback
+        
+        Quantitative metrics:
+        - ai_job_ratio: AI jobs / total tech jobs
+        - team_size: Total AI specialists
+        """
+        rubric = self._get_talent_rubric()
+        
+        return self._evaluate_rubric(
+            dimension="talent",
+            rubric=rubric,
+            evidence_text=evidence_text,
+            quantitative_metrics=quantitative_metrics
+        )
+    
+
+
+   # ========================================
+    # DIMENSION 6: USE CASE PORTFOLIO
+    # =======================================
+
+def _get_use_case_portfolio_rubric(self) -> Dict[ScoreLevel, RubricCriteria]:
+        """
+        Rubric for Use Case Portfolio dimension.
+        
+        Evaluates:
+        - Production AI deployments (5+ use cases = excellent)
+        - ROI tracking and measurement (3x+ ROI documented)
+        - Use case diversity across business functions
+        - Scaling plans and roadmap
+        """
+        return {
+            ScoreLevel.LEVEL_5: RubricCriteria(
+                level=ScoreLevel.LEVEL_5,
+                keywords=[
+                    "production ai", "3x roi", "ai product",
+                    "5+ use cases", "revenue-generating",
+                    "documented roi", "production deployments",
+                    "ai products", "measurable roi", "deployed models"
+                ],
+                min_keyword_matches=3,
+                quantitative_threshold=5.0,  # 5+ production use cases
+            ),
+            ScoreLevel.LEVEL_4: RubricCriteria(
+                level=ScoreLevel.LEVEL_4,
+                keywords=[
+                    "production", "measured roi", "scaling",
+                    "2-4 use cases", "positive roi", "scaling plans",
+                    "in production", "deployed models", "use cases"
+                ],
+                min_keyword_matches=2,
+                quantitative_threshold=2.0,  # 2-4 use cases
+            ),
+            ScoreLevel.LEVEL_3: RubricCriteria(
+                level=ScoreLevel.LEVEL_3,
+                keywords=[
+                    "pilot", "early production", "1-2 pilots",
+                    "early roi", "pilot to production",
+                    "roi tracking underway", "use case"
+                ],
+                min_keyword_matches=2,
+                quantitative_threshold=1.0,  # 1-2 use cases
+            ),
+            ScoreLevel.LEVEL_2: RubricCriteria(
+                level=ScoreLevel.LEVEL_2,
+                keywords=[
+                    "poc", "proof of concept", "no production",
+                    "pocs only", "experiments", "prototype"
+                ],
+                min_keyword_matches=1,
+                quantitative_threshold=0.0,
+            ),
+            ScoreLevel.LEVEL_1: RubricCriteria(
+                level=ScoreLevel.LEVEL_1,
+                keywords=[
+                    "exploring", "no use cases", "exploration phase",
+                    "no ai projects", "planning only"
+                ],
+                min_keyword_matches=1,
+                quantitative_threshold=0.0,
+            ),
+        }
+    
+def _score_use_case_portfolio(
+        self,
+        evidence_text: str,
+        quantitative_metrics: Dict[str, float]
+    ) -> RubricResult:
+        """
+        Score Use Case Portfolio dimension.
+        
+        Evidence sources:
+        - SEC Item 1 (70% weight) - Business section, product mentions
+        - innovation_activity (30% weight) - patents on applications
+        - SEC Item 7 (30% weight) - MD&A project ROI discussion
+        """
+        rubric = self._get_use_case_portfolio_rubric()
+        
+        return self._evaluate_rubric(
+            dimension="use_case_portfolio",
+            rubric=rubric,
+            evidence_text=evidence_text,
+            quantitative_metrics=quantitative_metrics
+        )
+    
+    # ========================================
+    # DIMENSION 7: CULTURE
+    # ========================================
+    
+def _get_culture_rubric(self) -> Dict[ScoreLevel, RubricCriteria]:
+        """
+        Rubric for Culture dimension.
+        
+        Evaluates:
+        - Innovation culture (celebrated, rewarded)
+        - Data-driven decision making (metrics-based)
+        - Change readiness (agile, adaptive)
+        - Experimentation mindset (fail-fast encouraged)
+        """
+        return {
+            ScoreLevel.LEVEL_5: RubricCriteria(
+                level=ScoreLevel.LEVEL_5,
+                keywords=[
+                    "innovative", "data-driven", "fail-fast",
+                    "innovation celebrated", "experimentation culture",
+                    "rewarded", "embedded decisions", "data culture",
+                    "agile", "iterative", "cutting-edge"
+                ],
+                min_keyword_matches=3,
+                quantitative_threshold=0.0,
+            ),
+            ScoreLevel.LEVEL_4: RubricCriteria(
+                level=ScoreLevel.LEVEL_4,
+                keywords=[
+                    "experimental", "learning culture", "encouraged",
+                    "experimentation encouraged", "data literacy",
+                    "growing culture", "open to innovation"
+                ],
+                min_keyword_matches=2,
+                quantitative_threshold=0.0,
+            ),
+            ScoreLevel.LEVEL_3: RubricCriteria(
+                level=ScoreLevel.LEVEL_3,
+                keywords=[
+                    "open to change", "some resistance",
+                    "mixed adoption", "middle management resistance",
+                    "gradual change"
+                ],
+                min_keyword_matches=2,
+                quantitative_threshold=0.0,
+            ),
+            ScoreLevel.LEVEL_2: RubricCriteria(
+                level=ScoreLevel.LEVEL_2,
+                keywords=[
+                    "bureaucratic", "resistant", "slow",
+                    "change resistant", "hierarchical",
+                    "intuition over data", "traditional"
+                ],
+                min_keyword_matches=1,
+                quantitative_threshold=0.0,
+            ),
+            ScoreLevel.LEVEL_1: RubricCriteria(
+                level=ScoreLevel.LEVEL_1,
+                keywords=[
+                    "hostile", "siloed", "no data culture",
+                    "hostile to change", "rigid organization",
+                    "no innovation"
+                ],
+                min_keyword_matches=1,
+                quantitative_threshold=0.0,
+            ),
+        }
+    
+def _score_culture(
+        self,
+        evidence_text: str,
+        quantitative_metrics: Dict[str, float]
+    ) -> RubricResult:
+        """
+        Score Culture dimension.
+        
+        Evidence sources:
+        - glassdoor_reviews (80% weight) - PRIMARY - Task 5.0c
+        - leadership_signals (10% weight)
+        - technology_hiring (10% weight) - job descriptions
+        """
+        rubric = self._get_culture_rubric()
+        
+        return self._evaluate_rubric(
+            dimension="culture",
+            rubric=rubric,
+            evidence_text=evidence_text,
+            quantitative_metrics=quantitative_metrics
+        )
