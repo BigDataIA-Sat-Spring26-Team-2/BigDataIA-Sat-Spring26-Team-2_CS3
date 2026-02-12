@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from typing import Dict, List, Tuple
 from enum import Enum
 from decimal import Decimal
-from unittest import result
 
 
 class ScoreLevel(Enum):
@@ -85,7 +84,6 @@ class RubricScorer:
         min_score = level.min_score
         max_score = level.max_score
         
-        # Linear interpolation: more matches = higher in range
         interpolated = min_score + (max_score - min_score) * match_ratio
         
         return Decimal(str(round(interpolated, 1)))
@@ -334,11 +332,81 @@ class RubricScorer:
             ),
         }
    
-   # ========================================
-    # DIMENSION 4: Talent
-    # =======================================
-
     
+    # Dimension 3 : TECHNOLOGY STACK
+    
+    def _get_technology_stack_rubric(self) -> Dict[ScoreLevel, RubricCriteria]:
+        return {
+            ScoreLevel.LEVEL_5: RubricCriteria(
+                level=ScoreLevel.LEVEL_5,
+                keywords=[
+                    "sagemaker", "mlops", "feature store",
+                    "vertex ai", "model registry", "automated pipelines",
+                    "kubeflow", "mlflow", "full mlops platform",
+                    "ci/cd ml", "model monitoring", "ml platform"
+                ],
+                min_keyword_matches=3,
+                quantitative_threshold=0.80,
+            ),
+            ScoreLevel.LEVEL_4: RubricCriteria(
+                level=ScoreLevel.LEVEL_4,
+                keywords=[
+                    "mlflow", "kubeflow", "databricks ml",
+                    "experiment tracking", "partial automation",
+                    "model tracking", "azure ml", "ml platform adopted",
+                    "wandb", "weights and biases"
+                ],
+                min_keyword_matches=2,
+                quantitative_threshold=0.60,
+            ),
+            ScoreLevel.LEVEL_3: RubricCriteria(
+                level=ScoreLevel.LEVEL_3,
+                keywords=[
+                    "jupyter", "notebooks", "manual deploy",
+                    "basic ml tools", "python", "scikit-learn",
+                    "tensorflow", "pytorch", "notebook-based",
+                    "machine learning", "deep learning"
+                ],
+                min_keyword_matches=2,
+                quantitative_threshold=0.40,
+            ),
+            ScoreLevel.LEVEL_2: RubricCriteria(
+                level=ScoreLevel.LEVEL_2,
+                keywords=[
+                    "excel", "tableau only", "no ml",
+                    "spreadsheet analytics", "basic bi",
+                    "no ml tooling", "manual analysis"
+                ],
+                min_keyword_matches=1,
+                quantitative_threshold=0.20,
+            ),
+            ScoreLevel.LEVEL_1: RubricCriteria(
+                level=ScoreLevel.LEVEL_1,
+                keywords=[
+                    "manual", "no tools", "no analytics",
+                    "no capability", "manual reporting"
+                ],
+                min_keyword_matches=1,
+                quantitative_threshold=0.0,
+            ),
+        }
+        
+    def _score_technology_stack(
+        self,
+        evidence_text: str,
+        quantitative_metrics: Dict[str, float]
+    ) -> RubricResult:
+        rubric = self._get_technology_stack_rubric()
+        
+        return self._evaluate_rubric(
+            dimension="technology_stack",
+            rubric=rubric,
+            evidence_text=evidence_text,
+            quantitative_metrics=quantitative_metrics
+        )
+
+
+    # DIMENSION 4: Talent    
     def _get_talent_rubric(self) -> Dict[ScoreLevel, RubricCriteria]:
         """
         Rubric for Talent dimension.
@@ -429,10 +497,8 @@ class RubricScorer:
             quantitative_metrics=quantitative_metrics
         )
     
-    # ========================================
-    # DIMENSION 5: LEADERSHIP
-    # ========================================
 
+    # DIMENSION 5: LEADERSHIP
     def _get_leadership_rubric(self) -> Dict[ScoreLevel, RubricCriteria]:
         """
     Rubric for Leadership dimension.
@@ -530,180 +596,180 @@ class RubricScorer:
     
         return result
 
-   # ========================================
+    
     # DIMENSION 6: USE CASE PORTFOLIO
-    # =======================================
-
-def _get_use_case_portfolio_rubric(self) -> Dict[ScoreLevel, RubricCriteria]:
-        """
-        Rubric for Use Case Portfolio dimension.
+    def _get_use_case_portfolio_rubric(self) -> Dict[ScoreLevel, RubricCriteria]:
+            """
+            Rubric for Use Case Portfolio dimension.
+            
+            Evaluates:
+            - Production AI deployments (5+ use cases = excellent)
+            - ROI tracking and measurement (3x+ ROI documented)
+            - Use case diversity across business functions
+            - Scaling plans and roadmap
+            """
+            return {
+                ScoreLevel.LEVEL_5: RubricCriteria(
+                    level=ScoreLevel.LEVEL_5,
+                    keywords=[
+                        "production ai", "3x roi", "ai product",
+                        "5+ use cases", "revenue-generating",
+                        "documented roi", "production deployments",
+                        "ai products", "measurable roi", "deployed models"
+                    ],
+                    min_keyword_matches=3,
+                    quantitative_threshold=5.0,  # 5+ production use cases
+                ),
+                ScoreLevel.LEVEL_4: RubricCriteria(
+                    level=ScoreLevel.LEVEL_4,
+                    keywords=[
+                        "production", "measured roi", "scaling",
+                        "2-4 use cases", "positive roi", "scaling plans",
+                        "in production", "deployed models", "use cases"
+                    ],
+                    min_keyword_matches=2,
+                    quantitative_threshold=2.0,  # 2-4 use cases
+                ),
+                ScoreLevel.LEVEL_3: RubricCriteria(
+                    level=ScoreLevel.LEVEL_3,
+                    keywords=[
+                        "pilot", "early production", "1-2 pilots",
+                        "early roi", "pilot to production",
+                        "roi tracking underway", "use case"
+                    ],
+                    min_keyword_matches=2,
+                    quantitative_threshold=1.0,  # 1-2 use cases
+                ),
+                ScoreLevel.LEVEL_2: RubricCriteria(
+                    level=ScoreLevel.LEVEL_2,
+                    keywords=[
+                        "poc", "proof of concept", "no production",
+                        "pocs only", "experiments", "prototype"
+                    ],
+                    min_keyword_matches=1,
+                    quantitative_threshold=0.0,
+                ),
+                ScoreLevel.LEVEL_1: RubricCriteria(
+                    level=ScoreLevel.LEVEL_1,
+                    keywords=[
+                        "exploring", "no use cases", "exploration phase",
+                        "no ai projects", "planning only"
+                    ],
+                    min_keyword_matches=1,
+                    quantitative_threshold=0.0,
+                ),
+            }
         
-        Evaluates:
-        - Production AI deployments (5+ use cases = excellent)
-        - ROI tracking and measurement (3x+ ROI documented)
-        - Use case diversity across business functions
-        - Scaling plans and roadmap
-        """
-        return {
-            ScoreLevel.LEVEL_5: RubricCriteria(
-                level=ScoreLevel.LEVEL_5,
-                keywords=[
-                    "production ai", "3x roi", "ai product",
-                    "5+ use cases", "revenue-generating",
-                    "documented roi", "production deployments",
-                    "ai products", "measurable roi", "deployed models"
-                ],
-                min_keyword_matches=3,
-                quantitative_threshold=5.0,  # 5+ production use cases
-            ),
-            ScoreLevel.LEVEL_4: RubricCriteria(
-                level=ScoreLevel.LEVEL_4,
-                keywords=[
-                    "production", "measured roi", "scaling",
-                    "2-4 use cases", "positive roi", "scaling plans",
-                    "in production", "deployed models", "use cases"
-                ],
-                min_keyword_matches=2,
-                quantitative_threshold=2.0,  # 2-4 use cases
-            ),
-            ScoreLevel.LEVEL_3: RubricCriteria(
-                level=ScoreLevel.LEVEL_3,
-                keywords=[
-                    "pilot", "early production", "1-2 pilots",
-                    "early roi", "pilot to production",
-                    "roi tracking underway", "use case"
-                ],
-                min_keyword_matches=2,
-                quantitative_threshold=1.0,  # 1-2 use cases
-            ),
-            ScoreLevel.LEVEL_2: RubricCriteria(
-                level=ScoreLevel.LEVEL_2,
-                keywords=[
-                    "poc", "proof of concept", "no production",
-                    "pocs only", "experiments", "prototype"
-                ],
-                min_keyword_matches=1,
-                quantitative_threshold=0.0,
-            ),
-            ScoreLevel.LEVEL_1: RubricCriteria(
-                level=ScoreLevel.LEVEL_1,
-                keywords=[
-                    "exploring", "no use cases", "exploration phase",
-                    "no ai projects", "planning only"
-                ],
-                min_keyword_matches=1,
-                quantitative_threshold=0.0,
-            ),
-        }
+    def _score_use_case_portfolio(
+            self,
+            evidence_text: str,
+            quantitative_metrics: Dict[str, float]
+        ) -> RubricResult:
+            """
+            Score Use Case Portfolio dimension.
+            
+            Evidence sources:
+            - SEC Item 1 (70% weight) - Business section, product mentions
+            - innovation_activity (30% weight) - patents on applications
+            - SEC Item 7 (30% weight) - MD&A project ROI discussion
+            """
+            rubric = self._get_use_case_portfolio_rubric()
+            
+            return self._evaluate_rubric(
+                dimension="use_case_portfolio",
+                rubric=rubric,
+                evidence_text=evidence_text,
+                quantitative_metrics=quantitative_metrics
+            )
+        
+        # ========================================
+        # DIMENSION 7: CULTURE
+        # ========================================
+        
     
-def _score_use_case_portfolio(
-        self,
-        evidence_text: str,
-        quantitative_metrics: Dict[str, float]
-    ) -> RubricResult:
-        """
-        Score Use Case Portfolio dimension.
-        
-        Evidence sources:
-        - SEC Item 1 (70% weight) - Business section, product mentions
-        - innovation_activity (30% weight) - patents on applications
-        - SEC Item 7 (30% weight) - MD&A project ROI discussion
-        """
-        rubric = self._get_use_case_portfolio_rubric()
-        
-        return self._evaluate_rubric(
-            dimension="use_case_portfolio",
-            rubric=rubric,
-            evidence_text=evidence_text,
-            quantitative_metrics=quantitative_metrics
-        )
-    
-    # ========================================
     # DIMENSION 7: CULTURE
-    # ========================================
-    
-def _get_culture_rubric(self) -> Dict[ScoreLevel, RubricCriteria]:
-        """
-        Rubric for Culture dimension.
+    def _get_culture_rubric(self) -> Dict[ScoreLevel, RubricCriteria]:
+            """
+            Rubric for Culture dimension.
+            
+            Evaluates:
+            - Innovation culture (celebrated, rewarded)
+            - Data-driven decision making (metrics-based)
+            - Change readiness (agile, adaptive)
+            - Experimentation mindset (fail-fast encouraged)
+            """
+            return {
+                ScoreLevel.LEVEL_5: RubricCriteria(
+                    level=ScoreLevel.LEVEL_5,
+                    keywords=[
+                        "innovative", "data-driven", "fail-fast",
+                        "innovation celebrated", "experimentation culture",
+                        "rewarded", "embedded decisions", "data culture",
+                        "agile", "iterative", "cutting-edge"
+                    ],
+                    min_keyword_matches=3,
+                    quantitative_threshold=0.0,
+                ),
+                ScoreLevel.LEVEL_4: RubricCriteria(
+                    level=ScoreLevel.LEVEL_4,
+                    keywords=[
+                        "experimental", "learning culture", "encouraged",
+                        "experimentation encouraged", "data literacy",
+                        "growing culture", "open to innovation"
+                    ],
+                    min_keyword_matches=2,
+                    quantitative_threshold=0.0,
+                ),
+                ScoreLevel.LEVEL_3: RubricCriteria(
+                    level=ScoreLevel.LEVEL_3,
+                    keywords=[
+                        "open to change", "some resistance",
+                        "mixed adoption", "middle management resistance",
+                        "gradual change"
+                    ],
+                    min_keyword_matches=2,
+                    quantitative_threshold=0.0,
+                ),
+                ScoreLevel.LEVEL_2: RubricCriteria(
+                    level=ScoreLevel.LEVEL_2,
+                    keywords=[
+                        "bureaucratic", "resistant", "slow",
+                        "change resistant", "hierarchical",
+                        "intuition over data", "traditional"
+                    ],
+                    min_keyword_matches=1,
+                    quantitative_threshold=0.0,
+                ),
+                ScoreLevel.LEVEL_1: RubricCriteria(
+                    level=ScoreLevel.LEVEL_1,
+                    keywords=[
+                        "hostile", "siloed", "no data culture",
+                        "hostile to change", "rigid organization",
+                        "no innovation"
+                    ],
+                    min_keyword_matches=1,
+                    quantitative_threshold=0.0,
+                ),
+            }
         
-        Evaluates:
-        - Innovation culture (celebrated, rewarded)
-        - Data-driven decision making (metrics-based)
-        - Change readiness (agile, adaptive)
-        - Experimentation mindset (fail-fast encouraged)
-        """
-        return {
-            ScoreLevel.LEVEL_5: RubricCriteria(
-                level=ScoreLevel.LEVEL_5,
-                keywords=[
-                    "innovative", "data-driven", "fail-fast",
-                    "innovation celebrated", "experimentation culture",
-                    "rewarded", "embedded decisions", "data culture",
-                    "agile", "iterative", "cutting-edge"
-                ],
-                min_keyword_matches=3,
-                quantitative_threshold=0.0,
-            ),
-            ScoreLevel.LEVEL_4: RubricCriteria(
-                level=ScoreLevel.LEVEL_4,
-                keywords=[
-                    "experimental", "learning culture", "encouraged",
-                    "experimentation encouraged", "data literacy",
-                    "growing culture", "open to innovation"
-                ],
-                min_keyword_matches=2,
-                quantitative_threshold=0.0,
-            ),
-            ScoreLevel.LEVEL_3: RubricCriteria(
-                level=ScoreLevel.LEVEL_3,
-                keywords=[
-                    "open to change", "some resistance",
-                    "mixed adoption", "middle management resistance",
-                    "gradual change"
-                ],
-                min_keyword_matches=2,
-                quantitative_threshold=0.0,
-            ),
-            ScoreLevel.LEVEL_2: RubricCriteria(
-                level=ScoreLevel.LEVEL_2,
-                keywords=[
-                    "bureaucratic", "resistant", "slow",
-                    "change resistant", "hierarchical",
-                    "intuition over data", "traditional"
-                ],
-                min_keyword_matches=1,
-                quantitative_threshold=0.0,
-            ),
-            ScoreLevel.LEVEL_1: RubricCriteria(
-                level=ScoreLevel.LEVEL_1,
-                keywords=[
-                    "hostile", "siloed", "no data culture",
-                    "hostile to change", "rigid organization",
-                    "no innovation"
-                ],
-                min_keyword_matches=1,
-                quantitative_threshold=0.0,
-            ),
-        }
-    
-def _score_culture(
-        self,
-        evidence_text: str,
-        quantitative_metrics: Dict[str, float]
-    ) -> RubricResult:
-        """
-        Score Culture dimension.
-        
-        Evidence sources:
-        - glassdoor_reviews (80% weight) - PRIMARY - Task 5.0c
-        - leadership_signals (10% weight)
-        - technology_hiring (10% weight) - job descriptions
-        """
-        rubric = self._get_culture_rubric()
-        
-        return self._evaluate_rubric(
-            dimension="culture",
-            rubric=rubric,
-            evidence_text=evidence_text,
-            quantitative_metrics=quantitative_metrics
-        )
+    def _score_culture(
+            self,
+            evidence_text: str,
+            quantitative_metrics: Dict[str, float]
+        ) -> RubricResult:
+            """
+            Score Culture dimension.
+            
+            Evidence sources:
+            - glassdoor_reviews (80% weight) - PRIMARY - Task 5.0c
+            - leadership_signals (10% weight)
+            - technology_hiring (10% weight) - job descriptions
+            """
+            rubric = self._get_culture_rubric()
+            
+            return self._evaluate_rubric(
+                dimension="culture",
+                rubric=rubric,
+                evidence_text=evidence_text,
+                quantitative_metrics=quantitative_metrics
+            )
