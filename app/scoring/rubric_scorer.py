@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Dict, List, Tuple
 from enum import Enum
 from decimal import Decimal
+from unittest import result
 
 
 class ScoreLevel(Enum):
@@ -48,6 +49,8 @@ class RubricScorer:
         self.dimension_scorers = {
             'data_infrastructure': self._score_data_infrastructure,
             'ai_governance': self._score_ai_governance,
+            'talent': self._score_talent,
+            'leadership': self._score_leadership,
             #add other dimensions
         }
     
@@ -104,6 +107,9 @@ class RubricScorer:
         
         elif dimension == "technology_stack":
             return metrics.get("mlops_maturity", 0) >= threshold
+        
+        elif dimension == "leadership":
+            return metrics.get("leadership_score", 0) >= threshold
         
         return True
     
@@ -423,7 +429,106 @@ class RubricScorer:
             quantitative_metrics=quantitative_metrics
         )
     
+    # ========================================
+    # DIMENSION 5: LEADERSHIP
+    # ========================================
 
+    def _get_leadership_rubric(self) -> Dict[ScoreLevel, RubricCriteria]:
+        """
+    Rubric for Leadership dimension.
+    
+    Evaluates:
+    - CEO/Board-level AI commitment
+    - C-suite AI sponsorship
+    - Strategic AI planning
+    - Executive engagement
+    """
+        return {
+            ScoreLevel.LEVEL_5: RubricCriteria(
+            level=ScoreLevel.LEVEL_5,
+            keywords=[
+                "ceo ai", "board committee", "ai strategy",
+                "ceo publicly champions", "board ai committee",
+                "multi-year ai strategic plan", "chief executive ai",
+                "ceo commitment", "board oversight", "strategic plan"
+            ],
+            min_keyword_matches=2,
+            quantitative_threshold=0.80,
+        ),
+            ScoreLevel.LEVEL_4: RubricCriteria(
+                level=ScoreLevel.LEVEL_4,
+                keywords=[
+                "cto ai", "strategic priority", "c-suite sponsor",
+                "cdo", "chief technology officer", "chief information officer",
+                "ai in strategy documents", "executive engagement",
+                "cio", "technology strategy"
+            ],
+            min_keyword_matches=2,
+            quantitative_threshold=0.60,
+        ),
+            ScoreLevel.LEVEL_3: RubricCriteria(
+                level=ScoreLevel.LEVEL_3,
+                keywords=[
+                "vp sponsor", "department initiative", "vp-level sponsorship",
+                "departmental ai initiatives", "vice president",
+                "vp data", "vp technology"
+            ],
+                min_keyword_matches=1,
+                quantitative_threshold=0.40,
+        ),
+            ScoreLevel.LEVEL_2: RubricCriteria(
+                level=ScoreLevel.LEVEL_2,
+                keywords=[
+                "it led", "limited awareness", "limited executive awareness",
+                "it-driven initiatives", "technology department only"
+            ],
+                min_keyword_matches=1,
+                quantitative_threshold=0.20,
+        ),
+            ScoreLevel.LEVEL_1: RubricCriteria(
+                level=ScoreLevel.LEVEL_1,
+                keywords=[
+                "no sponsor", "not discussed", "no executive sponsorship",
+                "ai not discussed", "no leadership", "no commitment"
+            ],
+                min_keyword_matches=1,
+                quantitative_threshold=0.0,
+        ),
+    }
+
+    def _score_leadership(
+        self,
+        evidence_text: str,
+        quantitative_metrics: Dict[str, float]
+    ) -> RubricResult:
+        """
+    Score Leadership dimension.
+    
+    Evidence sources:
+    - leadership_signals (60% weight) - PRIMARY - from CS2
+    - SEC Item 7 (50% weight) - MD&A executive discussion
+    - ai_governance (25% weight) - board composition
+    
+    Quantitative metrics:
+    - leadership_score: Normalized leadership signal score (0-1)
+    - executive_count: Total executives analyzed
+    - ai_executive_count: Executives with AI background
+    """
+        rubric = self._get_leadership_rubric()
+    
+        result = self._evaluate_rubric(
+            dimension="leadership",
+            rubric=rubric,
+            evidence_text=evidence_text,
+            quantitative_metrics=quantitative_metrics
+    )
+    
+    # Bonus: Multiple AI executives increases confidence
+        ai_executive_count = quantitative_metrics.get("ai_executive_count", 0)
+        if ai_executive_count >= 3:
+            result.confidence = min(Decimal("0.95"), result.confidence + Decimal("0.10"))
+    
+        return result
 
    # ========================================
     # DIMENSION 6: USE CASE PORTFOLIO

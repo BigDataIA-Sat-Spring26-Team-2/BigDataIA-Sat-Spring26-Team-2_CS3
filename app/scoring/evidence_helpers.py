@@ -12,7 +12,8 @@ def get_dimension_evidence(
 ) -> Tuple[str, Dict[str, float]]:
 
     extractors = {
-        'data_infrastructure': get_data_infrastructure_evidence
+        'data_infrastructure': get_data_infrastructure_evidence,
+        'leadership': get_leadership_evidence
     }
     
     extractor = extractors.get(dimension)
@@ -106,6 +107,62 @@ def get_data_infrastructure_evidence(company_id: UUID, ticker: str) -> Tuple[str
         metrics = {
             "data_quality_score": data_quality_score,
             "cloud_adoption": cloud_adoption
+        }
+        
+        return (evidence_text, metrics)
+        
+    finally:
+        cur.close()
+        conn.close()
+# LEADERSHIP
+def get_leadership_evidence(company_id: UUID, ticker: str) -> Tuple[str, Dict[str, float]]:
+    conn = get_connection()
+    cur = conn.cursor()
+    settings = get_settings()
+    
+    evidence_parts = []
+    
+    try:
+        # Fetch leadership signals
+        cur.execute(f"""
+            SELECT raw_value, normalized_score, metadata
+            FROM {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.external_signals
+            WHERE company_id = %s AND category = 'leadership_signals'
+            ORDER BY created_at DESC
+            LIMIT 1
+        """, (str(company_id),))
+        
+        row = cur.fetchone()
+        
+        if not row:
+            return ("", {})
+        
+        raw_value = row[0]
+        score = float(row[1])
+        metadata = json.loads(row[2]) if row[2] else {}
+        
+        # Add raw value
+        evidence_parts.append(raw_value)
+        
+        # Extract executive titles and indicators
+        exec_details = metadata.get("executive_details", [])
+        for exec_info in exec_details:
+            # Add title
+            title = exec_info.get("title", "")
+            evidence_parts.append(title)
+            
+            # Add indicator evidence
+            for indicator in exec_info.get("indicators", []):
+                evidence = indicator.get("evidence", "")
+                evidence_parts.append(evidence)
+        
+        evidence_text = " ".join(evidence_parts)
+        
+        # Metrics for quantitative rubric checks
+        metrics = {
+            "leadership_score": score / 100,  # Normalize to 0-1
+            "executive_count": metadata.get("executives_analyzed", 0),
+            "ai_executive_count": metadata.get("ai_executives", 0),
         }
         
         return (evidence_text, metrics)
