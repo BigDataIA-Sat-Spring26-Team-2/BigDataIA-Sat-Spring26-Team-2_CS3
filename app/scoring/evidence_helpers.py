@@ -114,6 +114,78 @@ def get_data_infrastructure_evidence(company_id: UUID, ticker: str) -> Tuple[str
     finally:
         cur.close()
         conn.close()
+
+def get_technology_stack_evidence(company_id: UUID, ticker: str) -> Tuple[str, Dict[str, float]]:
+    """
+    Extract Technology Stack evidence from:
+    - innovation_activity (PRIMARY - 50% weight)
+    - digital_presence (40% weight)
+    - technology_hiring (20% weight)
+    """
+
+    conn = get_connection()
+    cur = conn.cursor()
+    settings = get_settings()
+
+    evidence_parts = []
+
+    try:
+        cur.execute(f"""
+            SELECT category, raw_value, normalized_score, metadata
+            FROM {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.external_signals
+            WHERE company_id = %s
+            ORDER BY created_at DESC
+        """, (str(company_id),))
+
+        rows = cur.fetchall()
+
+        for row in rows:
+            category = row[0]
+            metadata = json.loads(row[3]) if row[3] else {}
+
+            if category == "innovation_activity":
+                keyword_matches = metadata.get("keyword_matches", {})
+                for keywords in keyword_matches.values():
+                    evidence_parts.extend(keywords)
+
+            elif category == "digital_presence":
+                tech_list = metadata.get("ai_technologies", [])
+                for tech in tech_list:
+                    evidence_parts.append(tech.get("name", ""))
+
+            elif category == "technology_hiring":
+                skills = metadata.get("skills_found", [])
+                ml_skills = ["mlops", "mlflow", "sagemaker", "kubeflow", 
+                            "tensorflow", "pytorch", "scikit-learn"]
+                found_ml = [s for s in skills if s in ml_skills]
+                evidence_parts.extend(found_ml)
+
+        evidence_text = " ".join(evidence_parts)
+
+        mlops_keywords = ["mlops", "mlflow", "kubeflow", "sagemaker"]
+        mlops_count = sum(1 for kw in mlops_keywords if kw in evidence_text.lower())
+
+        metrics = {
+            "mlops_maturity": min(1.0, mlops_count / 2)  # mature
+        }
+
+        return (evidence_text, metrics)
+
+    finally:
+        cur.close()
+        conn.close()
+
+# TO-DO
+def get_ai_governance_evidence(company_id: UUID, ticker: str) -> Tuple[str, Dict[str, float]]:
+    """
+    board_composition - 70%
+    leadership_signals - 25%
+    """
+    _, _ = get_leadership_evidence(company_id, ticker)
+
+    return ("AI governance framework in development", {})
+
+
 # LEADERSHIP
 def get_leadership_evidence(company_id: UUID, ticker: str) -> Tuple[str, Dict[str, float]]:
     conn = get_connection()
