@@ -3,6 +3,7 @@ from typing import Optional
 from uuid import UUID
 from pathlib import Path
 import structlog
+from app.models.enums import SignalSource
 from app.schemas.signal_tasks import QueuedTaskResponse
 from app.pipelines.tech_signals import TechSignalCollector
 from app.models.signal import (
@@ -20,6 +21,8 @@ from app.reports.patent_report import write_patent_report
 from app.services.snowflake import get_connection
 
 from app.pipelines.leadership_signals import LeadershipSignalCollector
+from app.pipelines.sec_item_analyzer import SECItem1Analyzer
+from datetime import datetime, timezone 
 
 from app.config import get_settings
 
@@ -306,3 +309,86 @@ async def collect_board_signals(
     signal_service.update_signal_summary(company_id)
     
     return stored
+@router.post(
+    "/collect-sec-item1-signals",
+    response_model=ExternalSignal,
+    status_code=status.HTTP_201_CREATED
+)
+async def collect_sec_item1_signals(
+    company_id: UUID = Query(...),
+    ticker: str = Query(...),
+    background_tasks: BackgroundTasks = None,
+):
+    """
+    Collect SEC Item 1 (Business section) signals.
+    Analyzes use case portfolio from business description.
+    """
+    from app.pipelines.sec_item_analyzer import SECItem1Analyzer
+    conn = get_connection()
+    cur = conn.cursor()
+    settings = get_settings()
+    
+    try:
+        cur.execute(f"""
+            SELECT ticker FROM {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.companies
+            WHERE id = %s AND is_deleted = FALSE
+        """, (str(company_id),))
+        
+        row = cur.fetchone()
+        
+        if not row:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Company not found: {company_id}"
+            )
+        
+        db_ticker = row[0]
+        
+        if db_ticker.upper() != ticker.upper():
+            raise HTTPException(
+                status_code=400,
+                detail=f"Ticker mismatch: company_id has ticker '{db_ticker}', but you provided '{ticker}'"
+            )
+    finally:
+        cur.close()
+        conn.close()
+    
+    logger.info("sec_item1_collection_started", ticker=ticker)
+    
+    try:
+        analyzer = SECItem1Analyzer()
+        score, confidence, metadata = analyzer.analyze_business_section(
+            company_id=company_id,
+            ticker=ticker
+        )
+        
+        # Create signal
+        signal = ExternalSignal(
+            company_id=company_id,
+            category=SignalCategory.USE_CASE_PORTFOLIO,
+            source=SignalSource.SEC_ITEM_1_BUSINESS,  
+            signal_date=datetime.now(timezone.utc),
+            raw_value=f"SEC Item 1 analysis: {metadata.get('use_case_score', 0):.0f} use case mentions",
+            normalized_score=float(score),
+            confidence=float(confidence),
+            metadata=metadata
+        )
+        
+        # Store signal
+        stored = signal_service.store_signal(signal)
+        
+        if background_tasks:
+            background_tasks.add_task(signal_service.update_signal_summary, company_id)
+        else:
+            signal_service.update_signal_summary(company_id)
+        
+        logger.info("sec_item1_collection_complete", ticker=ticker, score=float(score))
+        
+        return stored
+        
+    except Exception as e:
+        logger.error("sec_item1_collection_failed", ticker=ticker, error=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail=f"SEC Item 1 collection failed: {str(e)}"
+        )
