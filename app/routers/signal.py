@@ -226,9 +226,7 @@ async def collect_leadership_signals(
     company_name: str = Query(...),
     background_tasks: BackgroundTasks = None,
 ):
-    """
-    Collect leadership commitment signals from external sources.
-    """
+    
     import time
     start_time = time.time()
 
@@ -286,10 +284,10 @@ async def collect_board_signals(
     if not result:
         raise HTTPException(404, "No board data found")
     
-    # Convert to ExternalSignal
+   
     signal = ExternalSignal(
         company_id=company_id,
-        category=SignalCategory.AI_GOVERNANCE,  # Maps to AI_GOVERNANCE dimension
+        category=SignalCategory.AI_GOVERNANCE,  
         source=SignalSource.COMPANY_WEBSITE,
         signal_date=datetime.now(timezone.utc),
         raw_value=f"Board governance analysis: {result.governance_score:.1f}/100",
@@ -319,10 +317,7 @@ async def collect_sec_item1_signals(
     ticker: str = Query(...),
     background_tasks: BackgroundTasks = None,
 ):
-    """
-    Collect SEC Item 1 (Business section) signals.
-    Analyzes use case portfolio from business description.
-    """
+    
     from app.pipelines.sec_item_analyzer import SECItem1Analyzer
     conn = get_connection()
     cur = conn.cursor()
@@ -362,7 +357,7 @@ async def collect_sec_item1_signals(
             ticker=ticker
         )
         
-        # Create signal
+       
         signal = ExternalSignal(
             company_id=company_id,
             category=SignalCategory.USE_CASE_PORTFOLIO,
@@ -374,7 +369,7 @@ async def collect_sec_item1_signals(
             metadata=metadata
         )
         
-        # Store signal
+       
         stored = signal_service.store_signal(signal)
         
         if background_tasks:
@@ -405,7 +400,7 @@ async def collect_sec_item1a_signals(
 ):
     """Collect SEC Item 1A (Risk Factors) signals for AI Governance."""
     
-    # Ticker validation (same as Item 1)
+    
     conn = get_connection()
     cur = conn.cursor()
     settings = get_settings()
@@ -458,3 +453,67 @@ async def collect_sec_item1a_signals(
     except Exception as e:
         logger.error("sec_item1a_failed", ticker=ticker, error=str(e))
         raise HTTPException(500, f"SEC Item 1A collection failed: {str(e)}")
+
+@router.post(
+    "/collect-sec-item7-signals",
+    response_model=ExternalSignal,
+    status_code=status.HTTP_201_CREATED
+)
+async def collect_sec_item7_signals(
+    company_id: UUID = Query(...),
+    ticker: str = Query(...),
+    background_tasks: BackgroundTasks = None,
+):
+    
+    conn = get_connection()
+    cur = conn.cursor()
+    settings = get_settings()
+    
+    try:
+        cur.execute(f"""
+            SELECT ticker FROM {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.companies
+            WHERE id = %s AND is_deleted = FALSE
+        """, (str(company_id),))
+        
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(404, f"Company not found: {company_id}")
+        
+        if row[0].upper() != ticker.upper():
+            raise HTTPException(400, f"Ticker mismatch: expected '{row[0]}', got '{ticker}'")
+    finally:
+        cur.close()
+        conn.close()
+    
+    try:
+        from app.pipelines.sec_item_analyzer import SECItem7Analyzer
+        
+        analyzer = SECItem7Analyzer()
+        score, confidence, metadata = analyzer.analyze_mda_section(
+            company_id=company_id,
+            ticker=ticker
+        )
+        
+        signal = ExternalSignal(
+            company_id=company_id,
+            category=SignalCategory.LEADERSHIP_SIGNALS,  
+            source=SignalSource.SEC_ITEM_7_MDA,
+            signal_date=datetime.now(timezone.utc),
+            raw_value=f"SEC Item 7: {metadata.get('strategy_score', 0):.0f} strategy mentions",
+            normalized_score=float(score),
+            confidence=float(confidence),
+            metadata=metadata
+        )
+        
+        stored = signal_service.store_signal(signal)
+        
+        if background_tasks:
+            background_tasks.add_task(signal_service.update_signal_summary, company_id)
+        else:
+            signal_service.update_signal_summary(company_id)
+        
+        return stored
+        
+    except Exception as e:
+        logger.error("sec_item7_failed", ticker=ticker, error=str(e))
+        raise HTTPException(500, f"SEC Item 7 collection failed: {str(e)}")
