@@ -392,3 +392,69 @@ async def collect_sec_item1_signals(
             status_code=500,
             detail=f"SEC Item 1 collection failed: {str(e)}"
         )
+    
+@router.post(
+    "/collect-sec-item1a-signals",
+    response_model=ExternalSignal,
+    status_code=status.HTTP_201_CREATED
+)
+async def collect_sec_item1a_signals(
+    company_id: UUID = Query(...),
+    ticker: str = Query(...),
+    background_tasks: BackgroundTasks = None,
+):
+    """Collect SEC Item 1A (Risk Factors) signals for AI Governance."""
+    
+    # Ticker validation (same as Item 1)
+    conn = get_connection()
+    cur = conn.cursor()
+    settings = get_settings()
+    
+    try:
+        cur.execute(f"""
+            SELECT ticker FROM {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.companies
+            WHERE id = %s AND is_deleted = FALSE
+        """, (str(company_id),))
+        
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(404, f"Company not found: {company_id}")
+        
+        if row[0].upper() != ticker.upper():
+            raise HTTPException(400, f"Ticker mismatch: expected '{row[0]}', got '{ticker}'")
+    finally:
+        cur.close()
+        conn.close()
+    
+    try:
+        from app.pipelines.sec_item_analyzer import SECItem1AAnalyzer
+        
+        analyzer = SECItem1AAnalyzer()
+        score, confidence, metadata = analyzer.analyze_risk_section(
+            company_id=company_id,
+            ticker=ticker
+        )
+        
+        signal = ExternalSignal(
+            company_id=company_id,
+            category=SignalCategory.AI_GOVERNANCE,      
+            source=SignalSource.SEC_ITEM_1A_RISK,
+            signal_date=datetime.now(timezone.utc),
+            raw_value=f"SEC Item 1A: {metadata.get('ai_risk_score', 0):.0f} AI risk mentions",
+            normalized_score=float(score),
+            confidence=float(confidence),
+            metadata=metadata
+        )
+        
+        stored = signal_service.store_signal(signal)
+        
+        if background_tasks:
+            background_tasks.add_task(signal_service.update_signal_summary, company_id)
+        else:
+            signal_service.update_signal_summary(company_id)
+        
+        return stored
+        
+    except Exception as e:
+        logger.error("sec_item1a_failed", ticker=ticker, error=str(e))
+        raise HTTPException(500, f"SEC Item 1A collection failed: {str(e)}")

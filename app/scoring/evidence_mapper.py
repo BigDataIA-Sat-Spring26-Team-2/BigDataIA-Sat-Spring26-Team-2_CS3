@@ -107,7 +107,7 @@ class EvidenceMapper:
     This is PATH A (quantitative) in the Phase 3 scoring architecture.
     """
     
-    # Signal-to-Dimension Mappings from Case Study 3 PDF Table 1
+  
     SIGNAL_MAPPINGS: Dict[SignalSource, DimensionMapping] = {
         SignalSource.TECHNOLOGY_HIRING: DimensionMapping(
             source=SignalSource.TECHNOLOGY_HIRING,
@@ -122,7 +122,7 @@ class EvidenceMapper:
         
         SignalSource.INNOVATION_ACTIVITY: DimensionMapping(
             source=SignalSource.INNOVATION_ACTIVITY,
-            primary_dimension=Dimension.TECHNOLOGY_STACK,  # Bold: 0.50
+            primary_dimension=Dimension.TECHNOLOGY_STACK,  
             primary_weight=Decimal("0.50"),
             secondary_mappings={
                 Dimension.USE_CASE_PORTFOLIO: Decimal("0.30"),
@@ -133,7 +133,7 @@ class EvidenceMapper:
         
         SignalSource.DIGITAL_PRESENCE: DimensionMapping(
             source=SignalSource.DIGITAL_PRESENCE,
-            primary_dimension=Dimension.DATA_INFRASTRUCTURE,  # Bold: 0.60
+            primary_dimension=Dimension.DATA_INFRASTRUCTURE,  
             primary_weight=Decimal("0.60"),
             secondary_mappings={
                 Dimension.TECHNOLOGY_STACK: Decimal("0.40"),
@@ -143,7 +143,7 @@ class EvidenceMapper:
         
         SignalSource.LEADERSHIP_SIGNALS: DimensionMapping(
             source=SignalSource.LEADERSHIP_SIGNALS,
-            primary_dimension=Dimension.LEADERSHIP,  # Bold: 0.60
+            primary_dimension=Dimension.LEADERSHIP,  
             primary_weight=Decimal("0.60"),
             secondary_mappings={
                 Dimension.AI_GOVERNANCE: Decimal("0.25"),
@@ -154,7 +154,7 @@ class EvidenceMapper:
 
     SignalSource.SEC_ITEM_1: DimensionMapping(
         source=SignalSource.SEC_ITEM_1,
-        primary_dimension=Dimension.USE_CASE_PORTFOLIO,  # Bold: 0.70
+        primary_dimension=Dimension.USE_CASE_PORTFOLIO,  
         primary_weight=Decimal("0.70"),
         secondary_mappings={
             Dimension.TECHNOLOGY_STACK: Decimal("0.30"),
@@ -165,7 +165,7 @@ class EvidenceMapper:
 
     SignalSource.SEC_ITEM_1A: DimensionMapping(
         source=SignalSource.SEC_ITEM_1A,
-        primary_dimension=Dimension.AI_GOVERNANCE,  # Bold: 0.80
+        primary_dimension=Dimension.AI_GOVERNANCE,  
         primary_weight=Decimal("0.80"),
         secondary_mappings={
             Dimension.DATA_INFRASTRUCTURE: Decimal("0.20"),
@@ -175,7 +175,7 @@ class EvidenceMapper:
     
     SignalSource.SEC_ITEM_7: DimensionMapping(
         source=SignalSource.SEC_ITEM_7,
-        primary_dimension=Dimension.LEADERSHIP,  # Bold: 0.50
+        primary_dimension=Dimension.LEADERSHIP,  
         primary_weight=Decimal("0.50"),
         secondary_mappings={
             Dimension.USE_CASE_PORTFOLIO: Decimal("0.30"),
@@ -185,7 +185,7 @@ class EvidenceMapper:
     ),
         SignalSource.GLASSDOOR_REVIEWS: DimensionMapping(
         source=SignalSource.GLASSDOOR_REVIEWS,
-        primary_dimension=Dimension.CULTURE,  # Bold: 0.80
+        primary_dimension=Dimension.CULTURE,  
         primary_weight=Decimal("0.80"),
         secondary_mappings={
             Dimension.TALENT: Decimal("0.10"),
@@ -197,7 +197,7 @@ class EvidenceMapper:
    
     SignalSource.BOARD_COMPOSITION: DimensionMapping(
         source=SignalSource.BOARD_COMPOSITION,
-        primary_dimension=Dimension.AI_GOVERNANCE,  # Bold: 0.70
+        primary_dimension=Dimension.AI_GOVERNANCE,  
         primary_weight=Decimal("0.70"),
         secondary_mappings={
             Dimension.LEADERSHIP: Decimal("0.30"),
