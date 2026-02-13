@@ -6,10 +6,13 @@ Fetches data from Snowflake and runs Evidence Mapper per company.
 """
 
 import structlog
+import json 
 from uuid import UUID
 from decimal import Decimal
 from typing import Dict, List, Optional, Any
 
+from app.scoring.vr_calculator import VRCalculator, VRResult
+from app.scoring.talent_concentration import TalentConcentrationCalculator, JobAnalysis
 from app.scoring.evidence_mapper import (
     EvidenceMapper,
     EvidenceScore,
@@ -27,11 +30,15 @@ class ScoringService:
     """
     Service for calculating dimension scores per company.
     
-    This is the main entrypoint for Phase 3 PATH A scoring.
+    Supports:
+    - Phase 3 PATH A: Evidence Mapper (dimension scoring)
+    - Phase 5: V^R Calculator (venture readiness)
     """
     
     def __init__(self):
         self.mapper = EvidenceMapper()
+        self.vr_calculator = VRCalculator()
+        self.tc_calculator = TalentConcentrationCalculator()
         self.settings = get_settings()
     
     def score_company(
@@ -87,7 +94,7 @@ class ScoringService:
                 "signal_count": len(evidence_scores),
                 "signal_sources": [e.source.value for e in evidence_scores],
                 "scoring_method": "path_a_quantitative",
-                "path_b_included": False,  # Not implemented yet
+                "path_b_included": False,
             }
         }
         
@@ -110,16 +117,119 @@ class ScoringService:
         
         return response
     
+    def calculate_vr(
+        self,
+        company_id: UUID,
+        include_audit_trail: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Calculate V^R (Venture Readiness) score for a company.
+        
+        Pipeline:
+        1. Get 7 dimension scores (from Evidence Mapper - Path A)
+        2. Calculate Talent Concentration from job metadata  
+        3. Get company sector
+        4. Run V^R calculator
+        
+        Args:
+            company_id: UUID of company
+            include_audit_trail: Include calculation details
+        
+        Returns:
+            Dict with vr_score and components
+        
+        Raises:
+            ValueError: Missing required data
+        """
+        logger.info("vr_calculation_started", company_id=str(company_id))
+        
+        # Step 1: Get company info
+        company_info = self._get_company_info(company_id)
+        if not company_info:
+            raise ValueError(f"Company {company_id} not found in database")
+        
+        logger.debug("company_info_fetched", ticker=company_info["ticker"])
+        
+        # Step 2: Get dimension scores
+        dimension_result = self.score_company(company_id, include_audit_trail=False)
+        
+        # Step 3: Extract dimension scores
+        dimension_scores = {}
+        for dim_name, dim_data in dimension_result["dimension_scores"].items():
+            dimension_scores[dim_name] = float(dim_data["score"])
+        
+        logger.debug("dimension_scores_extracted", scores=dimension_scores)
+        
+        # Step 4: Calculate TC
+        tc = self._calculate_talent_concentration(company_id)
+        logger.debug("tc_calculated", tc=tc)
+        
+        # Step 5: Get sector
+        sector = self._get_company_sector(company_id)
+        logger.debug("sector_fetched", sector=sector)
+        
+        # Step 6: Calculate V^R
+        vr_result = self.vr_calculator.calculate(
+            dimension_scores=dimension_scores,
+            talent_concentration=tc,
+            sector=sector
+        )
+        
+        # Step 7: Build response
+        response = {
+            "company_id": str(company_id),
+            "ticker": company_info["ticker"],
+            "company_name": company_info["name"],
+            "vr_score": float(vr_result.vr_score),
+            "vr_components": {
+                "base_score": float(vr_result.weighted_mean),
+                "cv": float(vr_result.cv),
+                "cv_penalty": float(vr_result.cv_penalty),
+                "cv_penalty_amount": float(vr_result.cv_penalty_amount),
+                "talent_concentration": float(vr_result.talent_concentration),
+                "talent_risk_adj": float(vr_result.talent_risk_adj),
+                "tc_penalty_amount": float(vr_result.tc_penalty_amount),
+            },
+            "dimension_scores": dimension_scores,
+            "sector": sector,
+        }
+        
+        if include_audit_trail:
+            response["audit_trail"] = {
+                "vr_summary": vr_result.get_summary(),
+                "dimension_weights": {
+                    k: float(v) for k, v in vr_result.dimension_weights.items()
+                },
+                "calculation_steps": {
+                    "step_1_weighted_mean": float(vr_result.weighted_mean),
+                    "step_2_cv_calculation": {
+                        "cv": float(vr_result.cv),
+                        "cv_penalty": float(vr_result.cv_penalty),
+                        "points_lost": float(vr_result.cv_penalty_amount)
+                    },
+                    "step_3_tc_calculation": {
+                        "tc": float(vr_result.talent_concentration),
+                        "tc_adjustment": float(vr_result.talent_risk_adj),
+                        "points_lost": float(vr_result.tc_penalty_amount)
+                    },
+                    "step_4_final_vr": float(vr_result.vr_score)
+                }
+            }
+        
+        logger.info(
+            "vr_calculation_completed",
+            company_id=str(company_id),
+            ticker=company_info["ticker"],
+            vr_score=float(vr_result.vr_score)
+        )
+        
+        return response
+    
     def score_multiple_companies(
         self,
         company_ids: List[UUID]
     ) -> Dict[str, Dict[str, Any]]:
-        """
-        Score multiple companies in batch.
-        
-        Returns:
-            Dictionary mapping company_id -> scoring result
-        """
+        """Score multiple companies in batch."""
         results = {}
         
         for company_id in company_ids:
@@ -144,23 +254,12 @@ class ScoringService:
         company_ids: List[UUID],
         dimensions: Optional[List[Dimension]] = None
     ) -> Dict[str, Any]:
-        """
-        Score multiple companies and return comparison table.
-        
-        Args:
-            company_ids: List of companies to compare
-            dimensions: Specific dimensions to compare (default: all 7)
-        
-        Returns:
-            Comparison table with scores
-        """
+        """Score multiple companies and return comparison table."""
         if dimensions is None:
             dimensions = list(Dimension)
         
-        # Score all companies
         results = self.score_multiple_companies(company_ids)
         
-        # Build comparison table
         comparison = {
             "dimensions": [d.value for d in dimensions],
             "companies": {}
@@ -216,7 +315,7 @@ class ScoringService:
         """
         Fetch external signals from Snowflake for specific company.
         
-        This is the KEY method that makes scoring company-specific.
+        Skips unknown signal categories gracefully.
         """
         conn = get_connection()
         cur = conn.cursor()
@@ -228,9 +327,7 @@ class ScoringService:
                 normalized_score,
                 confidence,
                 raw_value,
-                metadata,
-                signal_date,
-                created_at
+                metadata
             FROM {self.settings.SNOWFLAKE_DATABASE}.{self.settings.SNOWFLAKE_SCHEMA}.external_signals
             WHERE company_id = %s
             ORDER BY signal_date DESC, created_at DESC
@@ -246,29 +343,197 @@ class ScoringService:
             )
             
             # Convert to EvidenceScore objects
-            # Take most recent score per category
             evidence_by_category = {}
+            skipped_categories = []
             
             for row in rows:
                 category = row[0]
                 
+                # Skip if already have this category
                 if category in evidence_by_category:
-                    continue  # Already have most recent
+                    continue
+                
+                # Try to convert category to SignalSource enum
+                try:
+                    signal_source = SignalSource(category)
+                except ValueError:
+                    # Category not in enum - skip it
+                    skipped_categories.append(category)
+                    logger.warning(
+                        "skipping_unknown_signal_category",
+                        category=category,
+                        company_id=str(company_id)
+                    )
+                    continue
                 
                 score = row[1]
                 confidence = row[2] if row[2] else 0.85
                 raw_value = row[3] if row[3] else ""
                 metadata = row[4] if row[4] else {}
                 
+                # Now safe - signal_source is validated
                 evidence_by_category[category] = EvidenceScore(
-                    source=SignalSource(category),
+                    source=signal_source,
                     score=Decimal(str(score)),
                     confidence=Decimal(str(confidence)),
                     raw_value=raw_value,
                     metadata=metadata
                 )
             
+            if skipped_categories:
+                logger.info(
+                    "skipped_categories_summary",
+                    company_id=str(company_id),
+                    skipped=skipped_categories,
+                    reason="not_in_cs2_signal_enum"
+                )
+            
             return list(evidence_by_category.values())
+            
+        finally:
+            cur.close()
+            conn.close()
+    
+    def _calculate_talent_concentration(self, company_id: UUID) -> float:
+        """
+        Calculate TC using YOUR existing TalentConcentrationCalculator.
+        
+        Raises:
+            ValueError: If no job metadata found
+        """
+        conn = get_connection()
+        cur = conn.cursor()
+        
+        try:
+            query = f"""
+            SELECT metadata
+            FROM {self.settings.SNOWFLAKE_DATABASE}.{self.settings.SNOWFLAKE_SCHEMA}.external_signals
+            WHERE company_id = %s
+              AND category = 'technology_hiring'
+            ORDER BY created_at DESC
+            LIMIT 1
+            """
+            
+            cur.execute(query, (str(company_id),))
+            row = cur.fetchone()
+            
+            if not row or not row[0]:
+                raise ValueError(
+                    f"No technology_hiring metadata found for company {company_id}. "
+                    f"TC calculation requires job posting data."
+                )
+            
+            # ⭐ THE FIX: Parse JSON string to dict
+            metadata_raw = row[0]
+            
+            if isinstance(metadata_raw, str):
+                # It's a JSON string - parse it!
+                metadata = json.loads(metadata_raw)
+            elif isinstance(metadata_raw, dict):
+                # Already a dict - use as-is
+                metadata = metadata_raw
+            else:
+                raise ValueError(
+                    f"Unexpected metadata type: {type(metadata_raw)}. "
+                    f"Expected JSON string or dict."
+                )
+            
+            # Now metadata is definitely a dict
+            total_jobs = metadata.get("ai_jobs", 0)
+            seniority_dist = metadata.get("seniority_distribution", {})
+            skills_found = metadata.get("skills_found", [])
+            
+            if total_jobs == 0:
+                raise ValueError(
+                    f"No AI jobs found in metadata for company {company_id}."
+                )
+            
+            # Build JobAnalysis for YOUR calculator
+            job_analysis = JobAnalysis(
+                total_ai_jobs=total_jobs,
+                senior_ai_jobs=(
+                    seniority_dist.get("senior", 0) + 
+                    seniority_dist.get("executive", 0) + 
+                    seniority_dist.get("principal", 0)
+                ),
+                mid_ai_jobs=seniority_dist.get("mid", 0),
+                entry_ai_jobs=seniority_dist.get("entry", 0),
+                unique_skills=set(skills_found) if skills_found else set()
+            )
+            
+            logger.debug(
+                "job_analysis_built",
+                company_id=str(company_id),
+                total_jobs=job_analysis.total_ai_jobs,
+                senior_jobs=job_analysis.senior_ai_jobs,
+                skill_count=len(job_analysis.unique_skills)
+            )
+            
+            # Use YOUR existing calculator
+            tc_result = self.tc_calculator.calculate_tc(
+                job_analysis=job_analysis,
+                glassdoor_individual_mentions=0,
+                glassdoor_review_count=1
+            )
+            
+            tc_float = float(tc_result)
+            
+            logger.info(
+                "talent_concentration_calculated",
+                company_id=str(company_id),
+                tc=tc_float,
+                components={
+                    "leadership_ratio": job_analysis.senior_ai_jobs / job_analysis.total_ai_jobs if job_analysis.total_ai_jobs > 0 else 0,
+                    "total_jobs": job_analysis.total_ai_jobs,
+                    "unique_skills": len(job_analysis.unique_skills)
+                }
+            )
+            
+            return tc_float
+            
+        finally:
+            cur.close()
+            conn.close()
+    
+    def _get_company_sector(self, company_id: UUID) -> str:
+        """
+        Get company sector by joining companies with industries table.
+        
+        Raises:
+            ValueError: If company not found or sector is NULL
+        """
+        conn = get_connection()
+        cur = conn.cursor()
+        
+        try:
+            # ⭐ FIX: JOIN with industries table to get sector
+            query = f"""
+            SELECT i.sector
+            FROM {self.settings.SNOWFLAKE_DATABASE}.{self.settings.SNOWFLAKE_SCHEMA}.companies c
+            JOIN {self.settings.SNOWFLAKE_DATABASE}.{self.settings.SNOWFLAKE_SCHEMA}.industries i
+              ON c.industry_id = i.id
+            WHERE c.id = %s AND c.is_deleted = FALSE
+            """
+            cur.execute(query, (str(company_id),))
+            row = cur.fetchone()
+            
+            if not row:
+                raise ValueError(
+                    f"Company {company_id} not found or has no industry assignment. "
+                    f"Check company exists and has valid industry_id."
+                )
+            
+            if not row[0]:
+                raise ValueError(
+                    f"Company {company_id}'s industry has NULL sector. "
+                    f"Update industries table with valid sector."
+                )
+            
+            sector = row[0]
+            
+            logger.debug("company_sector_fetched", company_id=str(company_id), sector=sector)
+            
+            return sector
             
         finally:
             cur.close()
@@ -318,7 +583,8 @@ class ScoringService:
                     "source": contrib.source.value,
                     "weight": float(contrib.weight),
                     "signal_score": float(contrib.signal_score),
-                    "weighted_contribution": float(contrib.weighted_contribution)
+                    "weighted_contribution": float(contrib.weighted_contribution),
+                    "is_primary": contrib.is_primary
                 }
                 for contrib in score.contributions
             ]
@@ -352,59 +618,3 @@ class ScoringService:
                 "warning": "No external signals found for this company"
             }
         }
-
-
-# ========================================
-# Example Usage
-# ========================================
-
-def example_score_single_company():
-    """Example: Score a single company"""
-    service = ScoringService()
-    
-    # Replace with actual UUID from your database
-    company_id = UUID("550e8400-e29b-41d4-a716-446655440000")
-    
-    result = service.score_company(
-        company_id,
-        include_audit_trail=True
-    )
-    
-    print(f"\nScoring Result for {result['ticker']}:")
-    print("=" * 70)
-    for dim_name, dim_data in result["dimension_scores"].items():
-        print(f"{dim_name:25s}: {dim_data['score']:6.1f}/100  "
-              f"(confidence: {dim_data['confidence']:.2f})")
-
-
-def example_compare_companies():
-    """Example: Compare multiple companies"""
-    service = ScoringService()
-    
-    company_ids = [
-        UUID("550e8400-e29b-41d4-a716-446655440000"),  # CAT
-        UUID("660e8400-e29b-41d4-a716-446655440001"),  # UNH
-        UUID("770e8400-e29b-41d4-a716-446655440002"),  # WMT
-    ]
-    
-    comparison = service.compare_companies(company_ids)
-    
-    print("\nCompany Comparison:")
-    print("=" * 90)
-    print(f"{'Dimension':<25s}", end="")
-    for ticker in comparison["companies"].keys():
-        print(f"{ticker:>12s}", end="")
-    print()
-    print("-" * 90)
-    
-    for dim in comparison["dimensions"]:
-        print(f"{dim:<25s}", end="")
-        for ticker, data in comparison["companies"].items():
-            score = data["scores"][dim]
-            print(f"{score:>12.1f}", end="")
-        print()
-
-
-if __name__ == "__main__":
-    example_score_single_company()
-    # example_compare_companies()
