@@ -69,6 +69,36 @@ typing_extensions = {version = ">=4.5", markers = "python_version < \"3.13\""}
 trio = ["trio (>=0.31.0) ; python_version < \"3.10\"", "trio (>=0.32.0) ; python_version >= \"3.10\""]
 
 [[package]]
+name = "apify-client"
+version = "2.4.1"
+description = "Apify API client for Python"
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "apify_client-2.4.1-py3-none-any.whl", hash = "sha256:aa4f7451ab05a91715cc20ba5570f4f781bda8e580bd281acd20a8f110b10120"},
+    {file = "apify_client-2.4.1.tar.gz", hash = "sha256:125d2874d364bd7fa17f7db8464ad10700caa3cb0f5502a624f6edd606469124"},
+]
+
+[package.dependencies]
+apify-shared = ">=2.1.0,<3.0.0"
+colorama = ">=0.4.0"
+impit = ">=0.9.2"
+more-itertools = ">=10.0.0"
+
+[[package]]
+name = "apify-shared"
+version = "2.2.0"
+description = "Tools and constants shared across Apify projects."
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "apify_shared-2.2.0-py3-none-any.whl", hash = "sha256:667d4d00ac3cf8091702640547387ac5c72a1df402bbb3923f7a401bc25d9d50"},
+    {file = "apify_shared-2.2.0.tar.gz", hash = "sha256:ad48a96084e3c38faa1bac723a47929a1bb2c771544da2f0cb503eabdecfc79a"},
+]
+
+[[package]]
 name = "asn1crypto"
 version = "1.5.1"
 description = "Fast ASN.1 parser and serializer with definitions for private keys, public keys, certificates, CRL, OCSP, CMS, PKCS#3, PKCS#7, PKCS#8, PKCS#12, PKCS#5, X.509 and TSP"
@@ -466,7 +496,7 @@ files = [
     {file = "colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6"},
     {file = "colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44"},
 ]
-markers = {main = "platform_system == \"Windows\" or sys_platform == \"win32\"", dev = "sys_platform == \"win32\""}
+markers = {dev = "sys_platform == \"win32\""}
 
 [[package]]
 name = "coverage"
@@ -965,6 +995,64 @@ files = [
 all = ["flake8 (>=7.1.1)", "mypy (>=1.11.2)", "pytest (>=8.3.2)", "ruff (>=0.6.2)"]
 
 [[package]]
+name = "impit"
+version = "0.11.0"
+description = "A library for making HTTP requests through browser impersonation"
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "impit-0.11.0-cp310-cp310-macosx_10_12_x86_64.whl", hash = "sha256:5d3c38d0be023a8158458a34d3dddb5603090d4aae9ab5237070b4379d58e01b"},
+    {file = "impit-0.11.0-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:b1affd50235760a207d51391155069d06c16c2d473ee66c9965ab38c2b2df137"},
+    {file = "impit-0.11.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:eb95becd38046beb0171a23ccf46c0db637d7ef867dc3f83aa8d08018e3decc2"},
+    {file = "impit-0.11.0-cp310-cp310-manylinux_2_28_aarch64.whl", hash = "sha256:8a0c10309893da378862c975b6ab5c0adbddd2d636926671c0897b78094ee061"},
+    {file = "impit-0.11.0-cp310-cp310-musllinux_1_2_aarch64.whl", hash = "sha256:5d327144a39845bb04dccae9653d70ed88244095ba1bd96207d35504832762b8"},
+    {file = "impit-0.11.0-cp310-cp310-musllinux_1_2_x86_64.whl", hash = "sha256:f6f1cb76d4ac5e195bd53a936c11f04c7e7fca9f063baaa2de211a23fa492183"},
+    {file = "impit-0.11.0-cp310-cp310-win_amd64.whl", hash = "sha256:74abab53345971c5ac89be55ba414b6a03b1180fe88861d27732c77a50977ee1"},
+    {file = "impit-0.11.0-cp311-cp311-macosx_10_12_x86_64.whl", hash = "sha256:1aaf865e22a987456e5d320633bcee14ac9561856ae7217ab2c669206eaf38d0"},
+    {file = "impit-0.11.0-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:dd5acb1bd15b5fe080c281bea638291bce6e9222eef94c88036a15d6a8a20680"},
+    {file = "impit-0.11.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:a153d1944b0071e7d55a978fc773bcae1aa2c9bf4073d756a1d546ed8ab0f72b"},
+    {file = "impit-0.11.0-cp311-cp311-manylinux_2_28_aarch64.whl", hash = "sha256:e9dd7c0e0a9fe53c1fa22109eb2700aeab75a1ea2cc73811b29b14fd6bc0a4e9"},
+    {file = "impit-0.11.0-cp311-cp311-musllinux_1_2_aarch64.whl", hash = "sha256:d73adc539584338670d08d9b8fd31c50bdd430d3c4af11a063794e039aeded07"},
+    {file = "impit-0.11.0-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:f5eb8628bcf589462a926c00bfe68e9da49167cc0e8aba9ebbd3bd493a72e659"},
+    {file = "impit-0.11.0-cp311-cp311-win_amd64.whl", hash = "sha256:29bbd35f309e13d13beec40045da096fa11ef40ae65192d0fa045fff95346ea3"},
+    {file = "impit-0.11.0-cp312-cp312-macosx_10_12_x86_64.whl", hash = "sha256:fd5faf67c6ea21fa0daf4e248d539681ecc0ae8536b462360744fbd962c16128"},
+    {file = "impit-0.11.0-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:b6cebdda176cb8d44ea2b588896779fd6b32e2599d3f78742d162612c46e5669"},
+    {file = "impit-0.11.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:451f78c532f9622403b3d3f15c99a649cf9a2a7a97071118c5daf74ec2996ef3"},
+    {file = "impit-0.11.0-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:a155b58bb339590e451df2f5d12bd7f04ed175620b070d6bef106387c3b0f1f0"},
+    {file = "impit-0.11.0-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:bea5ad2b9bdb01b9ed396c51ecaf1b53b78cf82ca67b97eb668b71de5d01a1fa"},
+    {file = "impit-0.11.0-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:a047f383a5f14a07066368202fe659b2fb1fff0d651fda2b3fb210361b2a3550"},
+    {file = "impit-0.11.0-cp312-cp312-win_amd64.whl", hash = "sha256:3b8508ffebcc656631eaacb65826d06c14839563fc4788bf7d8c93dd19f1472f"},
+    {file = "impit-0.11.0-cp313-cp313-macosx_10_12_x86_64.whl", hash = "sha256:53ab6096105fba0ef4de9ab76c26028984e251f401a880c479fe29c899f75166"},
+    {file = "impit-0.11.0-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:a7e29d51b8cf3acaa340d9994cd5a8a3b88e6e0f1341a3bbaefd1e3e9e742d0a"},
+    {file = "impit-0.11.0-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:f8514b211c3179e7b8957017864e297520b9908c269e2172bbb4cbb309198316"},
+    {file = "impit-0.11.0-cp313-cp313-manylinux_2_28_aarch64.whl", hash = "sha256:40570e79f33d95f484461a51976c1f5e53e45ed6b7cb7b72110fb70d1988bc48"},
+    {file = "impit-0.11.0-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:1259d1b926fee4ffe34cdcc8f35e2c226280281fd92d2c67a539849140ce9735"},
+    {file = "impit-0.11.0-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:e0a7bafedb603230fbda1b0ece0865e4d66076c4673176579ef9e4714e73d6b1"},
+    {file = "impit-0.11.0-cp313-cp313-win_amd64.whl", hash = "sha256:24ee5528c58c719d1a33d7253f290afd24109b500fea9ff7ba00c18295e78d4f"},
+    {file = "impit-0.11.0-cp313-cp313t-macosx_10_12_x86_64.whl", hash = "sha256:02da101435d1f8911d5b0fff3bf4cd0b143805c51bb8347c1d0bed5ab5faf11b"},
+    {file = "impit-0.11.0-cp313-cp313t-macosx_11_0_arm64.whl", hash = "sha256:b131a50299197cbb8c04cdf9ed7fd062481f92dea87b1a1de5cfee8845ffcad4"},
+    {file = "impit-0.11.0-cp313-cp313t-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:7c92fa5dce2af736c998615f00a867ef0b7d4f5064a31f6def82d137f81d1ad1"},
+    {file = "impit-0.11.0-cp313-cp313t-manylinux_2_28_aarch64.whl", hash = "sha256:c6e4ccf2406318b5bfc7bae68ed782f0db37400e3e38abc0ee0554311a81ffb7"},
+    {file = "impit-0.11.0-cp313-cp313t-musllinux_1_2_aarch64.whl", hash = "sha256:f332eff30b395ad124c67e03a62d2372381e3b868f8896183637653a67ffa2ec"},
+    {file = "impit-0.11.0-cp313-cp313t-musllinux_1_2_x86_64.whl", hash = "sha256:e2c115f1f7dc56df3ead8f6ad7e35d8e72d617401ef7c4beee7d98669b917999"},
+    {file = "impit-0.11.0-cp314-cp314-macosx_10_12_x86_64.whl", hash = "sha256:f1069b0923cf0ea09c6ea0600866a2a290422f25b35a33ec1587bf549fa04a09"},
+    {file = "impit-0.11.0-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:44376cec9c5ca0140dca1b2d7974fe3571b6e996a3c3cc5b934f690cb8c99ec6"},
+    {file = "impit-0.11.0-cp314-cp314-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:a546eb74b4d3b26635046e385cf4a7d0573865d18a303fc8d7387fbba656d93f"},
+    {file = "impit-0.11.0-cp314-cp314-manylinux_2_28_aarch64.whl", hash = "sha256:c2aefa00148e1b55b448d1e2b408e45c8f7728efdad06440b6d558dd75f25328"},
+    {file = "impit-0.11.0-cp314-cp314-musllinux_1_2_aarch64.whl", hash = "sha256:3f9072ba529a0c1600335e11d058475665d63b7517e161fa702d450c3f0f0b8c"},
+    {file = "impit-0.11.0-cp314-cp314-musllinux_1_2_x86_64.whl", hash = "sha256:feb92660a43cba72fa3314bb5be33098d0c0b8ab89f8f8e9a6980c355d507bfb"},
+    {file = "impit-0.11.0-cp314-cp314-win_amd64.whl", hash = "sha256:3fd3702edda92a15a7f09a71abce81c1b65fdfdbe964397e127700e228fbacac"},
+    {file = "impit-0.11.0-cp314-cp314t-macosx_10_12_x86_64.whl", hash = "sha256:7499cf0a34e2eff069013b2dd489e9a929b323c6c1c2adf2391de9438fadb557"},
+    {file = "impit-0.11.0-cp314-cp314t-macosx_11_0_arm64.whl", hash = "sha256:f7cb9fdd197c28128cfbba78fa1483e08ff1bf67cbc9997710ec4101aa9d4ae3"},
+    {file = "impit-0.11.0-cp314-cp314t-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:6dc7084882e57412cdb381718828e0d0cb69bc6a8cf3a2cc19dd5c60f840fbb3"},
+    {file = "impit-0.11.0-cp314-cp314t-manylinux_2_28_aarch64.whl", hash = "sha256:3a7c29bfc3c7196e67e004302680d0e52ae3382c0cb784f112c4fcfd379a10b4"},
+    {file = "impit-0.11.0-cp314-cp314t-musllinux_1_2_aarch64.whl", hash = "sha256:44437e828f1231fcc880b62ed98afeb16b0b033af003e260edd6e13b362b9eac"},
+    {file = "impit-0.11.0-cp314-cp314t-musllinux_1_2_x86_64.whl", hash = "sha256:568b6037c9bde1f0eb3c2bfec80402b3f52f171b69566b4bf2e81c1a8c694c74"},
+    {file = "impit-0.11.0.tar.gz", hash = "sha256:fa55517116c774ca7f402d0d76584278a547c23c9cfedf22973b0ac88d155a5f"},
+]
+
+[[package]]
 name = "iniconfig"
 version = "2.3.0"
 description = "brain-dead simple config-ini parsing"
@@ -1354,6 +1442,18 @@ files = [
     {file = "markupsafe-3.0.3-cp39-cp39-win_amd64.whl", hash = "sha256:7c3fb7d25180895632e5d3148dbdc29ea38ccb7fd210aa27acbd1201a1902c6e"},
     {file = "markupsafe-3.0.3-cp39-cp39-win_arm64.whl", hash = "sha256:38664109c14ffc9e7437e86b4dceb442b0096dfe3541d7864d9cbe1da4cf36c8"},
     {file = "markupsafe-3.0.3.tar.gz", hash = "sha256:722695808f4b6457b320fdc131280796bdceb04ab50fe1795cd540799ebe1698"},
+]
+
+[[package]]
+name = "more-itertools"
+version = "10.8.0"
+description = "More routines for operating on iterables, beyond itertools"
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "more_itertools-10.8.0-py3-none-any.whl", hash = "sha256:52d4362373dcf7c52546bc4af9a86ee7c4579df9a8dc268be0a2f949d376cc9b"},
+    {file = "more_itertools-10.8.0.tar.gz", hash = "sha256:f638ddf8a1a0d134181275fb5d58b086ead7c6a72429ad725c67503f13ba30bd"},
 ]
 
 [[package]]
@@ -3463,4 +3563,4 @@ dev = ["pytest", "setuptools"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<4.0"
-content-hash = "99a492229efdfecd3b57c4ff0fb4b428038cfa4e379ef333d72082212f15d456"
+content-hash = "4b020ecb7379d668bfeee51ebff6fa573577b4c0a39ed98ffde8fb02151075aa"
