@@ -45,6 +45,10 @@ class SignalCategory(str, Enum):
     DIGITAL_PRESENCE = "digital_presence"
     LEADERSHIP_SIGNALS = "leadership_signals"
     AI_GOVERNANCE = "ai_governance"
+    USE_CASE_PORTFOLIO = "use_case_portfolio"
+    CULTURE = "culture"
+
+
 
 class SignalSource(str, Enum):
     LINKEDIN = "linkedin"
@@ -53,5 +57,7 @@ class SignalSource(str, Enum):
     COMPANY_WEBSITE = "company_website"
     MULTIPLE = "LinkedIn_Indeed"
     TECH_STACK_SCRAPE="tech_stack_scrape"
-    # Patent signals
     GOOGLE_PATENTS = "google_patents"
+    SEC_ITEM_1_BUSINESS = "sec_item_1_business"
+    SEC_ITEM_1A_RISK = "sec_item_1a_risk_factors"
+    SEC_ITEM_7_MDA = "sec_item_7_mda"
