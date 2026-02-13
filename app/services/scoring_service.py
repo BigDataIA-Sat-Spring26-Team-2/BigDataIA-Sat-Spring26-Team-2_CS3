@@ -6,6 +6,7 @@ Fetches data from Snowflake and runs Evidence Mapper per company.
 """
 
 import structlog
+import json  # ⭐ ADD THIS IMPORT!
 from uuid import UUID
 from decimal import Decimal
 from typing import Dict, List, Optional, Any
@@ -152,10 +153,9 @@ class ScoringService:
         # Step 2: Get dimension scores
         dimension_result = self.score_company(company_id, include_audit_trail=False)
         
-        # Step 3: Extract dimension scores (handle the dict format from _format_dimension_scores)
+        # Step 3: Extract dimension scores
         dimension_scores = {}
         for dim_name, dim_data in dimension_result["dimension_scores"].items():
-            # dim_data is {"score": 53.4, "confidence": 0.95, "method": "weighted_average", ...}
             dimension_scores[dim_name] = float(dim_data["score"])
         
         logger.debug("dimension_scores_extracted", scores=dimension_scores)
@@ -192,11 +192,6 @@ class ScoringService:
             },
             "dimension_scores": dimension_scores,
             "sector": sector,
-            "metadata": {
-                "scoring_method": "path_a_quantitative",
-                "path_b_included": False,
-                "dimension_source": "evidence_mapper"
-            }
         }
         
         if include_audit_trail:
@@ -320,72 +315,7 @@ class ScoringService:
         """
         Fetch external signals from Snowflake for specific company.
         
-        ⭐ KEY FIX: Only fetches CS2 signals (filters out ai_governance, etc.)
-        """
-        conn = get_connection()
-        cur = conn.cursor()
-        
-        try:
-            # ⭐ CRITICAL FIX: Filter to only CS2 signal categories
-            query = f"""
-            SELECT 
-                category,
-                normalized_score,
-                confidence,
-                raw_value,
-                metadata
-            FROM {self.settings.SNOWFLAKE_DATABASE}.{self.settings.SNOWFLAKE_SCHEMA}.external_signals
-            WHERE company_id = %s
-              AND category IN ('technology_hiring', 'innovation_activity', 'digital_presence', 'leadership_signals')
-            ORDER BY signal_date DESC, created_at DESC
-            """
-            
-            cur.execute(query, (str(company_id),))
-            rows = cur.fetchall()
-            
-            logger.debug(
-                "signals_fetched_from_snowflake",
-                company_id=str(company_id),
-                row_count=len(rows)
-            )
-            
-            # Convert to EvidenceScore objects
-            evidence_by_category = {}
-            
-            for row in rows:
-                category = row[0]
-                
-                if category in evidence_by_category:
-                    continue  # Already have most recent
-                
-                score = row[1]
-                confidence = row[2] if row[2] else 0.85
-                raw_value = row[3] if row[3] else ""
-                metadata = row[4] if row[4] else {}
-                
-                # Now safe - category is guaranteed to be in SignalSource enum
-                evidence_by_category[category] = EvidenceScore(
-                    source=SignalSource(category),
-                    score=Decimal(str(score)),
-                    confidence=Decimal(str(confidence)),
-                    raw_value=raw_value,
-                    metadata=metadata
-                )
-            
-            return list(evidence_by_category.values())
-            
-        finally:
-            cur.close()
-            conn.close()
-    
-
-
-    def _fetch_external_signals(self, company_id: UUID) -> List[EvidenceScore]:
-        """
-        Fetch external signals from Snowflake for specific company.
-        
-        Only processes signals that exist in SignalSource enum.
-        Skips unknown categories with warning log.
+        Skips unknown signal categories gracefully.
         """
         conn = get_connection()
         cur = conn.cursor()
@@ -423,7 +353,7 @@ class ScoringService:
                 if category in evidence_by_category:
                     continue
                 
-                # ⭐ TRY to convert category to SignalSource enum
+                # Try to convert category to SignalSource enum
                 try:
                     signal_source = SignalSource(category)
                 except ValueError:
@@ -443,7 +373,7 @@ class ScoringService:
                 
                 # Now safe - signal_source is validated
                 evidence_by_category[category] = EvidenceScore(
-                    source=signal_source,  # Use validated enum value
+                    source=signal_source,
                     score=Decimal(str(score)),
                     confidence=Decimal(str(confidence)),
                     raw_value=raw_value,
@@ -463,7 +393,7 @@ class ScoringService:
         finally:
             cur.close()
             conn.close()
-
+    
     def _calculate_talent_concentration(self, company_id: UUID) -> float:
         """
         Calculate TC using YOUR existing TalentConcentrationCalculator.
@@ -479,7 +409,7 @@ class ScoringService:
             SELECT metadata
             FROM {self.settings.SNOWFLAKE_DATABASE}.{self.settings.SNOWFLAKE_SCHEMA}.external_signals
             WHERE company_id = %s
-            AND category = 'technology_hiring'
+              AND category = 'technology_hiring'
             ORDER BY created_at DESC
             LIMIT 1
             """
@@ -564,11 +494,10 @@ class ScoringService:
         finally:
             cur.close()
             conn.close()
-
     
     def _get_company_sector(self, company_id: UUID) -> str:
         """
-        Get company sector from companies table.
+        Get company sector by joining companies with industries table.
         
         Raises:
             ValueError: If company not found or sector is NULL
@@ -577,23 +506,27 @@ class ScoringService:
         cur = conn.cursor()
         
         try:
+            # ⭐ FIX: JOIN with industries table to get sector
             query = f"""
-            SELECT sector
-            FROM {self.settings.SNOWFLAKE_DATABASE}.{self.settings.SNOWFLAKE_SCHEMA}.companies
-            WHERE id = %s AND is_deleted = FALSE
+            SELECT i.sector
+            FROM {self.settings.SNOWFLAKE_DATABASE}.{self.settings.SNOWFLAKE_SCHEMA}.companies c
+            JOIN {self.settings.SNOWFLAKE_DATABASE}.{self.settings.SNOWFLAKE_SCHEMA}.industries i
+              ON c.industry_id = i.id
+            WHERE c.id = %s AND c.is_deleted = FALSE
             """
             cur.execute(query, (str(company_id),))
             row = cur.fetchone()
             
             if not row:
                 raise ValueError(
-                    f"Company {company_id} not found in database."
+                    f"Company {company_id} not found or has no industry assignment. "
+                    f"Check company exists and has valid industry_id."
                 )
             
             if not row[0]:
                 raise ValueError(
-                    f"Company {company_id} has NULL sector. "
-                    f"Update companies table with valid sector."
+                    f"Company {company_id}'s industry has NULL sector. "
+                    f"Update industries table with valid sector."
                 )
             
             sector = row[0]

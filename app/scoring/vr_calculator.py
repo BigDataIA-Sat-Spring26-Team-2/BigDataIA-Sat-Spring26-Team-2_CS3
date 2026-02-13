@@ -20,8 +20,7 @@ IMPORTANT: This calculator is INPUT-AGNOSTIC
 
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any, Dict
-from uuid import UUID
+from typing import Dict
 import structlog
 
 from app.scoring.utils import (
@@ -325,136 +324,70 @@ class VRCalculator:
         
         return result
     
-    def calculate_vr(
-        self,
-        company_id: UUID,
-        include_audit_trail: bool = False
-    ) -> Dict[str, Any]:
-        """Calculate V^R score with print() debugging"""
-        
-        print("\n" + "="*70)
-        print("VR CALCULATION DEBUG START")
-        print("="*70)
-        
-        try:
-            # STEP 1
-            print("STEP 1: Getting company info...")
-            company_info = self._get_company_info(company_id)
-            print(f"  ✓ Company: {company_info['ticker']}")
-            
-            # STEP 2
-            print("STEP 2: Getting dimension scores...")
-            dimension_result = self.score_company(company_id, include_audit_trail=False)
-            print(f"  ✓ Got result, type: {type(dimension_result)}")
-            print(f"  ✓ Keys: {list(dimension_result.keys())}")
-            
-            # STEP 3
-            print("STEP 3: Extracting dimension scores...")
-            print(f"  dimension_scores type: {type(dimension_result['dimension_scores'])}")
-            
-            dimension_scores = {}
-            for dim_name, dim_data in dimension_result["dimension_scores"].items():
-                print(f"  Processing {dim_name}: type={type(dim_data)}")
-                if isinstance(dim_data, dict):
-                    print(f"    Is dict, keys: {list(dim_data.keys())}")
-                    dimension_scores[dim_name] = float(dim_data["score"])
-                else:
-                    print(f"    Is {type(dim_data)}, value: {dim_data}")
-                    dimension_scores[dim_name] = float(dim_data)
-            
-            print(f"  ✓ Extracted scores: {dimension_scores}")
-            
-            # STEP 4
-            print("STEP 4: Calculating TC...")
-            tc = self._calculate_talent_concentration(company_id)
-            print(f"  ✓ TC: {tc}")
-            
-            # STEP 5
-            print("STEP 5: Getting sector...")
-            sector = self._get_company_sector(company_id)
-            print(f"  ✓ Sector: {sector}")
-            
-            # STEP 6
-            print("STEP 6: Calling VR calculator...")
-            print(f"  Input dimensions: {dimension_scores}")
-            print(f"  Input TC: {tc}")
-            print(f"  Input sector: {sector}")
-            
-            vr_result = self.vr_calculator.calculate(
-                dimension_scores=dimension_scores,
-                talent_concentration=tc,
-                sector=sector
-            )
-            print(f"  ✓ VR Score: {vr_result.vr_score}")
-            
-            # STEP 7
-            print("STEP 7: Building response...")
-            response = {
-                "company_id": str(company_id),
-                "ticker": company_info["ticker"],
-                "company_name": company_info["name"],
-                "vr_score": float(vr_result.vr_score),
-                "vr_components": {
-                    "base_score": float(vr_result.weighted_mean),
-                    "cv": float(vr_result.cv),
-                    "cv_penalty": float(vr_result.cv_penalty),
-                    "cv_penalty_amount": float(vr_result.cv_penalty_amount),
-                    "talent_concentration": float(vr_result.talent_concentration),
-                    "talent_risk_adj": float(vr_result.talent_risk_adj),
-                    "tc_penalty_amount": float(vr_result.tc_penalty_amount),
-                },
-                "dimension_scores": dimension_scores,
-                "sector": sector,
-            }
-            print("  ✓ Response built successfully")
-            
-            print("="*70)
-            print("VR CALCULATION DEBUG END - SUCCESS")
-            print("="*70 + "\n")
-            
-            return response
-            
-        except Exception as e:
-            print("\n" + "="*70)
-            print("VR CALCULATION DEBUG END - FAILED")
-            print("="*70)
-            print(f"ERROR TYPE: {type(e).__name__}")
-            print(f"ERROR MESSAGE: {str(e)}")
-            print("\nFULL TRACEBACK:")
-            import traceback
-            traceback.print_exc()
-            print("="*70 + "\n")
-            raise
-
-
     def _get_sector_weights(self, sector: str) -> Dict[str, Decimal]:
         """
         Get dimension weights for a sector.
         
+        Handles various sector name formats from database.
+        
         Args:
-            sector: Sector name (case-insensitive)
+            sector: Sector name from database
         
         Returns:
             Dict of dimension weights (sum = 1.0)
         
         Raises:
-            ValueError: If sector not recognized (NO silent defaults!)
+            ValueError: If sector cannot be mapped
         """
-        sector_lower = sector.lower().replace(" ", "_")
+       
+        sector_mapping = {
+            # Database name → VRCalculator key
+            "financial": "financial_services",
+            "financials": "financial_services",
+            "financial services": "financial_services",
+            "financial_services": "financial_services",
+            
+            "manufacturing": "manufacturing",
+            "industrials": "manufacturing",
+            
+            "healthcare": "healthcare",
+            "healthcare services": "healthcare",
+            
+            "retail": "retail",
+            "consumer": "retail",
+            
+            "technology": "technology",
+            "tech": "technology",
+            
+            "services": "business_services",
+            "business services": "business_services",
+            "business_services": "business_services",
+        }
         
-        if sector_lower not in self.SECTOR_WEIGHTS:
-            available_sectors = list(self.SECTOR_WEIGHTS.keys())
-            raise ValueError(
-                f"Unknown sector: '{sector}'. "
-                f"Available sectors: {available_sectors}. "
-                f"Update companies table with valid sector or add sector to SECTOR_WEIGHTS."
+        sector_lower = sector.lower().strip()
+        
+        # Try direct lookup first
+        if sector_lower in self.SECTOR_WEIGHTS:
+            mapped_sector = sector_lower
+        elif sector_lower in sector_mapping:
+            # Use mapping
+            mapped_sector = sector_mapping[sector_lower]
+        else:
+            # Not found - use default weights
+            logger.warning(
+                "unknown_sector_using_default",
+                sector=sector,
+                available=list(self.SECTOR_WEIGHTS.keys())
             )
+            # Return default weights instead of failing
+            return self.DEFAULT_WEIGHTS
         
-        weights = self.SECTOR_WEIGHTS[sector_lower]
+        weights = self.SECTOR_WEIGHTS[mapped_sector]
         
         logger.debug(
             "sector_weights_selected",
-            sector=sector,
+            sector_from_db=sector,
+            sector_used=mapped_sector,
             weights={k: float(v) for k, v in weights.items()}
         )
         
