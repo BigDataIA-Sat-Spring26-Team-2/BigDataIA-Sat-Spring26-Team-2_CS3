@@ -61,3 +61,4 @@ class SignalSource(str, Enum):
     SEC_ITEM_1_BUSINESS = "sec_item_1_business"
     SEC_ITEM_1A_RISK = "sec_item_1a_risk_factors"
     SEC_ITEM_7_MDA = "sec_item_7_mda"
+    BOARD_COMPOSITION = "board_composition" 

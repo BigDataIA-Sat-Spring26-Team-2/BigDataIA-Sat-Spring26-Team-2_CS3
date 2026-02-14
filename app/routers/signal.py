@@ -284,27 +284,87 @@ async def collect_board_signals(
     if not result:
         raise HTTPException(404, "No board data found")
     
-   
+    # Build detailed raw_value with key findings
+    raw_parts = []
+    raw_parts.append(f"Board governance: {result.governance_score:.1f}/100")
+    
+    if result.has_tech_committee:
+        raw_parts.append(f"Tech Committee: {', '.join(result.relevant_committees)}")
+    
+    if result.ai_experts:
+        raw_parts.append(f"{len(result.ai_experts)} AI expert(s): {', '.join(result.ai_experts[:3])}")
+    
+    raw_value = " | ".join(raw_parts)
+    
+    # Enhanced metadata with all relevant details
     signal = ExternalSignal(
         company_id=company_id,
-        category=SignalCategory.AI_GOVERNANCE,  
-        source=SignalSource.COMPANY_WEBSITE,
+        category=SignalCategory.AI_GOVERNANCE,
+        source=SignalSource.BOARD_COMPOSITION,
         signal_date=datetime.now(timezone.utc),
-        raw_value=f"Board governance analysis: {result.governance_score:.1f}/100",
+        raw_value=raw_value,  # ✅ More descriptive
         normalized_score=float(result.governance_score),
         confidence=float(result.confidence),
         metadata={
+            # Boolean indicators
             "has_tech_committee": result.has_tech_committee,
             "has_ai_expertise": result.has_ai_expertise,
             "has_data_officer": result.has_data_officer,
-            "independent_ratio": result.independent_ratio,
-            "board_members": len(result.board_members),
-            "ai_experts": result.ai_experts,
+            "has_risk_tech_oversight": result.has_risk_tech_oversight,
+            "has_ai_in_strategy": result.has_ai_in_strategy,
+            
+            # Quantitative metrics
+            "tech_expertise_count": result.tech_expertise_count,
+            "independent_ratio": float(result.independent_ratio),
+            "total_board_members": len(result.board_members),
+            
+            # Key names (for evidence/audit)
+            "ai_experts": result.ai_experts,  # List of names
+            "relevant_committees": result.relevant_committees,  # Committee names
+            
+            # Detailed board member info
+            "board_member_details": [
+                {
+                    "name": member.name,
+                    "title": member.title,
+                    "is_independent": member.is_independent,
+                    "has_ai_background": member.has_ai_background,
+                    "ai_keywords_found": member.ai_keywords_found[:3],  # Top 3
+                    "committees": member.committees,
+                }
+                for member in result.board_members[:10]  # Top 10 members
+            ],
+            
+            # Score breakdown (for transparency)
+            "score_breakdown": {
+                "base": 20,
+                "tech_committee_bonus": 15 if result.has_tech_committee else 0,
+                "ai_expertise_bonus": 20 if result.has_ai_expertise else 0,
+                "data_officer_bonus": 15 if result.has_data_officer else 0,
+                "independent_bonus": 10 if result.independent_ratio > 0.5 else 0,
+                "risk_oversight_bonus": 10 if result.has_risk_tech_oversight else 0,
+                "ai_strategy_bonus": 10 if result.has_ai_in_strategy else 0,
+            },
+            
+            # Data quality indicators
+            "data_quality": {
+                "proxy_statement_available": True,
+                "member_count": len(result.board_members),
+                "committee_count": len(result.relevant_committees),
+            }
         }
     )
     
     stored = signal_service.store_signal(signal)
     signal_service.update_signal_summary(company_id)
+    
+    logger.info(
+        "board_signals_stored",
+        ticker=ticker,
+        score=result.governance_score,
+        ai_experts=len(result.ai_experts),
+        tech_committees=len(result.relevant_committees)
+    )
     
     return stored
 @router.post(
