@@ -27,10 +27,10 @@ class Dimension(str, Enum):
 
 class SignalSource(str, Enum):
     """CS2 External Signal Categories"""
-    TECHNOLOGY_HIRING = "technology_hiring"
-    INNOVATION_ACTIVITY = "innovation_activity"
-    DIGITAL_PRESENCE = "digital_presence"
-    LEADERSHIP_SIGNALS = "leadership_signals"
+    TECHNOLOGY_HIRING = "technology_hiring"          
+    INNOVATION_ACTIVITY = "google_patents"            
+    DIGITAL_PRESENCE = "tech_stack_scrape"             
+    LEADERSHIP_SIGNALS = "company_website"            
     SEC_ITEM_1 = "sec_item_1_business"
     SEC_ITEM_1A = "sec_item_1a_risk_factors"
     SEC_ITEM_7 = "sec_item_7_mda"
@@ -394,6 +394,86 @@ class EvidenceMapper:
         for dimension, score in dimension_scores.items():
             explanations[dimension.value] = score.get_explanation()
         return explanations
+    
+
+    def fetch_and_map_company_evidence(self, company_id: str, ticker: str) -> Dict[Dimension, DimensionScore]:
+        """
+        Fetch all signals for a company from Snowflake and map to dimensions.
+    
+        Args:
+            company_id: Company UUID
+        ticker: Stock ticker (for logging)
+        
+        Returns:
+        Dict of 7 dimension scores
+        """
+        from app.services.snowflake import get_connection
+        from app.config import get_settings
+    
+        settings = get_settings()
+        conn = get_connection()
+        cur = conn.cursor()
+    
+        evidence_scores: List[EvidenceScore] = []
+    
+        try:
+        # Fetch latest signal per category for this company
+            query = f"""
+            SELECT 
+            es.source,
+            es.normalized_score,
+            es.confidence,
+            es.raw_value,
+            es.metadata
+            FROM {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.external_signals es
+        WHERE es.company_id = %s
+        AND (es.source, es.created_at) IN (
+            SELECT source, MAX(created_at)
+            FROM {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.external_signals
+            WHERE company_id = %s
+            GROUP BY source
+            )
+            """
+        
+            cur.execute(query, (company_id, company_id))
+            rows = cur.fetchall()
+        
+        # Convert to EvidenceScore objects
+            for row in rows:
+                source_str = row[0]  # e.g., "technology_hiring", "sec_item_1_business"
+                score = float(row[1])
+                confidence = float(row[2])
+                raw_value = row[3]
+                metadata = row[4] if row[4] else {}
+            
+            # Map source string to enum
+                try:
+                    source_enum = SignalSource(source_str)
+                except ValueError:
+                    logger.warning("unknown_source", source=source_str, ticker=ticker)
+                    continue
+            
+                evidence_scores.append(EvidenceScore(
+                    source=source_enum,
+                    score=Decimal(str(score)),
+                    confidence=Decimal(str(confidence)),
+                    raw_value=raw_value,
+                    metadata=metadata
+            ))
+        
+            logger.info(
+                "evidence_fetched",
+                ticker=ticker,
+                signal_count=len(evidence_scores),
+                sources=[e.source.value for e in evidence_scores]
+        )
+        
+        finally:
+            cur.close()
+            conn.close()
+    
+    # Map to dimensions
+        return self.map_evidence_to_dimensions(evidence_scores)
 
 
 def example_usage():
