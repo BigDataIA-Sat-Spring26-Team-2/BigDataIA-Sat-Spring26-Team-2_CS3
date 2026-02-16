@@ -63,8 +63,8 @@ def validate_company(**context):
     Retrieve company_id and CIK for downstream tasks.
     """
     ti = context['ti']
-    ticker = context['dag_run'].conf.get('ticker', 'WMT')  # Default for testing
-    
+    default_ticker = Variable.get('default_ticker', 'WMT')
+    ticker = context['dag_run'].conf.get('ticker', default_ticker)  #Provide the input from Airfow UI
     logger.info("task_validate_company_started", ticker=ticker)
     
     # Get Snowflake connection from Airflow
