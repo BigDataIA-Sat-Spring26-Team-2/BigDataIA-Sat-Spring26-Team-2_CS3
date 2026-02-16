@@ -1,0 +1,66 @@
+[2026-02-16T15:31:55.499+0000] {taskinstance.py:1956} INFO - Dependencies all met for dep_context=non-requeueable deps ti=<TaskInstance: sec_edgar_pipeline.parse_documents manual__2026-02-16T15:28:31.889710+00:00 [queued]>
+[2026-02-16T15:31:55.512+0000] {taskinstance.py:1956} INFO - Dependencies all met for dep_context=requeueable deps ti=<TaskInstance: sec_edgar_pipeline.parse_documents manual__2026-02-16T15:28:31.889710+00:00 [queued]>
+[2026-02-16T15:31:55.513+0000] {taskinstance.py:2170} INFO - Starting attempt 1 of 4
+[2026-02-16T15:31:55.580+0000] {taskinstance.py:2191} INFO - Executing <Task(PythonOperator): parse_documents> on 2026-02-16 15:28:31.889710+00:00
+[2026-02-16T15:31:55.591+0000] {standard_task_runner.py:60} INFO - Started process 418 to run task
+[2026-02-16T15:31:55.594+0000] {standard_task_runner.py:87} INFO - Running: ['***', 'tasks', 'run', 'sec_edgar_pipeline', 'parse_documents', 'manual__2026-02-16T15:28:31.889710+00:00', '--job-id', '81', '--raw', '--subdir', 'DAGS_FOLDER/sec_edgar_dag.py', '--cfg-path', '/tmp/tmppbxp11uc']
+[2026-02-16T15:31:55.597+0000] {standard_task_runner.py:88} INFO - Job 81: Subtask parse_documents
+[2026-02-16T15:31:55.655+0000] {task_command.py:423} INFO - Running <TaskInstance: sec_edgar_pipeline.parse_documents manual__2026-02-16T15:28:31.889710+00:00 [running]> on host ea18fbadf717
+[2026-02-16T15:31:55.856+0000] {taskinstance.py:2480} INFO - Exporting env vars: AIRFLOW_CTX_DAG_OWNER='pe-orgair-team' AIRFLOW_CTX_DAG_ID='sec_edgar_pipeline' AIRFLOW_CTX_TASK_ID='parse_documents' AIRFLOW_CTX_EXECUTION_DATE='2026-02-16T15:28:31.889710+00:00' AIRFLOW_CTX_TRY_NUMBER='1' AIRFLOW_CTX_DAG_RUN_ID='manual__2026-02-16T15:28:31.889710+00:00'
+[2026-02-16T15:31:55.888+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:31:55 [info     ] parsing_document               path=/opt/***/dags/temp_downloads/sec-edgar-filings/WMT/10-K/0000104169-20-000011/full-submission.txt
+[2026-02-16T15:32:02.686+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:32:02 [info     ] document_parsed                filing_type=10-K sections=4 words=489494
+[2026-02-16T15:32:02.694+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:32:02 [info     ] parsing_document               path=/opt/***/dags/temp_downloads/sec-edgar-filings/WMT/10-K/0000104169-21-000033/full-submission.txt
+[2026-02-16T15:32:06.970+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:32:06 [info     ] document_parsed                filing_type=10-K sections=5 words=467037
+[2026-02-16T15:32:06.976+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:32:06 [info     ] parsing_document               path=/opt/***/dags/temp_downloads/sec-edgar-filings/WMT/10-K/0000104169-22-000012/full-submission.txt
+[2026-02-16T15:32:11.433+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:32:11 [info     ] document_parsed                filing_type=10-K sections=5 words=512015
+[2026-02-16T15:32:11.440+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:32:11 [info     ] parsing_document               path=/opt/***/dags/temp_downloads/sec-edgar-filings/WMT/10-K/0000104169-23-000020/full-submission.txt
+[2026-02-16T15:56:52.508+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:56:52 [info     ] document_parsed                filing_type=10-K sections=5 words=527124
+[2026-02-16T15:56:52.993+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:56:52 [info     ] parsing_document               path=/opt/***/dags/temp_downloads/sec-edgar-filings/WMT/10-K/0000104169-24-000056/full-submission.txt
+[2026-02-16T15:57:00.656+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:57:00 [info     ] document_parsed                filing_type=10-K sections=5 words=532045
+[2026-02-16T15:57:00.662+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:57:00 [info     ] parsing_document               path=/opt/***/dags/temp_downloads/sec-edgar-filings/WMT/10-K/0000104169-25-000021/full-submission.txt
+[2026-02-16T15:57:04.464+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:57:04 [info     ] document_parsed                filing_type=10-K sections=5 words=491879
+[2026-02-16T15:57:04.473+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:57:04 [info     ] parsing_document               path=/opt/***/dags/temp_downloads/sec-edgar-filings/WMT/10-Q/0000104169-22-000083/full-submission.txt
+[2026-02-16T15:57:05.665+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:57:05 [info     ] document_parsed                filing_type=10-Q sections=0 words=0
+[2026-02-16T15:57:05.674+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:57:05 [info     ] parsing_document               path=/opt/***/dags/temp_downloads/sec-edgar-filings/WMT/10-Q/0000104169-23-000052/full-submission.txt
+[2026-02-16T15:57:06.479+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:57:06 [info     ] document_parsed                filing_type=10-Q sections=0 words=0
+[2026-02-16T15:57:06.486+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:57:06 [info     ] parsing_document               path=/opt/***/dags/temp_downloads/sec-edgar-filings/WMT/10-Q/0000104169-23-000097/full-submission.txt
+[2026-02-16T15:57:07.862+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:57:07 [info     ] document_parsed                filing_type=10-Q sections=0 words=0
+[2026-02-16T15:57:07.868+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:57:07 [info     ] parsing_document               path=/opt/***/dags/temp_downloads/sec-edgar-filings/WMT/10-Q/0000104169-23-000132/full-submission.txt
+[2026-02-16T15:57:08.758+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:57:08 [info     ] document_parsed                filing_type=10-Q sections=0 words=0
+[2026-02-16T15:57:08.764+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:57:08 [info     ] parsing_document               path=/opt/***/dags/temp_downloads/sec-edgar-filings/WMT/10-Q/0000104169-24-000105/full-submission.txt
+[2026-02-16T15:57:09.821+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:57:09 [info     ] document_parsed                filing_type=10-Q sections=0 words=0
+[2026-02-16T15:57:09.827+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:57:09 [info     ] parsing_document               path=/opt/***/dags/temp_downloads/sec-edgar-filings/WMT/10-Q/0000104169-24-000141/full-submission.txt
+[2026-02-16T15:57:10.873+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:57:10 [info     ] document_parsed                filing_type=10-Q sections=0 words=0
+[2026-02-16T15:57:10.879+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:57:10 [info     ] parsing_document               path=/opt/***/dags/temp_downloads/sec-edgar-filings/WMT/10-Q/0000104169-24-000178/full-submission.txt
+[2026-02-16T15:57:11.848+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:57:11 [info     ] document_parsed                filing_type=10-Q sections=0 words=0
+[2026-02-16T15:57:11.855+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:57:11 [info     ] parsing_document               path=/opt/***/dags/temp_downloads/sec-edgar-filings/WMT/10-Q/0000104169-25-000090/full-submission.txt
+[2026-02-16T15:57:22.232+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:57:22 [info     ] document_parsed                filing_type=10-Q sections=2 words=174758
+[2026-02-16T15:57:22.239+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:57:22 [info     ] parsing_document               path=/opt/***/dags/temp_downloads/sec-edgar-filings/WMT/10-Q/0000104169-25-000137/full-submission.txt
+[2026-02-16T15:57:36.078+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:57:36 [info     ] document_parsed                filing_type=10-Q sections=2 words=191102
+[2026-02-16T15:57:36.084+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:57:36 [info     ] parsing_document               path=/opt/***/dags/temp_downloads/sec-edgar-filings/WMT/10-Q/0000104169-25-000191/full-submission.txt
+[2026-02-16T15:57:50.625+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:57:50 [info     ] document_parsed                filing_type=10-Q sections=3 words=225319
+[2026-02-16T15:57:50.632+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:57:50 [info     ] parsing_document               path=/opt/***/dags/temp_downloads/sec-edgar-filings/WMT/8-K/0000104169-25-000120/full-submission.txt
+[2026-02-16T15:57:58.431+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:57:58 [info     ] document_parsed                filing_type=8-K sections=0 words=759998
+[2026-02-16T15:57:58.439+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:57:58 [info     ] parsing_document               path=/opt/***/dags/temp_downloads/sec-edgar-filings/WMT/8-K/0000104169-25-000143/full-submission.txt
+[2026-02-16T15:57:58.636+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:57:58 [info     ] document_parsed                filing_type=8-K sections=1 words=6714
+[2026-02-16T15:57:58.641+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:57:58 [info     ] parsing_document               path=/opt/***/dags/temp_downloads/sec-edgar-filings/WMT/8-K/0000104169-25-000151/full-submission.txt
+[2026-02-16T15:57:58.832+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:57:58 [info     ] document_parsed                filing_type=8-K sections=1 words=6758
+[2026-02-16T15:57:58.840+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:57:58 [info     ] parsing_document               path=/opt/***/dags/temp_downloads/sec-edgar-filings/WMT/8-K/0000104169-25-000153/full-submission.txt
+[2026-02-16T15:57:59.022+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:57:59 [info     ] document_parsed                filing_type=8-K sections=1 words=6797
+[2026-02-16T15:57:59.028+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:57:59 [info     ] parsing_document               path=/opt/***/dags/temp_downloads/sec-edgar-filings/WMT/8-K/0000104169-25-000168/full-submission.txt
+[2026-02-16T15:57:59.242+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:57:59 [info     ] document_parsed                filing_type=8-K sections=0 words=6578
+[2026-02-16T15:57:59.249+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:57:59 [info     ] parsing_document               path=/opt/***/dags/temp_downloads/sec-edgar-filings/WMT/8-K/0000104169-25-000172/full-submission.txt
+[2026-02-16T15:57:59.469+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:57:59 [info     ] document_parsed                filing_type=8-K sections=0 words=8198
+[2026-02-16T15:57:59.476+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:57:59 [info     ] parsing_document               path=/opt/***/dags/temp_downloads/sec-edgar-filings/WMT/8-K/0000104169-25-000177/full-submission.txt
+[2026-02-16T15:58:06.328+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:58:06 [info     ] document_parsed                filing_type=8-K sections=0 words=664781
+[2026-02-16T15:58:06.335+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:58:06 [info     ] parsing_document               path=/opt/***/dags/temp_downloads/sec-edgar-filings/WMT/8-K/0000104169-25-000238/full-submission.txt
+[2026-02-16T15:58:06.523+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:58:06 [info     ] document_parsed                filing_type=8-K sections=1 words=6639
+[2026-02-16T15:58:06.529+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:58:06 [info     ] parsing_document               path=/opt/***/dags/temp_downloads/sec-edgar-filings/WMT/8-K/0000104169-26-000008/full-submission.txt
+[2026-02-16T15:58:06.734+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:58:06 [info     ] document_parsed                filing_type=8-K sections=0 words=7220
+[2026-02-16T15:58:06.740+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:58:06 [info     ] parsing_document               path=/opt/***/dags/temp_downloads/sec-edgar-filings/WMT/8-K/0000104169-26-000023/full-submission.txt
+[2026-02-16T15:58:06.960+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:58:06 [info     ] document_parsed                filing_type=8-K sections=0 words=8844
+[2026-02-16T15:58:06.961+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:58:06 [info     ] parsing_complete               documents_parsed=26 ticker=WMT
+[2026-02-16T15:58:07.358+0000] {python.py:201} INFO - Done. Returned value was: 26
+[2026-02-16T15:58:07.384+0000] {taskinstance.py:1138} INFO - Marking task as SUCCESS. dag_id=sec_edgar_pipeline, task_id=parse_documents, execution_date=20260216T152831, start_date=20260216T153155, end_date=20260216T155807
+[2026-02-16T15:58:07.434+0000] {local_task_job_runner.py:234} INFO - Task exited with return code 0
+[2026-02-16T15:58:07.468+0000] {taskinstance.py:3280} INFO - 1 downstream tasks scheduled from follow-on schedule check

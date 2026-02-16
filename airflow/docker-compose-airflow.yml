@@ -5,7 +5,10 @@ version: '3.8'
 
 x-airflow-common:
   &airflow-common
-  image: apache/airflow:2.8.1-python3.11
+  # image: apache/airflow:2.8.1-python3.11
+  build:
+    context: .
+    dockerfile: Dockerfile
   environment:
     &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
@@ -15,24 +18,23 @@ x-airflow-common:
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
-    
+    PYTHONPATH: /opt/airflow/project
     # Python path for your project
-    PYTHONPATH: /opt/airflow/dags/pe-org-air-platform
+    # PYTHONPATH: /opt/airflow/dags/pe-org-air-platform
     
-    # Snowflake connection
-    AIRFLOW_CONN_SNOWFLAKE_DEFAULT: 'snowflake://YOUR_USER:YOUR_PASSWORD@YOUR_ACCOUNT/PE_ORGAIR/PUBLIC?warehouse=COMPUTE_WH&role='
-    
-    # AWS connection  
-    AIRFLOW_CONN_AWS_DEFAULT: 'aws://YOUR_AWS_ACCESS_KEY:YOUR_AWS_SECRET_KEY@?region_name=us-east-1'
-    
-    # Airflow Variables
-    AIRFLOW_VAR_S3_BUCKET: 'your-s3-bucket-name'
+    # ⚠️ CHANGED: Use env vars from .env file (no hardcoded values)
+    AIRFLOW_CONN_SNOWFLAKE_DEFAULT: ${AIRFLOW_CONN_SNOWFLAKE_DEFAULT}
+    AIRFLOW_CONN_AWS_DEFAULT: ${AIRFLOW_CONN_AWS_DEFAULT}
+    AIRFLOW_VAR_S3_BUCKET: ${AIRFLOW_VAR_S3_BUCKET}
+    AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT: 300  # Increase this too
+    AIRFLOW__SCHEDULER__DAG_FILE_PROCESSOR_TIMEOUT: 300  # ← CHANGE TO THIS
     
   volumes:
     - ./dags:/opt/airflow/dags
     - ./logs:/opt/airflow/logs
     - ./plugins:/opt/airflow/plugins
-    - ./pe-org-air-platform:/opt/airflow/dags/pe-org-air-platform  # Mount your project
+    # - ../:/opt/airflow/dags/pe-org-air-platform  
+    - ../:/opt/airflow/project
     - /tmp/airflow:/tmp/airflow  # For temporary SEC downloads
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
@@ -47,6 +49,8 @@ services:
       POSTGRES_USER: airflow
       POSTGRES_PASSWORD: airflow
       POSTGRES_DB: airflow
+    ports:
+      - "5433:5432"  # ✅ ADDED: Changed from 5432:5432 to avoid conflict
     volumes:
       - postgres-db-volume:/var/lib/postgresql/data
     healthcheck:

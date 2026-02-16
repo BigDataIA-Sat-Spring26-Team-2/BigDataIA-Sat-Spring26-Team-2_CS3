@@ -1,0 +1,16 @@
+[2026-02-16T15:31:43.100+0000] {taskinstance.py:1956} INFO - Dependencies all met for dep_context=non-requeueable deps ti=<TaskInstance: sec_edgar_pipeline.download_sec_filings manual__2026-02-16T15:28:31.889710+00:00 [queued]>
+[2026-02-16T15:31:43.114+0000] {taskinstance.py:1956} INFO - Dependencies all met for dep_context=requeueable deps ti=<TaskInstance: sec_edgar_pipeline.download_sec_filings manual__2026-02-16T15:28:31.889710+00:00 [queued]>
+[2026-02-16T15:31:43.116+0000] {taskinstance.py:2170} INFO - Starting attempt 1 of 4
+[2026-02-16T15:31:43.181+0000] {taskinstance.py:2191} INFO - Executing <Task(PythonOperator): download_sec_filings> on 2026-02-16 15:28:31.889710+00:00
+[2026-02-16T15:31:43.192+0000] {standard_task_runner.py:60} INFO - Started process 413 to run task
+[2026-02-16T15:31:43.195+0000] {standard_task_runner.py:87} INFO - Running: ['***', 'tasks', 'run', 'sec_edgar_pipeline', 'download_sec_filings', 'manual__2026-02-16T15:28:31.889710+00:00', '--job-id', '80', '--raw', '--subdir', 'DAGS_FOLDER/sec_edgar_dag.py', '--cfg-path', '/tmp/tmp712rlsu3']
+[2026-02-16T15:31:43.199+0000] {standard_task_runner.py:88} INFO - Job 80: Subtask download_sec_filings
+[2026-02-16T15:31:43.257+0000] {task_command.py:423} INFO - Running <TaskInstance: sec_edgar_pipeline.download_sec_filings manual__2026-02-16T15:28:31.889710+00:00 [running]> on host ea18fbadf717
+[2026-02-16T15:31:43.478+0000] {taskinstance.py:2480} INFO - Exporting env vars: AIRFLOW_CTX_DAG_OWNER='pe-orgair-team' AIRFLOW_CTX_DAG_ID='sec_edgar_pipeline' AIRFLOW_CTX_TASK_ID='download_sec_filings' AIRFLOW_CTX_EXECUTION_DATE='2026-02-16T15:28:31.889710+00:00' AIRFLOW_CTX_TRY_NUMBER='1' AIRFLOW_CTX_DAG_RUN_ID='manual__2026-02-16T15:28:31.889710+00:00'
+[2026-02-16T15:31:43.493+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:31:43 [info     ] task_download_started          cik=None ticker=WMT
+[2026-02-16T15:31:43.523+0000] {limiter.py:143} INFO - Initializing default bucket(InMemoryBucket) with rates: [limit=10/1000]
+[2026-02-16T15:31:52.543+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:31:52 [info     ] download_complete              files_downloaded=26 ticker=WMT
+[2026-02-16T15:31:52.612+0000] {python.py:201} INFO - Done. Returned value was: 26
+[2026-02-16T15:31:52.639+0000] {taskinstance.py:1138} INFO - Marking task as SUCCESS. dag_id=sec_edgar_pipeline, task_id=download_sec_filings, execution_date=20260216T152831, start_date=20260216T153143, end_date=20260216T153152
+[2026-02-16T15:31:52.711+0000] {local_task_job_runner.py:234} INFO - Task exited with return code 0
+[2026-02-16T15:31:52.744+0000] {taskinstance.py:3280} INFO - 1 downstream tasks scheduled from follow-on schedule check

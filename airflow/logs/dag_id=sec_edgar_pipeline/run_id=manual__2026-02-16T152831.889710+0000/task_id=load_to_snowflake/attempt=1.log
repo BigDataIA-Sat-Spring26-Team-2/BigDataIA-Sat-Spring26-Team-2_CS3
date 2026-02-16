@@ -1,0 +1,23 @@
+[2026-02-16T15:58:22.688+0000] {taskinstance.py:1956} INFO - Dependencies all met for dep_context=non-requeueable deps ti=<TaskInstance: sec_edgar_pipeline.load_to_snowflake manual__2026-02-16T15:28:31.889710+00:00 [queued]>
+[2026-02-16T15:58:22.703+0000] {taskinstance.py:1956} INFO - Dependencies all met for dep_context=requeueable deps ti=<TaskInstance: sec_edgar_pipeline.load_to_snowflake manual__2026-02-16T15:28:31.889710+00:00 [queued]>
+[2026-02-16T15:58:22.704+0000] {taskinstance.py:2170} INFO - Starting attempt 1 of 4
+[2026-02-16T15:58:22.773+0000] {taskinstance.py:2191} INFO - Executing <Task(PythonOperator): load_to_snowflake> on 2026-02-16 15:28:31.889710+00:00
+[2026-02-16T15:58:22.784+0000] {standard_task_runner.py:60} INFO - Started process 496 to run task
+[2026-02-16T15:58:22.788+0000] {standard_task_runner.py:87} INFO - Running: ['***', 'tasks', 'run', 'sec_edgar_pipeline', 'load_to_snowflake', 'manual__2026-02-16T15:28:31.889710+00:00', '--job-id', '84', '--raw', '--subdir', 'DAGS_FOLDER/sec_edgar_dag.py', '--cfg-path', '/tmp/tmpzubwzzel']
+[2026-02-16T15:58:22.792+0000] {standard_task_runner.py:88} INFO - Job 84: Subtask load_to_snowflake
+[2026-02-16T15:58:22.851+0000] {task_command.py:423} INFO - Running <TaskInstance: sec_edgar_pipeline.load_to_snowflake manual__2026-02-16T15:28:31.889710+00:00 [running]> on host ea18fbadf717
+[2026-02-16T15:58:23.062+0000] {taskinstance.py:2480} INFO - Exporting env vars: AIRFLOW_CTX_DAG_OWNER='pe-orgair-team' AIRFLOW_CTX_DAG_ID='sec_edgar_pipeline' AIRFLOW_CTX_TASK_ID='load_to_snowflake' AIRFLOW_CTX_EXECUTION_DATE='2026-02-16T15:28:31.889710+00:00' AIRFLOW_CTX_TRY_NUMBER='1' AIRFLOW_CTX_DAG_RUN_ID='manual__2026-02-16T15:28:31.889710+00:00'
+[2026-02-16T15:58:23.090+0000] {crypto.py:82} WARNING - empty cryptography key - values will not be stored encrypted.
+[2026-02-16T15:58:23.092+0000] {base.py:83} INFO - Using connection ID 'snowflake_default' for task execution.
+[2026-02-16T15:58:23.093+0000] {connection.py:370} INFO - Snowflake Connector for Python Version: 3.6.0, Python Version: 3.11.8, Platform: Linux-5.15.167.4-microsoft-standard-WSL2-x86_64-with-glibc2.36
+[2026-02-16T15:58:23.095+0000] {connection.py:1171} INFO - This connection is in OCSP Fail Open Mode. TLS Certificates would be checked for validity and revocation status. Any other Certificate Revocation related exceptions or OCSP Responder failures would be disregarded in favor of connectivity.
+[2026-02-16T15:58:24.253+0000] {cursor.py:1028} INFO - query: [COMMIT]
+[2026-02-16T15:58:24.350+0000] {cursor.py:1041} INFO - query execution done
+[2026-02-16T15:58:24.351+0000] {cursor.py:1205} INFO - Number of results in first chunk: 1
+[2026-02-16T15:58:24.352+0000] {logging_mixin.py:188} INFO - 2026-02-16 15:58:24 [info     ] snowflake_load_complete        chunks_inserted=0 documents_inserted=0 ticker=WMT
+[2026-02-16T15:58:24.369+0000] {connection.py:718} INFO - closed
+[2026-02-16T15:58:24.450+0000] {connection.py:724} INFO - No async queries seem to be running, deleting session
+[2026-02-16T15:58:24.552+0000] {python.py:201} INFO - Done. Returned value was: 0
+[2026-02-16T15:58:24.596+0000] {taskinstance.py:1138} INFO - Marking task as SUCCESS. dag_id=sec_edgar_pipeline, task_id=load_to_snowflake, execution_date=20260216T152831, start_date=20260216T155822, end_date=20260216T155824
+[2026-02-16T15:58:24.650+0000] {local_task_job_runner.py:234} INFO - Task exited with return code 0
+[2026-02-16T15:58:24.680+0000] {taskinstance.py:3280} INFO - 1 downstream tasks scheduled from follow-on schedule check
