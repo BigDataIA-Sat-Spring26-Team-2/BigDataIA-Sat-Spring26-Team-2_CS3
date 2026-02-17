@@ -194,7 +194,7 @@ class RubricScorer:
                     "cloud-native", "serverless"
                 ],
                 min_keyword_matches=3,
-                quantitative_threshold=0.90,
+                quantitative_threshold=0.60,
             ),
             ScoreLevel.LEVEL_4: RubricCriteria(
                 level=ScoreLevel.LEVEL_4,
@@ -206,7 +206,7 @@ class RubricScorer:
                     "kafka", "postgresql", "mongodb", "nosql"
                 ],
                 min_keyword_matches=2,
-                quantitative_threshold=0.70,
+                quantitative_threshold=0.30,
             ),
             ScoreLevel.LEVEL_3: RubricCriteria(
                 level=ScoreLevel.LEVEL_3,
@@ -218,7 +218,7 @@ class RubricScorer:
                     "sql", "cloud", "vertex ai"
                 ],
                 min_keyword_matches=2,
-                quantitative_threshold=0.40,
+                quantitative_threshold=0.10,
             ),
             ScoreLevel.LEVEL_2: RubricCriteria(
                 level=ScoreLevel.LEVEL_2,
@@ -228,7 +228,7 @@ class RubricScorer:
                     "on-prem", "fragmented"
                 ],
                 min_keyword_matches=1,
-                quantitative_threshold=0.20,
+                quantitative_threshold=0.0,
             ),
             ScoreLevel.LEVEL_1: RubricCriteria(
                 level=ScoreLevel.LEVEL_1,
@@ -353,7 +353,7 @@ class RubricScorer:
                     "ci/cd ml", "model monitoring", "ml platform"
                 ],
                 min_keyword_matches=3,
-                quantitative_threshold=0.80,
+                quantitative_threshold=0.60,
             ),
             ScoreLevel.LEVEL_4: RubricCriteria(
                 level=ScoreLevel.LEVEL_4,
@@ -364,7 +364,7 @@ class RubricScorer:
                     "wandb", "weights and biases"
                 ],
                 min_keyword_matches=2,
-                quantitative_threshold=0.60,
+                quantitative_threshold=0.40,
             ),
             ScoreLevel.LEVEL_3: RubricCriteria(
                 level=ScoreLevel.LEVEL_3,
@@ -375,7 +375,7 @@ class RubricScorer:
                     "machine learning", "deep learning"
                 ],
                 min_keyword_matches=2,
-                quantitative_threshold=0.40,
+                quantitative_threshold=0.20,
             ),
             ScoreLevel.LEVEL_2: RubricCriteria(
                 level=ScoreLevel.LEVEL_2,
@@ -385,7 +385,7 @@ class RubricScorer:
                     "no ml tooling", "manual analysis"
                 ],
                 min_keyword_matches=1,
-                quantitative_threshold=0.20,
+                quantitative_threshold=0.0,
             ),
             ScoreLevel.LEVEL_1: RubricCriteria(
                 level=ScoreLevel.LEVEL_1,
@@ -532,7 +532,7 @@ class RubricScorer:
                 "board ai expertise", "chief of operations"
             ],
             min_keyword_matches=2,
-            quantitative_threshold=0.80,
+            quantitative_threshold=0.50,
         ),
             ScoreLevel.LEVEL_4: RubricCriteria(
                 level=ScoreLevel.LEVEL_4,
@@ -544,7 +544,7 @@ class RubricScorer:
                 "executive vice president", "chief", "president and ceo"
             ],
             min_keyword_matches=2,
-            quantitative_threshold=0.60,
+            quantitative_threshold=0.25,
         ),
             ScoreLevel.LEVEL_3: RubricCriteria(
                 level=ScoreLevel.LEVEL_3,
@@ -555,7 +555,7 @@ class RubricScorer:
                 "corporate vice president", "president", "innovation"
             ],
                 min_keyword_matches=1,
-                quantitative_threshold=0.40,
+                quantitative_threshold=0.10,
         ),
             ScoreLevel.LEVEL_2: RubricCriteria(
                 level=ScoreLevel.LEVEL_2,
@@ -564,7 +564,7 @@ class RubricScorer:
                 "it-driven initiatives", "technology department only"
             ],
                 min_keyword_matches=1,
-                quantitative_threshold=0.20,
+                quantitative_threshold=0.0,
         ),
             ScoreLevel.LEVEL_1: RubricCriteria(
                 level=ScoreLevel.LEVEL_1,
