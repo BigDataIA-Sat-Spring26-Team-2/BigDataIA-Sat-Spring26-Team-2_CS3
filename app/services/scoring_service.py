@@ -20,6 +20,8 @@ from app.scoring.evidence_mapper import (
     Dimension,
     DimensionScore,
 )
+from app.scoring.rubric_scorer import RubricScorer
+from app.scoring.evidence_helpers import get_dimension_evidence
 from app.services.snowflake import get_connection
 from app.config import get_settings
 
@@ -37,6 +39,7 @@ class ScoringService:
     
     def __init__(self):
         self.mapper = EvidenceMapper()
+        self.rubric_scorer = RubricScorer()
         self.vr_calculator = VRCalculator()
         self.tc_calculator = TalentConcentrationCalculator()
         self.settings = get_settings()
@@ -81,10 +84,43 @@ class ScoringService:
             # Return default scores
             return self._create_default_response(company_info)
         
-        # Step 3: Run Evidence Mapper (PATH A)
+        # Step 3: Run Evidence Mapper (PATH A - quantitative)
         dimension_scores = self.mapper.map_evidence_to_dimensions(evidence_scores)
-        
-        # Step 4: Build response
+
+        # Step 4: Run Rubric Scorer (PATH B - qualitative)
+        rubric_results = {}
+        ticker = company_info["ticker"]
+        dimensions = [
+            "data_infrastructure", "ai_governance", "technology_stack",
+            "talent", "leadership", "use_case_portfolio", "culture"
+        ]
+        for dim in dimensions:
+            try:
+                evidence_text, metrics = get_dimension_evidence(company_id, ticker, dim)
+                if evidence_text:
+                    rubric_results[dim] = self.rubric_scorer.score_dimension(dim, evidence_text, metrics)
+            except Exception as e:
+                logger.warning("rubric_scoring_failed", dimension=dim, error=str(e))
+
+        # Step 5: Combine Path A + Path B (60% Path A, 40% Path B)
+        for dim_enum, path_a_score in dimension_scores.items():
+            dim_name = dim_enum.value
+            if dim_name in rubric_results:
+                rubric_result = rubric_results[dim_name]
+                path_a_val = float(path_a_score.score)
+                path_b_val = float(rubric_result.score)
+                combined = Decimal(str(round(path_a_val * 0.6 + path_b_val * 0.4, 2)))
+                combined = max(Decimal("0"), min(Decimal("100"), combined))
+                dimension_scores[dim_enum] = DimensionScore(
+                    dimension=dim_enum,
+                    score=combined,
+                    confidence=path_a_score.confidence,
+                    contributions=path_a_score.contributions,
+                    total_weight=path_a_score.total_weight,
+                    method="combined_a_b"
+                )
+
+        # Step 6: Build response
         response = {
             "company_id": str(company_id),
             "ticker": company_info["ticker"],
@@ -93,16 +129,26 @@ class ScoringService:
             "metadata": {
                 "signal_count": len(evidence_scores),
                 "signal_sources": [e.source.value for e in evidence_scores],
-                "scoring_method": "path_a_quantitative",
-                "path_b_included": False,
+                "scoring_method": "combined_path_a_b",
+                "path_b_included": bool(rubric_results),
+                "rubric_dimensions_scored": list(rubric_results.keys()),
             }
         }
-        
+
         if include_audit_trail:
             response["audit_trail"] = {
                 "raw_signals": self._format_evidence_scores(evidence_scores),
                 "explanations": self.mapper.explain_calculation(dimension_scores),
-                "contribution_breakdown": self._build_contribution_breakdown(dimension_scores)
+                "contribution_breakdown": self._build_contribution_breakdown(dimension_scores),
+                "rubric_details": {
+                    dim: {
+                        "level": r.level.label,
+                        "score": float(r.score),
+                        "matched_keywords": r.matched_keywords,
+                        "rationale": r.rationale,
+                    }
+                    for dim, r in rubric_results.items()
+                }
             }
         
         logger.info(
