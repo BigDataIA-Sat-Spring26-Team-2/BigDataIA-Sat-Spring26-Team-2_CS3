@@ -26,16 +26,18 @@ class Dimension(str, Enum):
 
 
 class SignalSource(str, Enum):
-    """CS2 External Signal Categories"""
-    TECHNOLOGY_HIRING = "technology_hiring"          
-    INNOVATION_ACTIVITY = "google_patents"            
-    DIGITAL_PRESENCE = "tech_stack_scrape"             
-    LEADERSHIP_SIGNALS = "company_website"            
+    """CS2 External Signal Categories — values must match Snowflake category column"""
+    TECHNOLOGY_HIRING = "technology_hiring"
+    INNOVATION_ACTIVITY = "innovation_activity"
+    DIGITAL_PRESENCE = "digital_presence"
+    LEADERSHIP_SIGNALS = "leadership_signals"
     SEC_ITEM_1 = "sec_item_1_business"
     SEC_ITEM_1A = "sec_item_1a_risk_factors"
     SEC_ITEM_7 = "sec_item_7_mda"
     GLASSDOOR_REVIEWS = "glassdoor_reviews"
     BOARD_COMPOSITION = "board_composition"
+    AI_GOVERNANCE = "ai_governance"
+    USE_CASE_PORTFOLIO = "use_case_portfolio"
 
 
 @dataclass
@@ -197,10 +199,32 @@ class EvidenceMapper:
    
     SignalSource.BOARD_COMPOSITION: DimensionMapping(
         source=SignalSource.BOARD_COMPOSITION,
-        primary_dimension=Dimension.AI_GOVERNANCE,  
+        primary_dimension=Dimension.AI_GOVERNANCE,
         primary_weight=Decimal("0.70"),
         secondary_mappings={
             Dimension.LEADERSHIP: Decimal("0.30"),
+        },
+        reliability=Decimal("0.85"),
+    ),
+
+    SignalSource.AI_GOVERNANCE: DimensionMapping(
+        source=SignalSource.AI_GOVERNANCE,
+        primary_dimension=Dimension.AI_GOVERNANCE,
+        primary_weight=Decimal("0.70"),
+        secondary_mappings={
+            Dimension.LEADERSHIP: Decimal("0.20"),
+            Dimension.CULTURE: Decimal("0.10"),
+        },
+        reliability=Decimal("0.85"),
+    ),
+
+    SignalSource.USE_CASE_PORTFOLIO: DimensionMapping(
+        source=SignalSource.USE_CASE_PORTFOLIO,
+        primary_dimension=Dimension.USE_CASE_PORTFOLIO,
+        primary_weight=Decimal("0.70"),
+        secondary_mappings={
+            Dimension.TECHNOLOGY_STACK: Decimal("0.20"),
+            Dimension.DATA_INFRASTRUCTURE: Decimal("0.10"),
         },
         reliability=Decimal("0.85"),
     ),
