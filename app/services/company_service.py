@@ -54,6 +54,17 @@ def create_company(payload: CompanyCreate) -> CompanyResponse:
 
         _ensure_industry_exists(cur, payload.industry_id)
 
+        # Check if ticker already exists
+        cur.execute(
+            f"SELECT 1 FROM {COMPANIES_TABLE} WHERE ticker = %s AND is_deleted = FALSE",
+            (payload.ticker,),
+        )
+        if cur.fetchone():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Company with ticker '{payload.ticker}' already exists",
+            )
+
         cur.execute(
             sql,
             (
