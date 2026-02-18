@@ -256,3 +256,39 @@ class APIClient:
             timeout=120  # 2 minutes
         )
         return self._handle_response(response)
+
+    # ── Scoring endpoints ──
+
+    def get_vr_score(self, company_id: str) -> Dict[str, Any]:
+        """Calculate V^R score for a company"""
+        response = requests.get(
+            f"{self.base_url}/scoring/companies/{company_id}/vr",
+            timeout=30
+        )
+        return self._handle_response(response)
+
+    def get_dimension_scores(self, company_id: str) -> Dict[str, Any]:
+        """Calculate all 7 dimension scores for a company"""
+        response = requests.get(
+            f"{self.base_url}/scoring/companies/{company_id}/dimensions",
+            params={"include_audit_trail": True},
+            timeout=30
+        )
+        return self._handle_response(response)
+
+    def generate_memo(self, company_id: str) -> Dict[str, Any]:
+        """Generate PE-style investment memo for a company"""
+        response = requests.post(
+            f"{self.base_url}/scoring/companies/{company_id}/memo",
+            timeout=120  # Claude generation can be slow
+        )
+        return self._handle_response(response)
+
+    def compare_vr_scores(self, company_ids: List[str]) -> Dict[str, Any]:
+        """Compare V^R scores across multiple companies"""
+        response = requests.post(
+            f"{self.base_url}/scoring/companies/vr/compare",
+            json=company_ids,
+            timeout=60
+        )
+        return self._handle_response(response)
