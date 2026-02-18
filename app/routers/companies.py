@@ -51,6 +51,15 @@ def update_company(company_id: UUID, payload: CompanyCreate):
 
 
 @router.delete(
+    "/companies/{company_id}/hard",
+    status_code=status.HTTP_204_NO_CONTENT
+)
+def hard_delete_company(company_id: UUID):
+    company_service.hard_delete_company(company_id)
+    return None
+
+
+@router.delete(
     "/companies/{company_id}",
     status_code=status.HTTP_204_NO_CONTENT
 )
