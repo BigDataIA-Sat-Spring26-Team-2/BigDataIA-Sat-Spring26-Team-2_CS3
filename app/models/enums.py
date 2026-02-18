@@ -30,6 +30,8 @@ class Sector(str, Enum):
     RETAIL = "Retail"
     PROFESSIONAL_SERVICES = "Professional Services"
     MANUFACTURING = "Manufacturing"
+    INDUSTRIALS = "Industrials"
+    SERVICES = "Services"
 
 class DocumentStatus(str, Enum):
     PENDING = "pending"
