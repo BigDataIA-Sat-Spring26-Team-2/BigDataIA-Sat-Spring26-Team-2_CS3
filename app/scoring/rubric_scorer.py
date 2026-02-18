@@ -49,8 +49,8 @@ class RubricScorer:
             'data_infrastructure': self._score_data_infrastructure,
             'ai_governance': self._score_ai_governance,
             'technology_stack': self._score_technology_stack,
-            'talent': self._score_talent,
-            'leadership': self._score_leadership,
+            'talent_skills': self._score_talent,
+            'leadership_vision': self._score_leadership,
             'use_case_portfolio': self._score_use_case_portfolio,
             'culture': self._score_culture,
         }
@@ -99,16 +99,16 @@ class RubricScorer:
         if dimension == "data_infrastructure":
             return metrics.get("data_quality_score", 0) >= threshold
         
-        elif dimension == "talent":
+        elif dimension == "talent_skills":
             return metrics.get("ai_job_ratio", 0) >= threshold
-        
+
         elif dimension == "use_case_portfolio":
             return metrics.get("production_use_cases", 0) >= threshold
-        
+
         elif dimension == "technology_stack":
             return metrics.get("mlops_maturity", 0) >= threshold
-        
-        elif dimension == "leadership":
+
+        elif dimension == "leadership_vision":
             return metrics.get("leadership_score", 0) >= threshold
         
         return True
@@ -501,9 +501,9 @@ class RubricScorer:
         - team_size: Total AI specialists
         """
         rubric = self._get_talent_rubric()
-        
+
         return self._evaluate_rubric(
-            dimension="talent",
+            dimension="talent_skills",
             rubric=rubric,
             evidence_text=evidence_text,
             quantitative_metrics=quantitative_metrics
@@ -596,9 +596,9 @@ class RubricScorer:
     - ai_executive_count: Executives with AI background
     """
         rubric = self._get_leadership_rubric()
-    
+
         result = self._evaluate_rubric(
-            dimension="leadership",
+            dimension="leadership_vision",
             rubric=rubric,
             evidence_text=evidence_text,
             quantitative_metrics=quantitative_metrics
