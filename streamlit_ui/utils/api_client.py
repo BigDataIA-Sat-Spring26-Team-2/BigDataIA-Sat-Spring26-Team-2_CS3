@@ -261,8 +261,16 @@ class APIClient:
         )
         return self._handle_response(response)
 
+    def get_cached_memo(self, ticker: str, company_id: str) -> Optional[Dict[str, Any]]:
+        """Fetch the most recent memo from S3 if it exists. Returns None if not found."""
+        try:
+            from app.services.s3_storage import get_memo_from_s3
+            return get_memo_from_s3(ticker=ticker, company_id=company_id)
+        except Exception:
+            return None
+
     def generate_memo(self, company_id: str) -> Dict[str, Any]:
-        """Generate PE-style investment memo for a company"""
+        """Generate PE-style investment memo for a company (Claude API call)"""
         response = requests.post(
             f"{self.base_url}/scoring/companies/{company_id}/memo",
             timeout=120  # Claude generation can be slow

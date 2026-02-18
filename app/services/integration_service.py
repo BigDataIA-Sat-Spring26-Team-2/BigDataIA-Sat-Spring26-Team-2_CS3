@@ -152,7 +152,7 @@ class ScoringIntegrationService:
         # Step 1 ─────────────────────────────────────────────────────────────
         company = self._fetch_company(ticker)
         company_id = company["id"]
-        sector = company.get("sector", "business_services")
+        sector = self._get_sector_from_db(company_id)
         market_cap_percentile = float(company.get("market_cap_percentile", 0.5))
 
         logger.info(
@@ -332,6 +332,36 @@ class ScoringIntegrationService:
     # -----------------------------------------------------------------------
     # Step helpers
     # -----------------------------------------------------------------------
+
+    def _get_sector_from_db(self, company_id: str) -> str:
+        """Look up sector by joining companies → industries in Snowflake."""
+        from app.services.snowflake import get_connection
+        from app.config import get_settings
+
+        settings = get_settings()
+        conn = get_connection()
+        cur = conn.cursor()
+        try:
+            cur.execute(f"""
+                SELECT i.sector
+                FROM {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.companies c
+                JOIN {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.industries i
+                  ON c.industry_id = i.id
+                WHERE c.id = %s AND c.is_deleted = FALSE
+            """, (str(company_id),))
+            row = cur.fetchone()
+            if row and row[0]:
+                sector = row[0].lower().strip()
+                logger.info("sector_resolved", company_id=company_id, sector=sector)
+                return sector
+        except Exception as exc:
+            logger.warning("sector_lookup_failed", company_id=company_id, error=str(exc))
+        finally:
+            cur.close()
+            conn.close()
+
+        logger.warning("sector_not_found_using_default", company_id=company_id)
+        return "business_services"
 
     def _fetch_company(self, ticker: str) -> Dict[str, Any]:
         """

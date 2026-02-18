@@ -253,18 +253,40 @@ with tab_overview:
 with tab_memo:
     st.subheader(f"Investment Memo — {company_name} ({ticker})")
 
-    if st.button("Generate Investment Memo", type="primary"):
-        with st.spinner("Generating memo via Claude AI... this may take up to 60 seconds"):
-            try:
-                memo_result = api.generate_memo(company_id)
-            except Exception as e:
-                memo_result = None
-                st.error(f"Connection error while generating memo: {e}")
+    btn_col1, btn_col2 = st.columns([1, 1])
+    with btn_col1:
+        generate_clicked = st.button("Generate Investment Memo", type="primary", use_container_width=True)
+    with btn_col2:
+        regenerate_clicked = st.button("Regenerate (Fresh Claude Call)", use_container_width=True)
 
-            if memo_result and "markdown" in memo_result:
-                st.session_state["memo_result"] = memo_result
-            elif memo_result:
-                st.error(f"Memo generation returned unexpected response. Check API logs.")
+    if generate_clicked or regenerate_clicked:
+        # If "Generate" → check S3 cache first; if "Regenerate" → skip cache
+        memo_result = None
+        served_from_cache = False
+
+        if generate_clicked and not regenerate_clicked:
+            with st.spinner("Checking for existing memo in S3..."):
+                cached = api.get_cached_memo(ticker=ticker, company_id=str(company_id))
+                if cached and "markdown" in cached:
+                    memo_result = cached
+                    served_from_cache = True
+
+        if not memo_result:
+            with st.spinner("Generating memo via Claude AI... this may take up to 60 seconds"):
+                try:
+                    memo_result = api.generate_memo(company_id)
+                except Exception as e:
+                    memo_result = None
+                    st.error(f"Connection error while generating memo: {e}")
+
+        if memo_result and "markdown" in memo_result:
+            st.session_state["memo_result"] = memo_result
+            if served_from_cache:
+                st.success(f"Memo loaded from cache (generated at {memo_result.get('generated_at', 'unknown')})")
+            else:
+                st.success("New memo generated via Claude AI and saved to S3.")
+        elif memo_result:
+            st.error(f"Memo generation returned unexpected response. Check API logs.")
 
     if "memo_result" in st.session_state:
         memo = st.session_state["memo_result"]
