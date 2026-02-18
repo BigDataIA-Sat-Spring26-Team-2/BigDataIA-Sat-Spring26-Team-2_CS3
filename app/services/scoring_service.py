@@ -92,7 +92,7 @@ class ScoringService:
         ticker = company_info["ticker"]
         dimensions = [
             "data_infrastructure", "ai_governance", "technology_stack",
-            "talent", "leadership", "use_case_portfolio", "culture"
+            "talent_skills", "leadership_vision", "use_case_portfolio", "culture"
         ]
         for dim in dimensions:
             try:
