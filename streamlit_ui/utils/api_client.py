@@ -13,6 +13,8 @@ class APIClient:
             response.raise_for_status()
             return response.json()
         except requests.exceptions.HTTPError as e:
+            if response.status_code == 404:
+                return {}  # silent — missing data is expected for some endpoints
             st.error(f"API Error ({response.status_code}): {response.text}")
             return {}
         except requests.exceptions.RequestException as e:
@@ -79,24 +81,7 @@ class APIClient:
         )
         return self._handle_response(response)
     
-    def collect_job_signals(
-        self, 
-        company_id: str, 
-        company_name: str, 
-        max_results: int = 20
-    ) -> Dict[str, Any]:
-        """Trigger job signal collection for a company"""
-        params = {
-            "company_id": company_id,
-            "company_name": company_name,
-            "max_results": max_results
-        }
-        response = requests.post(
-            f"{self.base_url}/signals/collect-job-signals",
-            params=params,
-            timeout=300  
-        )
-        return self._handle_response(response)
+    
     
     def refresh_signal_summary(self, company_id: str) -> Dict[str, Any]:
         """Recalculate signal summary for a company"""
@@ -292,3 +277,30 @@ class APIClient:
             timeout=60
         )
         return self._handle_response(response)
+
+    def update_company(self, company_id: str, name: str, ticker: str, industry_id: str, position_factor: float) -> Dict[str, Any]:
+        data = {"name": name, "ticker": ticker, "industry_id": industry_id, "position_factor": position_factor}
+        response = requests.put(f"{self.base_url}/companies/{company_id}", json=data, timeout=10)
+        return self._handle_response(response)
+
+    def delete_company(self, company_id: str) -> bool:
+        response = requests.delete(f"{self.base_url}/companies/{company_id}", timeout=10)
+        return response.status_code == 204
+
+    def hard_delete_company(self, company_id: str) -> bool:
+        response = requests.delete(f"{self.base_url}/companies/{company_id}/hard", timeout=10)
+        return response.status_code == 204
+
+    def create_industry(self, name: str, sector: str, h_r_base: float) -> Dict[str, Any]:
+        data = {"name": name, "sector": sector, "h_r_base": h_r_base}
+        response = requests.post(f"{self.base_url}/industries", json=data, timeout=10)
+        return self._handle_response(response)
+
+    def delete_industry(self, industry_id: str) -> bool:
+        response = requests.delete(f"{self.base_url}/industries/{industry_id}", timeout=10)
+        return response.status_code == 204
+
+    def get_sectors(self) -> list:
+        response = requests.get(f"{self.base_url}/sectors", timeout=10)
+        result = self._handle_response(response)
+        return result if isinstance(result, list) else []

@@ -321,3 +321,28 @@ def delete_company(company_id: UUID) -> None:
             conn.close()
 
     cache.delete(f"company:{company_id}")
+
+
+def hard_delete_company(company_id: UUID) -> None:
+    sql = f"DELETE FROM {COMPANIES_TABLE} WHERE id = %s"
+
+    conn = None
+    cur = None
+    try:
+        conn = snowflake.get_connection()
+        cur = conn.cursor()
+        cur.execute(sql, (str(company_id),))
+        conn.commit()
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to hard delete company: {str(e)}",
+        )
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
+
+    cache.delete(f"company:{company_id}")
