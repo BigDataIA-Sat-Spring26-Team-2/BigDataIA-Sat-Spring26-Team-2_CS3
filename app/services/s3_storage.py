@@ -1,7 +1,9 @@
 # app/services/s3_storage.py
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from functools import lru_cache
+import json
 from pathlib import Path
 import mimetypes
 
@@ -114,3 +116,81 @@ def upload_file_to_s3(local_path: Path, s3_key: str) -> str:
     )
 
     return s3_uri
+
+
+def upload_memo_to_s3(
+    ticker: str, company_id: str, markdown: str, json_summary: dict
+) -> str:
+    """
+    Upload an investment memo (markdown + JSON summary) to S3.
+
+    S3 key: memos/{ticker}/{company_id}_{timestamp}.json
+    Returns the s3:// URI.
+    """
+    s = get_settings()
+    s3 = _s3_client()
+
+    now = datetime.now(timezone.utc)
+    timestamp = now.strftime("%Y-%m-%dT%H%M%S")
+    s3_key = f"memos/{ticker}/{company_id}_{timestamp}.json"
+
+    document = {
+        "markdown": markdown,
+        "summary": json_summary,
+        "generated_at": now.isoformat(),
+        "ticker": ticker,
+        "company_id": company_id,
+    }
+
+    logger.info("memo_upload_started", s3_key=s3_key, ticker=ticker)
+
+    try:
+        s3.put_object(
+            Bucket=s.S3_BUCKET,
+            Key=s3_key,
+            Body=json.dumps(document, default=str),
+            ContentType="application/json",
+        )
+    except Exception as e:
+        logger.exception("memo_upload_failed", s3_key=s3_key, error=str(e))
+        raise
+
+    s3_uri = f"s3://{s.S3_BUCKET}/{s3_key}"
+    logger.info("memo_upload_completed", s3_uri=s3_uri)
+    return s3_uri
+
+
+def get_memo_from_s3(ticker: str, company_id: str) -> dict | None:
+    """
+    Retrieve the most recent memo for a ticker/company from S3.
+
+    Lists objects under memos/{ticker}/ whose key contains the company_id,
+    picks the latest by LastModified, and returns the parsed JSON.
+    Returns None if no memo exists.
+    """
+    s = get_settings()
+    s3 = _s3_client()
+    prefix = f"memos/{ticker}/"
+
+    try:
+        response = s3.list_objects_v2(Bucket=s.S3_BUCKET, Prefix=prefix)
+    except Exception as e:
+        logger.exception("memo_list_failed", prefix=prefix, error=str(e))
+        raise
+
+    contents = response.get("Contents", [])
+    # Filter to this company_id
+    matching = [obj for obj in contents if company_id in obj["Key"]]
+    if not matching:
+        return None
+
+    # Pick the most recent
+    latest = max(matching, key=lambda obj: obj["LastModified"])
+
+    try:
+        obj = s3.get_object(Bucket=s.S3_BUCKET, Key=latest["Key"])
+        body = obj["Body"].read().decode("utf-8")
+        return json.loads(body)
+    except Exception as e:
+        logger.exception("memo_get_failed", key=latest["Key"], error=str(e))
+        raise

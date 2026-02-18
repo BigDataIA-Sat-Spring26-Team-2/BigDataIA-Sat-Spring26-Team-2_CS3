@@ -10,13 +10,16 @@ from typing import Any, Dict, List, Optional
 import structlog
 
 from app.services.scoring_service import ScoringService
+from app.services.s3_storage import upload_memo_to_s3
 from app.scoring.evidence_mapper import Dimension
+from app.scoring.investment_memo_generator import InvestmentMemoGenerator
 
 router = APIRouter(prefix="/scoring", tags=["Scoring"])
 logger = structlog.get_logger()
 
-# Initialize service
+# Initialize services
 scoring_service = ScoringService()
+memo_generator = InvestmentMemoGenerator()
 
 @router.get(
     "/companies/{company_id}/vr",
@@ -478,6 +481,95 @@ async def compare_companies(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Comparison failed: {str(e)}"
+        )
+
+
+@router.post(
+    "/companies/{company_id}/memo",
+    summary="Generate PE-style investment memo",
+    response_model=Dict[str, Any],
+)
+async def generate_investment_memo(company_id: UUID):
+    """
+    Generate an AI-readiness investment memo for a company.
+
+    Pipeline:
+    1. Run full scoring (Path A + Path B combined)
+    2. Calculate V^R
+    3. Feed scores + evidence into Claude to produce a PE-style memo
+
+    **Response:**
+    ```json
+    {
+        "markdown": "# Investment Memo: ...",
+        "summary": {
+            "recommendation": "BUY",
+            "vr_score": 42.5,
+            "top_strength": "talent",
+            "top_weakness": "ai_governance",
+            "discrepancy_flags": ["culture"]
+        }
+    }
+    ```
+    """
+    try:
+        # Step 1: Get dimension scores (combined Path A + B)
+        dimension_result = scoring_service.score_company(
+            company_id=company_id, include_audit_trail=True
+        )
+
+        # Step 2: Calculate V^R
+        vr_result = scoring_service.calculate_vr(company_id=company_id)
+
+        # Step 3: Extract Path A and Path B scores separately
+        path_a_scores: Dict[str, float] = {}
+        path_b_scores: Dict[str, Any] = {}
+        evidence_metadata: Dict[str, str] = {}
+
+        audit = dimension_result.get("audit_trail", {})
+        rubric_details = audit.get("rubric_details", {})
+
+        for dim_name, dim_data in dimension_result["dimension_scores"].items():
+            path_a_scores[dim_name] = dim_data["score"]
+            if dim_name in rubric_details:
+                path_b_scores[dim_name] = rubric_details[dim_name]
+
+        # Step 4: Generate memo
+        markdown, summary = memo_generator.generate_memo(
+            ticker=dimension_result["ticker"],
+            company_name=dimension_result["company_name"],
+            path_a_scores=path_a_scores,
+            path_b_scores=path_b_scores,
+            vr_result=vr_result,
+            evidence_metadata=evidence_metadata or None,
+        )
+
+        # Step 5: Persist memo to S3
+        s3_uri = upload_memo_to_s3(
+            ticker=dimension_result["ticker"],
+            company_id=str(company_id),
+            markdown=markdown,
+            json_summary=summary,
+        )
+
+        return {"markdown": markdown, "summary": summary, "s3_uri": s3_uri}
+
+    except ValueError as e:
+        logger.error("memo_data_error", company_id=str(company_id), error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.error(
+            "memo_generation_error",
+            company_id=str(company_id),
+            error=str(e),
+            error_type=type(e).__name__,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Memo generation failed: {type(e).__name__}: {str(e)}",
         )
 
 

@@ -48,9 +48,11 @@ class RubricScorer:
         self.dimension_scorers = {
             'data_infrastructure': self._score_data_infrastructure,
             'ai_governance': self._score_ai_governance,
+            'technology_stack': self._score_technology_stack,
             'talent': self._score_talent,
             'leadership': self._score_leadership,
-            #add other dimensions
+            'use_case_portfolio': self._score_use_case_portfolio,
+            'culture': self._score_culture,
         }
     
     def score_dimension(
@@ -192,7 +194,7 @@ class RubricScorer:
                     "cloud-native", "serverless"
                 ],
                 min_keyword_matches=3,
-                quantitative_threshold=0.90,
+                quantitative_threshold=0.60,
             ),
             ScoreLevel.LEVEL_4: RubricCriteria(
                 level=ScoreLevel.LEVEL_4,
@@ -200,10 +202,11 @@ class RubricScorer:
                     "azure", "aws", "gcp", "warehouse", "etl",
                     "batch pipelines", "hybrid cloud", "data catalog",
                     "cloud data", "data lake", "redshift", "bigquery",
-                    "s3", "azure data lake", "mlops", "airflow"
+                    "s3", "azure data lake", "mlops", "airflow",
+                    "kafka", "postgresql", "mongodb", "nosql"
                 ],
                 min_keyword_matches=2,
-                quantitative_threshold=0.70,
+                quantitative_threshold=0.30,
             ),
             ScoreLevel.LEVEL_3: RubricCriteria(
                 level=ScoreLevel.LEVEL_3,
@@ -211,10 +214,11 @@ class RubricScorer:
                     "migration", "hybrid", "modernizing", "cloud adoption",
                     "roadmap", "transitioning", "upgrading", "pilot",
                     "cloud strategy", "apache spark", "spark", "hadoop",
-                    "data processing", "docker", "kubernetes"
+                    "data processing", "docker", "kubernetes",
+                    "sql", "cloud", "vertex ai"
                 ],
                 min_keyword_matches=2,
-                quantitative_threshold=0.40,
+                quantitative_threshold=0.10,
             ),
             ScoreLevel.LEVEL_2: RubricCriteria(
                 level=ScoreLevel.LEVEL_2,
@@ -224,7 +228,7 @@ class RubricScorer:
                     "on-prem", "fragmented"
                 ],
                 min_keyword_matches=1,
-                quantitative_threshold=0.20,
+                quantitative_threshold=0.0,
             ),
             ScoreLevel.LEVEL_1: RubricCriteria(
                 level=ScoreLevel.LEVEL_1,
@@ -284,7 +288,8 @@ class RubricScorer:
                     "chief ai officer", "chief data officer",
                     "ai governance framework", "board ai committee",
                     "comprehensive framework", "model risk management",
-                    "ai ethics board", "responsible ai"
+                    "ai ethics board", "responsible ai",
+                    "technology committee", "ai expertise"
                 ],
                 min_keyword_matches=3,
                 quantitative_threshold=0.0,
@@ -295,7 +300,8 @@ class RubricScorer:
                     "vp data", "ai policy", "risk framework",
                     "documented policies", "risk assessment",
                     "vp ai", "ai governance", "model governance",
-                    "data governance", "compliance framework"
+                    "data governance", "compliance framework",
+                    "board governance", "tech committee"
                 ],
                 min_keyword_matches=2,
                 quantitative_threshold=0.0,
@@ -305,7 +311,8 @@ class RubricScorer:
                 keywords=[
                     "director", "guidelines", "it governance",
                     "basic policies", "director level ownership",
-                    "policy exists", "it-led governance"
+                    "policy exists", "it-led governance",
+                    "governance", "committee"
                 ],
                 min_keyword_matches=2,
                 quantitative_threshold=0.0,
@@ -346,7 +353,7 @@ class RubricScorer:
                     "ci/cd ml", "model monitoring", "ml platform"
                 ],
                 min_keyword_matches=3,
-                quantitative_threshold=0.80,
+                quantitative_threshold=0.60,
             ),
             ScoreLevel.LEVEL_4: RubricCriteria(
                 level=ScoreLevel.LEVEL_4,
@@ -357,7 +364,7 @@ class RubricScorer:
                     "wandb", "weights and biases"
                 ],
                 min_keyword_matches=2,
-                quantitative_threshold=0.60,
+                quantitative_threshold=0.40,
             ),
             ScoreLevel.LEVEL_3: RubricCriteria(
                 level=ScoreLevel.LEVEL_3,
@@ -368,7 +375,7 @@ class RubricScorer:
                     "machine learning", "deep learning"
                 ],
                 min_keyword_matches=2,
-                quantitative_threshold=0.40,
+                quantitative_threshold=0.20,
             ),
             ScoreLevel.LEVEL_2: RubricCriteria(
                 level=ScoreLevel.LEVEL_2,
@@ -378,7 +385,7 @@ class RubricScorer:
                     "no ml tooling", "manual analysis"
                 ],
                 min_keyword_matches=1,
-                quantitative_threshold=0.20,
+                quantitative_threshold=0.0,
             ),
             ScoreLevel.LEVEL_1: RubricCriteria(
                 level=ScoreLevel.LEVEL_1,
@@ -425,7 +432,9 @@ class RubricScorer:
                     ">20 specialists", "ai leadership", "principal ml",
                     "staff ml", "research capability", "ml platform team",
                     "internal research", "principal engineer", "staff engineer",
-                    "low turnover", "ml research"
+                    "low turnover", "ml research",
+                    "pytorch", "tensorflow", "computer vision", "nlp",
+                    "langchain", "rag", "transformers", "openai"
                 ],
                 min_keyword_matches=3,
                 quantitative_threshold=0.40,  # >40% AI job ratio
@@ -436,7 +445,9 @@ class RubricScorer:
                     "data science team", "ml engineers", "10-20 professionals",
                     "active hiring", "retention programs", "established team",
                     "senior ml", "lead data scientist", "growing team",
-                    "hiring pipeline", "senior data scientist"
+                    "hiring pipeline", "senior data scientist",
+                    "python", "mlops", "kubernetes", "docker",
+                    "spark", "gcp", "vertex ai", "natural language processing"
                 ],
                 min_keyword_matches=2,
                 quantitative_threshold=0.25,
@@ -446,7 +457,8 @@ class RubricScorer:
                 keywords=[
                     "data scientist", "growing team", "small team",
                     "3-10 data scientists", "building capability",
-                    "some turnover", "developing team", "ml engineer"
+                    "some turnover", "developing team", "ml engineer",
+                    "sql", "aws", "azure", "cloud", "airflow", "scala"
                 ],
                 min_keyword_matches=2,
                 quantitative_threshold=0.15,
@@ -516,10 +528,11 @@ class RubricScorer:
                 "ceo ai", "board committee", "ai strategy",
                 "ceo publicly champions", "board ai committee",
                 "multi-year ai strategic plan", "chief executive ai",
-                "ceo commitment", "board oversight", "strategic plan"
+                "ceo commitment", "board oversight", "strategic plan",
+                "board ai expertise", "chief of operations"
             ],
             min_keyword_matches=2,
-            quantitative_threshold=0.80,
+            quantitative_threshold=0.50,
         ),
             ScoreLevel.LEVEL_4: RubricCriteria(
                 level=ScoreLevel.LEVEL_4,
@@ -527,20 +540,22 @@ class RubricScorer:
                 "cto ai", "strategic priority", "c-suite sponsor",
                 "cdo", "chief technology officer", "chief information officer",
                 "ai in strategy documents", "executive engagement",
-                "cio", "technology strategy"
+                "cio", "technology strategy",
+                "executive vice president", "chief", "president and ceo"
             ],
             min_keyword_matches=2,
-            quantitative_threshold=0.60,
+            quantitative_threshold=0.25,
         ),
             ScoreLevel.LEVEL_3: RubricCriteria(
                 level=ScoreLevel.LEVEL_3,
                 keywords=[
                 "vp sponsor", "department initiative", "vp-level sponsorship",
                 "departmental ai initiatives", "vice president",
-                "vp data", "vp technology"
+                "vp data", "vp technology",
+                "corporate vice president", "president", "innovation"
             ],
                 min_keyword_matches=1,
-                quantitative_threshold=0.40,
+                quantitative_threshold=0.10,
         ),
             ScoreLevel.LEVEL_2: RubricCriteria(
                 level=ScoreLevel.LEVEL_2,
@@ -549,7 +564,7 @@ class RubricScorer:
                 "it-driven initiatives", "technology department only"
             ],
                 min_keyword_matches=1,
-                quantitative_threshold=0.20,
+                quantitative_threshold=0.0,
         ),
             ScoreLevel.LEVEL_1: RubricCriteria(
                 level=ScoreLevel.LEVEL_1,
@@ -625,7 +640,8 @@ class RubricScorer:
                     keywords=[
                         "production", "measured roi", "scaling",
                         "2-4 use cases", "positive roi", "scaling plans",
-                        "in production", "deployed models", "use cases"
+                        "in production", "deployed models", "use cases",
+                        "ai-enabled", "automation", "predictive", "use case"
                     ],
                     min_keyword_matches=2,
                     quantitative_threshold=2.0,  # 2-4 use cases
@@ -635,7 +651,9 @@ class RubricScorer:
                     keywords=[
                         "pilot", "early production", "1-2 pilots",
                         "early roi", "pilot to production",
-                        "roi tracking underway", "use case"
+                        "roi tracking underway", "use case",
+                        "automated", "intelligent", "smart", "analytics",
+                        "machine learning"
                     ],
                     min_keyword_matches=2,
                     quantitative_threshold=1.0,  # 1-2 use cases
@@ -715,7 +733,8 @@ class RubricScorer:
                     keywords=[
                         "experimental", "learning culture", "encouraged",
                         "experimentation encouraged", "data literacy",
-                        "growing culture", "open to innovation"
+                        "growing culture", "open to innovation",
+                        "innovation", "product", "global", "data science"
                     ],
                     min_keyword_matches=2,
                     quantitative_threshold=0.0,
@@ -725,7 +744,7 @@ class RubricScorer:
                     keywords=[
                         "open to change", "some resistance",
                         "mixed adoption", "middle management resistance",
-                        "gradual change"
+                        "gradual change", "executive", "senior"
                     ],
                     min_keyword_matches=2,
                     quantitative_threshold=0.0,

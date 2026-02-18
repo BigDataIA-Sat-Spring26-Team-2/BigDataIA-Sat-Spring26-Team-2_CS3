@@ -65,7 +65,7 @@ app.include_router(dimension_scores.router, prefix="/api/v1")
 app.include_router(industries.router, prefix="/api/v1")
 app.include_router(documents.router, prefix="/api/v1")
 app.include_router(signal.router, prefix="/api/v1")
-app.include_router(scoring.router)
+app.include_router(scoring.router, prefix="/api/v1")
 
 
 @app.get("/")
