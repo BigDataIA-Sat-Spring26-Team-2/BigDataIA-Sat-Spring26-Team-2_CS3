@@ -37,6 +37,12 @@ class Settings(BaseSettings):
         description="NewsAPI key (optional, get from https://newsapi.org)"
     )
 
+    # ---- Anthropic / Claude ----
+    ANTHROPIC_API_KEY: str = Field(default="", description="Anthropic API key for Claude")
+    CLAUDE_MODEL: str = Field(
+        default="claude-haiku-4-5-20251001",
+        description="Claude model ID (use claude-sonnet-4-5-20250929 for production)"
+    )
 
     # ---- App metadata ----
     APP_ENV: str = Field("local", description="Environment name: local/dev/prod")
