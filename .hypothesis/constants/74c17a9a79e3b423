@@ -1,0 +1,4 @@
+# file: D:\Work\SEMESTER_3\BIG_DATA\Case Study\case study BD\Case study 3\BigDataIA-Sat-Spring26-Team-2\app\services\signal_service.py
+# hypothesis_version: 6.151.6
+
+[0.0, 0.2, 0.25, 0.3, ' AND category = %s', 'COMPANIES', 'Company exists - OK', 'Company not found', 'EXTERNAL_SIGNALS', 'Executing INSERT', 'HTTPException raised', 'Metadata serialized', 'Rows affected', 'Verification count', 'digital_presence', 'innovation_activity', 'items', 'leadership_signals', 'page', 'page_size', 'technology_hiring', 'total', 'total_pages']

@@ -1,0 +1,4 @@
+# file: D:\Work\SEMESTER_3\BIG_DATA\Case Study\case study BD\Case study 3\BigDataIA-Sat-Spring26-Team-2\app\services\__init__.py
+# hypothesis_version: 6.151.6
+
+['assessments_service', 'company_service', 'industry_service', 'redis_cache', 's3_storage', 'sec_edgar_service', 'signal_service', 'snowflake']

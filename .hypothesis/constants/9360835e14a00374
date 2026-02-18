@@ -1,0 +1,4 @@
+# file: D:\Work\SEMESTER_3\BIG_DATA\Case Study\case study BD\Case study 3\BigDataIA-Sat-Spring26-Team-2\app\services\s3_storage.py
+# hypothesis_version: 6.151.6
+
+['%Y-%m-%dT%H%M%S', '404', 'Body', 'Code', 'ContentType', 'Contents', 'Error', 'Key', 'LastModified', 'NoSuchKey', 'NotFound', 'application/json', 'company_id', 'generated_at', 'healthy', 'markdown', 'memo_get_failed', 'memo_list_failed', 'memo_upload_failed', 'memo_upload_started', 'not_configured', 's3', 's3_upload_completed', 's3_upload_failed', 's3_upload_started', 'summary', 'ticker', 'unhealthy', 'utf-8']
