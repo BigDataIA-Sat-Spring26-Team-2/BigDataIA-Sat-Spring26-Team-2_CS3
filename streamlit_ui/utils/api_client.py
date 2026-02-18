@@ -81,24 +81,7 @@ class APIClient:
         )
         return self._handle_response(response)
     
-    def collect_job_signals(
-        self, 
-        company_id: str, 
-        company_name: str, 
-        max_results: int = 20
-    ) -> Dict[str, Any]:
-        """Trigger job signal collection for a company"""
-        params = {
-            "company_id": company_id,
-            "company_name": company_name,
-            "max_results": max_results
-        }
-        response = requests.post(
-            f"{self.base_url}/signals/collect-job-signals",
-            params=params,
-            timeout=300  
-        )
-        return self._handle_response(response)
+    
     
     def refresh_signal_summary(self, company_id: str) -> Dict[str, Any]:
         """Recalculate signal summary for a company"""
