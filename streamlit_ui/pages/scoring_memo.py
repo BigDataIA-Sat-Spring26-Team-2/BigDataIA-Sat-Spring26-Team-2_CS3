@@ -3,7 +3,6 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import sys
-import io
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -53,8 +52,8 @@ st.divider()
 col_select, col_btn = st.columns([3, 1])
 
 company_options = {
-    f"{ticker} - {info['name']}": ticker
-    for ticker, info in TARGET_COMPANIES.items()
+    f"{tkr} - {info['name']}": tkr
+    for tkr, info in TARGET_COMPANIES.items()
 }
 
 with col_select:
@@ -65,17 +64,23 @@ with col_btn:
     st.write("")  # spacer
     calculate_clicked = st.button("Calculate Scores", type="primary", use_container_width=True)
 
-# ── Resolve company_id ──
+# ── Resolve company_id and fetch scores on click ──
 if calculate_clicked:
-    company = api.get_company_by_ticker(selected_ticker)
+    try:
+        company = api.get_company_by_ticker(selected_ticker)
+    except Exception:
+        company = None
+
     if company:
         st.session_state["score_company_id"] = company["id"]
         st.session_state["score_ticker"] = selected_ticker
         st.session_state["score_company_name"] = company["name"]
-        # Clear previous memo
+        # Clear previous memo and cached scores when switching company
         st.session_state.pop("memo_result", None)
+        st.session_state.pop("cached_vr", None)
+        st.session_state.pop("cached_dims", None)
     else:
-        st.error(f"Company {selected_ticker} not found. Run Collection Dashboard first.")
+        st.error(f"Company **{selected_ticker}** not found in the database. Run the Collection Dashboard first to register it.")
         st.stop()
 
 # ── Guard: need scores loaded ──
@@ -87,18 +92,28 @@ company_id = st.session_state["score_company_id"]
 ticker = st.session_state["score_ticker"]
 company_name = st.session_state["score_company_name"]
 
-# ── Fetch scores (cached per session) ──
-@st.cache_data(ttl=300, show_spinner="Calculating scores...")
-def fetch_scores(cid: str):
-    vr = api.get_vr_score(cid)
-    dims = api.get_dimension_scores(cid)
-    return vr, dims
+# ── Fetch scores (session-state cached, cleared on company switch) ──
+if "cached_vr" not in st.session_state or "cached_dims" not in st.session_state:
+    with st.spinner("Calculating scores..."):
+        try:
+            vr_result = api.get_vr_score(company_id)
+            dim_result = api.get_dimension_scores(company_id)
+        except Exception as e:
+            st.error(f"Connection error: {e}")
+            st.stop()
 
-vr_result, dim_result = fetch_scores(company_id)
+    if not vr_result or "vr_score" not in vr_result:
+        st.error("Failed to calculate V^R score. Ensure evidence has been collected for this company.")
+        st.stop()
+    if not dim_result or "dimension_scores" not in dim_result:
+        st.error("Failed to calculate dimension scores. Ensure evidence has been collected for this company.")
+        st.stop()
 
-if not vr_result or not dim_result:
-    st.error("Failed to calculate scores. Check that evidence has been collected for this company.")
-    st.stop()
+    st.session_state["cached_vr"] = vr_result
+    st.session_state["cached_dims"] = dim_result
+
+vr_result = st.session_state["cached_vr"]
+dim_result = st.session_state["cached_dims"]
 
 st.divider()
 
@@ -115,7 +130,6 @@ with tab_overview:
     vr_score = vr_result.get("vr_score", 0)
     vr_comp = vr_result.get("vr_components", {})
 
-    # Determine recommendation color from score
     if vr_score >= 60:
         rec_label, rec_color = "BUY", "#2e7d32"
     elif vr_score >= 35:
@@ -137,6 +151,8 @@ with tab_overview:
 
     # Row 2 — Horizontal bar chart for 7 dimensions
     dim_scores = dim_result.get("dimension_scores", {})
+    vr_dim_scores = vr_result.get("dimension_scores", {})
+
     chart_data = []
     for dim_key, label in DIMENSION_LABELS.items():
         score_val = dim_scores.get(dim_key, {})
@@ -171,6 +187,7 @@ with tab_overview:
     fig.update_layout(
         title="Seven-Dimension Scores",
         xaxis_title="Score (0-100)",
+        xaxis_range=[0, 100],
         yaxis=dict(categoryorder="total ascending"),
         height=400,
         margin=dict(l=10, r=10, t=40, b=10),
@@ -179,24 +196,40 @@ with tab_overview:
 
     st.divider()
 
-    # Row 3 — Detailed scores table
+    # Row 3 — Detailed scores table with Path A scores from VR + dimension endpoint
     st.subheader("Detailed Dimension Breakdown")
+
+    # Get rubric details from audit trail if available
+    audit = dim_result.get("audit_trail", {})
+    rubric_details = audit.get("rubric_details", {})
 
     table_rows = []
     for dim_key, label in DIMENSION_LABELS.items():
         score_data = dim_scores.get(dim_key, {})
+        vr_dim = vr_dim_scores.get(dim_key, None)
+
+        # Path A (quantitative) score
         if isinstance(score_data, dict):
-            table_rows.append({
-                "Dimension": label,
-                "Score": f"{score_data.get('score', 0):.1f}",
-                "Confidence": f"{score_data.get('confidence', 0):.2f}",
-            })
+            path_a = score_data.get("score", 0)
+            confidence = score_data.get("confidence", 0)
         else:
-            table_rows.append({
-                "Dimension": label,
-                "Score": f"{float(score_data):.1f}" if score_data else "N/A",
-                "Confidence": "N/A",
-            })
+            path_a = float(score_data) if score_data else 0
+            confidence = None
+
+        # Path B (qualitative) score from rubric
+        rb = rubric_details.get(dim_key, {})
+        path_b = rb.get("score", None) if isinstance(rb, dict) else None
+
+        # Combined from VR result
+        combined = float(vr_dim) if vr_dim is not None else path_a
+
+        table_rows.append({
+            "Dimension": label,
+            "Path A (Quantitative)": f"{path_a:.1f}",
+            "Path B (Qualitative)": f"{path_b:.1f}" if path_b is not None else "N/A",
+            "Combined": f"{combined:.1f}",
+            "Confidence": f"{confidence:.2f}" if confidence is not None else "N/A",
+        })
 
     table_df = pd.DataFrame(table_rows)
     st.dataframe(table_df, use_container_width=True, hide_index=True)
@@ -222,11 +255,16 @@ with tab_memo:
 
     if st.button("Generate Investment Memo", type="primary"):
         with st.spinner("Generating memo via Claude AI... this may take up to 60 seconds"):
-            memo_result = api.generate_memo(company_id)
-            if memo_result:
+            try:
+                memo_result = api.generate_memo(company_id)
+            except Exception as e:
+                memo_result = None
+                st.error(f"Connection error while generating memo: {e}")
+
+            if memo_result and "markdown" in memo_result:
                 st.session_state["memo_result"] = memo_result
-            else:
-                st.error("Failed to generate memo. Check API logs for details.")
+            elif memo_result:
+                st.error(f"Memo generation returned unexpected response. Check API logs.")
 
     if "memo_result" in st.session_state:
         memo = st.session_state["memo_result"]
@@ -273,7 +311,6 @@ with tab_memo:
             )
 
         with dl2:
-            # PDF generation
             try:
                 from fpdf import FPDF
 
@@ -332,7 +369,7 @@ with tab_compare:
     st.subheader("Compare V^R Scores Across Companies")
 
     compare_options = [
-        f"{ticker} - {info['name']}" for ticker, info in TARGET_COMPANIES.items()
+        f"{tkr} - {info['name']}" for tkr, info in TARGET_COMPANIES.items()
     ]
 
     selected_compare = st.multiselect(
@@ -347,27 +384,38 @@ with tab_compare:
 
         # Resolve company IDs
         compare_ids = []
-        ticker_map = {}
-        for t in compare_tickers:
-            c = api.get_company_by_ticker(t)
+        missing_tickers = []
+        for tkr in compare_tickers:
+            try:
+                c = api.get_company_by_ticker(tkr)
+            except Exception:
+                c = None
             if c:
                 compare_ids.append(c["id"])
-                ticker_map[c["id"]] = t
+            else:
+                missing_tickers.append(tkr)
+
+        if missing_tickers:
+            st.warning(f"Companies not found in database: **{', '.join(missing_tickers)}**. Run Collection Dashboard first.")
 
         if len(compare_ids) < 2:
-            st.error("Could not resolve enough companies. Ensure they exist in the database.")
+            st.error("Need at least 2 companies in the database to compare.")
         else:
             with st.spinner("Calculating V^R for selected companies..."):
-                comparison = api.compare_vr_scores(compare_ids)
+                try:
+                    comparison = api.compare_vr_scores(compare_ids)
+                except Exception as e:
+                    comparison = None
+                    st.error(f"Comparison failed: {e}")
 
             if comparison and "companies" in comparison:
                 companies_data = comparison["companies"]
 
                 # Bar chart
                 bar_data = []
-                for t, data in companies_data.items():
+                for tkr_key, data in companies_data.items():
                     bar_data.append({
-                        "Company": f"{data['company_name']} ({t})",
+                        "Company": f"{data['company_name']} ({tkr_key})",
                         "V^R Score": data["vr_score"],
                     })
 
@@ -386,7 +434,8 @@ with tab_compare:
                 fig.update_traces(texttemplate="%{text:.1f}", textposition="outside")
                 fig.update_layout(
                     yaxis=dict(categoryorder="total ascending"),
-                    height=300 + len(bar_data) * 40,
+                    xaxis_range=[0, 100],
+                    height=300 + len(bar_data) * 50,
                     showlegend=False,
                 )
                 st.plotly_chart(fig, use_container_width=True)
@@ -396,9 +445,9 @@ with tab_compare:
                 # Comparison table
                 st.subheader("Detailed Comparison")
                 comp_rows = []
-                for t, data in companies_data.items():
+                for tkr_key, data in companies_data.items():
                     comp_rows.append({
-                        "Ticker": t,
+                        "Ticker": tkr_key,
                         "Company": data["company_name"],
                         "V^R Score": f"{data['vr_score']:.1f}",
                         "Base Score": f"{data['base_score']:.1f}",
@@ -410,8 +459,8 @@ with tab_compare:
 
                 comp_df = pd.DataFrame(comp_rows)
                 st.dataframe(comp_df, use_container_width=True, hide_index=True)
-            else:
-                st.error("Comparison failed. Some companies may not have enough data.")
+            elif comparison is not None:
+                st.error("Comparison returned no results. Some companies may not have enough evidence data.")
 
     elif len(selected_compare) < 2:
         st.info("Select at least 2 companies to compare.")

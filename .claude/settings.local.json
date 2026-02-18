@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "Bash(find:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(cd:*)",
+      "WebFetch(domain:www.goldmansachs.com)",
+      "WebFetch(domain:corporate.walmart.com)"
     ]
   }
 }
