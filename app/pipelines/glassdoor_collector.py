@@ -9,6 +9,11 @@ from app.config import get_settings
 from app.services.s3_storage import upload_file_to_s3
 from apify_client import ApifyClient
 from pathlib import Path
+from app.services.signal_service import store_signal
+from app.models.signal import ExternalSignal
+from app.models.enums import SignalCategory, SignalSource
+from uuid import uuid4, UUID
+from datetime import timezone
 import json
 import boto3
 from botocore.exceptions import ClientError
@@ -45,6 +50,38 @@ class CultureSignal:
     positive_keywords_found: List[str] = field(default_factory=list)
     negative_keywords_found: List[str] = field(default_factory=list)
 
+
+    def to_external_signal(self):
+        """Convert to ExternalSignal for database storage"""
+        
+        
+        # Build metadata from existing fields
+        metadata = {
+            "review_count": self.review_count,
+            "avg_rating": float(self.avg_rating),
+            "current_employee_ratio": float(self.current_employee_ratio),
+            "component_scores": {
+                "innovation": float(self.innovation_score),
+                "data_driven": float(self.data_driven_score),
+                "change_readiness": float(self.change_readiness_score),
+                "ai_awareness": float(self.ai_awareness_score),
+            },
+            "positive_keywords": self.positive_keywords_found,
+            "negative_keywords": self.negative_keywords_found,
+        }
+        
+        return ExternalSignal(
+            id=uuid4(),
+            company_id=UUID(self.company_id),
+            category=SignalCategory.CULTURE,
+            source=SignalSource.GLASSDOOR,
+            signal_date=datetime.now(timezone.utc),
+            raw_value=f"{self.review_count} reviews analyzed",
+            normalized_score=float(self.overall_score),
+            confidence=float(self.confidence),
+            metadata=metadata,
+            created_at=datetime.now(timezone.utc)
+        )
 
 class GlassdoorScraper:
     """
@@ -578,6 +615,8 @@ class GlassdoorCollectionPipeline:
         # Analyze
         culture_signal = self.analyzer.analyze_reviews(company_id, ticker, reviews)
         
+        self._store_signal(culture_signal)
+
         logger.info("Culture analysis complete", 
                    ticker=ticker, 
                    score=float(culture_signal.overall_score),
@@ -585,6 +624,19 @@ class GlassdoorCollectionPipeline:
                    filter_applied=filter_tech_roles)
         
         return culture_signal
+    
+    
+    def _store_signal(self, culture_signal: CultureSignal) -> None:
+        """Store in external_signals table"""
+    
+        external_signal = culture_signal.to_external_signal()
+        store_signal(external_signal)
+        
+        logger.info(
+            "culture_signal_stored",
+            ticker=culture_signal.ticker,
+            score=float(culture_signal.overall_score)
+        )
 
 
 # ========================================
@@ -620,67 +672,177 @@ def batch_analyze_glassdoor(
     return results
 
 
-# def test_walmart_culture_from_s3():
-#     """Test with Walmart data from S3 - Tech Roles Only"""
+def example_single_company():
+    """
+    Example: Collect and store Glassdoor signal for NVIDIA.
+    """
+    from app.services.snowflake import get_connection
     
-#     print("="*70)
-#     print("WALMART CULTURE ANALYSIS - S3 Data Source (Tech Roles Only)")
-#     print("="*70)
+    print("=" * 70)
+    print("EXAMPLE: Collect Glassdoor Signal for NVIDIA")
+    print("=" * 70)
     
-#     analyzer = GlassdoorCultureCollector()
+    # Step 1: Get company_id from database
+    print("\nStep 1: Getting company_id...")
     
-#     reviews = analyzer.load_reviews_from_s3("WMT", filter_tech_roles=True)
+    settings = get_settings()
+    conn = get_connection()
+    cur = conn.cursor()
     
-#     if not reviews:
-#         print("\n No tech role reviews found in S3 for WMT")
-#         print("\nOptions:")
-#         print("1. Upload local data to S3: python scripts/upload_glassdoor_to_s3.py")
-#         print("2. Try without filtering: set filter_tech_roles=False")
-#         return None
+    cur.execute(f"""
+        SELECT id, name, ticker
+        FROM {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.companies
+        WHERE ticker = 'WMT'
+        LIMIT 1
+    """)
     
-#     print(f"\n Loaded {len(reviews)} tech role reviews from S3")
+    row = cur.fetchone()
     
-#     # Show sample tech reviews
-#     if reviews:
-#         print(f"\n Sample Tech Role Reviews:")
-#         for i, r in enumerate(reviews[:5], 1):
-#             print(f"\n{i}. {r.title}")
-#             print(f"   {r.rating}⭐ | 💻 {r.job_title}")
-#             print(f"   Pros: {r.pros[:80]}...")
-#             print(f"   Cons: {r.cons[:80]}...")
+    if not row:
+        print("✗ NVDA not found in database")
+        cur.close()
+        conn.close()
+        return
     
-#     # Analyze
-#     culture = analyzer.analyze_reviews("dummy-id", "WMT", reviews)
+    company_id = row[0]
+    company_name = row[1]
+    ticker = row[2]
     
-#     print("\n" + "="*70)
-#     print("CULTURE SCORES (Tech Roles Only)")
-#     print("="*70)
-#     print(f"\n  Innovation:       {culture.innovation_score}/100")
-#     print(f"  Data-Driven:      {culture.data_driven_score}/100")
-#     print(f"  Change Readiness: {culture.change_readiness_score}/100")
-#     print(f"  AI Awareness:     {culture.ai_awareness_score}/100")
-#     print(f"\n Overall: {culture.overall_score}/100")
-#     print(f"   Confidence: {culture.confidence}")
-#     print(f"   Based on: {culture.review_count} tech/data/AI role reviews")
+    print(f"✓ Found: {company_name} (ID: {company_id})")
     
-#     # Show comparison with all roles
-#     print("\n" + "="*70)
-#     print("COMPARISON: Tech Roles vs All Roles")
-#     print("="*70)
+    cur.close()
+    conn.close()
     
-#     all_reviews = analyzer.load_reviews_from_s3("WMT", filter_tech_roles=False)
-#     culture_all = analyzer.analyze_reviews("dummy-id", "WMT", all_reviews)
+    # Step 2: Run Glassdoor pipeline
+    print("\nStep 2: Running Glassdoor collection pipeline...")
     
-#     print(f"\n{'Metric':<25} {'Tech Roles':<15} {'All Roles':<15} {'Difference':<15}")
-#     print("-"*70)
-#     print(f"{'Review Count':<25} {culture.review_count:<15} {culture_all.review_count:<15} {culture.review_count - culture_all.review_count:<15}")
-#     print(f"{'Innovation':<25} {float(culture.innovation_score):<15.1f} {float(culture_all.innovation_score):<15.1f} {float(culture.innovation_score - culture_all.innovation_score):<15.1f}")
-#     print(f"{'Data-Driven':<25} {float(culture.data_driven_score):<15.1f} {float(culture_all.data_driven_score):<15.1f} {float(culture.data_driven_score - culture_all.data_driven_score):<15.1f}")
-#     print(f"{'AI Awareness':<25} {float(culture.ai_awareness_score):<15.1f} {float(culture_all.ai_awareness_score):<15.1f} {float(culture.ai_awareness_score - culture_all.ai_awareness_score):<15.1f}")
-#     print(f"{'Overall':<25} {float(culture.overall_score):<15.1f} {float(culture_all.overall_score):<15.1f} {float(culture.overall_score - culture_all.overall_score):<15.1f}")
+    pipeline = GlassdoorCollectionPipeline()
     
-#     return culture
+    culture_signal = pipeline.collect_and_analyze(
+        company_id=company_id,
+        ticker=ticker,
+        filter_tech_roles=True
+    )
+    
+    # Step 3: Display results
+    print("\n" + "=" * 70)
+    print("RESULTS")
+    print("=" * 70)
+    
+    print(f"\n📊 Culture Scores:")
+    print(f"   Overall:          {culture_signal.overall_score:.1f}/100")
+    print(f"   Innovation:       {culture_signal.innovation_score:.1f}/100")
+    print(f"   Data-Driven:      {culture_signal.data_driven_score:.1f}/100")
+    print(f"   AI Awareness:     {culture_signal.ai_awareness_score:.1f}/100")
+    print(f"   Change Readiness: {culture_signal.change_readiness_score:.1f}/100")
+    
+    print(f"\n📝 Review Info:")
+    print(f"   Reviews Analyzed: {culture_signal.review_count}")
+    print(f"   Average Rating:   {culture_signal.avg_rating:.1f}/5.0")
+    print(f"   Confidence:       {culture_signal.confidence:.2f}")
+    
+    # Step 4: Verify it's stored
+    print("\n" + "=" * 70)
+    print("VERIFICATION")
+    print("=" * 70)
+    
+    conn = get_connection()
+    cur = conn.cursor()
+    
+    cur.execute(f"""
+        SELECT id, category, source, normalized_score, confidence, created_at
+        FROM {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.external_signals
+        WHERE company_id = %s AND category = 'culture'
+        ORDER BY created_at DESC
+        LIMIT 1
+    """, (company_id,))
+    
+    row = cur.fetchone()
+    
+    if row:
+        print(f"\n✓ Signal stored in external_signals table")
+        print(f"  Signal ID:  {row[0]}")
+        print(f"  Category:   {row[1]}")
+        print(f"  Source:     {row[2]}")
+        print(f"  Score:      {row[3]:.1f}/100")
+        print(f"  Confidence: {row[4]:.2f}")
+        print(f"  Created:    {row[5]}")
+    else:
+        print(f"\n⚠ Signal NOT found in database - check for errors above")
+    
+    cur.close()
+    conn.close()
+    
+    print("\n" + "=" * 70)
+    print("✅ EXAMPLE COMPLETE")
+    print("=" * 70)
 
 
-# if __name__ == "__main__":
-#     test_walmart_culture_from_s3()
+def example_batch_companies():
+    """
+    Example: Collect and store Glassdoor signals for all CS3 companies.
+    """
+    print("=" * 70)
+    print("EXAMPLE: Batch Collect All CS3 Companies")
+    print("=" * 70)
+    
+    # CS3 portfolio companies
+    tickers = ["NVDA", "JPM", "WMT", "GE", "DG"]
+    
+    from app.services.snowflake import get_connection
+    settings = get_settings()
+    
+    for ticker in tickers:
+        print(f"\n{'─'*70}")
+        print(f"Processing: {ticker}")
+        print('─'*70)
+        
+        try:
+            # Get company_id
+            conn = get_connection()
+            cur = conn.cursor()
+            
+            cur.execute(f"""
+                SELECT id, name
+                FROM {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.companies
+                WHERE ticker = %s
+            """, (ticker,))
+            
+            row = cur.fetchone()
+            
+            if not row:
+                print(f"✗ {ticker} not found in database - skipping")
+                cur.close()
+                conn.close()
+                continue
+            
+            company_id = row[0]
+            company_name = row[1]
+            
+            cur.close()
+            conn.close()
+            
+            print(f"✓ Found: {company_name}")
+            
+            # Run pipeline
+            pipeline = GlassdoorCollectionPipeline()
+            culture_signal = pipeline.collect_and_analyze(
+                company_id=company_id,
+                ticker=ticker,
+                filter_tech_roles=True
+            )
+            
+            print(f"✓ Score: {culture_signal.overall_score:.1f}/100 ({culture_signal.review_count} reviews)")
+            
+        except Exception as e:
+            print(f"✗ Failed: {str(e)}")
+    
+    print("\n" + "=" * 70)
+    print("BATCH COMPLETE")
+    print("=" * 70)
+
+
+if __name__ == "__main__":
+    # Run single company example
+    #example_single_company()
+    example_batch_companies()
