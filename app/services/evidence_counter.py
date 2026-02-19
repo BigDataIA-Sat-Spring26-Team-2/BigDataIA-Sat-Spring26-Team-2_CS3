@@ -377,7 +377,6 @@ def get_total_evidence_count(company_id: UUID) -> int:
             SELECT 
                 category,
                 source,
-                evidence_count,
                 metadata,
                 normalized_score
             FROM {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.external_signals
@@ -399,9 +398,8 @@ def get_total_evidence_count(company_id: UUID) -> int:
         for row in rows:
             category_str = row[0]
             source_str = row[1]
-            evidence_count_stored = row[2]  # From database (if column exists)
-            metadata = row[3]
-            score = float(row[4]) if row[4] else 0.0
+            metadata = row[2]
+            score = float(row[3]) if row[3] else 0.0
             
             if isinstance(metadata, str):
                 try:
@@ -423,12 +421,7 @@ def get_total_evidence_count(company_id: UUID) -> int:
                 )
                 continue
             
-            # Use stored evidence_count if available, otherwise calculate
-            if evidence_count_stored and evidence_count_stored > 0:
-                evidence_count = int(evidence_count_stored)
-            else:
-                # Calculate from metadata
-                evidence_count = calculate_evidence_count(category, source, metadata)
+            evidence_count = calculate_evidence_count(category, source, metadata)
             
             total_evidence += evidence_count
             
@@ -494,7 +487,6 @@ def get_evidence_breakdown(company_id: UUID) -> Dict[str, Dict]:
             SELECT 
                 category,
                 source,
-                evidence_count,
                 metadata,
                 normalized_score,
                 confidence,
@@ -518,11 +510,10 @@ def get_evidence_breakdown(company_id: UUID) -> Dict[str, Dict]:
         for row in rows:
             category_str = row[0]
             source_str = row[1]
-            evidence_count_stored = row[2]
-            metadata = row[3]
-            score = float(row[4]) if row[4] else 0.0
-            confidence = float(row[5]) if row[5] else 0.0
-            raw_value = row[6]
+            metadata = row[2]
+            score = float(row[3]) if row[3] else 0.0
+            confidence = float(row[4]) if row[4] else 0.0
+            raw_value = row[5]
             
             # Parse metadata
             if isinstance(metadata, str):
@@ -538,10 +529,7 @@ def get_evidence_breakdown(company_id: UUID) -> Dict[str, Dict]:
                 category = SignalCategory(category_str)
                 source = SignalSource(source_str)
                 
-                if evidence_count_stored and evidence_count_stored > 0:
-                    evidence_count = int(evidence_count_stored)
-                else:
-                    evidence_count = calculate_evidence_count(category, source, metadata)
+                evidence_count = calculate_evidence_count(category, source, metadata)
             except ValueError:
                 evidence_count = 1
             

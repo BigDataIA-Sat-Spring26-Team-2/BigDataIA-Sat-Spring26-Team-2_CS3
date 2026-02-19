@@ -288,10 +288,10 @@ class ScoringIntegrationService:
 
     def _fetch_cs2_evidence(self, company_id: str) -> Dict[str, Any]:
         """Step 2: Fetch from CS2 API"""
-        url = f"{self.cs1_url}/api/v1/signals"
+        url = f"{self.cs1_url}/api/v1/signals/companies/{company_id}"
         response = self.http.get(
             url,
-            params={"company_id": company_id, "limit": 200},
+            params={"limit": 200},
         )
         response.raise_for_status()
         data = response.json()
@@ -555,7 +555,7 @@ class ScoringIntegrationService:
                         %s, %s, %s, %s,
                         %s, %s, %s, %s,
                         %s, %s, %s,
-                        %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s,
                         PARSE_JSON(%s),
                         %s
                 """
@@ -566,7 +566,6 @@ class ScoringIntegrationService:
                         assessment_id,
                         company_id,
                         date.today(),
-                        'submitted',
                         result["vr_score"],
                         result["hr_score"],
                         result["synergy_score"],

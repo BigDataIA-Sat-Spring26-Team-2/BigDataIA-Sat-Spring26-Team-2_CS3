@@ -5,7 +5,6 @@ service = ScoringIntegrationService(
     cs1_api_url="http://localhost:8000"
 )
 
-# Run scoring for NVIDIA
 print("Running scoring pipeline for WMT...")
 
 result = service.score_company(
@@ -34,5 +33,5 @@ print(f"   95% CI: [{result['ci_lower']:.1f}, {result['ci_upper']:.1f}]")
 print(f"   ρ:      {result['confidence']:.3f}")
 print(f"   SEM:    {result['sem']:.2f}")
 
-print(f"\nAssessment ID: {result['assessment_id']}")
+print(f"\nAssessment ID: {result['id']}")
 print("="*70)
