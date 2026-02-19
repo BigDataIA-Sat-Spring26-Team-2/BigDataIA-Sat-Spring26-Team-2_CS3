@@ -15,6 +15,8 @@ class APIClient:
         except requests.exceptions.HTTPError as e:
             if response.status_code == 404:
                 return {}  # silent — missing data is expected for some endpoints
+            if response.status_code == 404:
+                return {}  # silent — missing data is expected for some endpoints
             st.error(f"API Error ({response.status_code}): {response.text}")
             return {}
         except requests.exceptions.RequestException as e:
