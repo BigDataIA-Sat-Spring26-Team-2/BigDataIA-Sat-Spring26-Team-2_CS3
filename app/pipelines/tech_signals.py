@@ -103,6 +103,28 @@ DEFAULT_COMPANY_SOURCES: Dict[str, Dict[str, List[str]]] = {
         "tech_blogs": [],
         "github_orgs": [],
         "careers": ["https://www.paychex.com/careers"],
+    
+    },
+    "NVDA": {
+    "name": "NVIDIA Corporation",
+    "sector": "Technology",
+    "tech_blogs": ["https://developer.nvidia.com/blog", "https://blogs.nvidia.com"],
+    "github_orgs": ["https://github.com/NVIDIA"],
+    "careers": ["https://www.nvidia.com/en-us/about-nvidia/careers/"],
+    },
+    "DG": {
+        "name": "Dollar General Corp",
+        "sector": "Retail",
+        "tech_blogs": [],
+        "github_orgs": [],
+        "careers": ["https://careers.dollargeneral.com"],
+    },
+    "GE": {
+        "name": "General Electric Co",
+        "sector": "Manufacturing",
+        "tech_blogs": ["https://www.ge.com/news/reports"],
+        "github_orgs": ["https://github.com/GeneralElectric"],
+        "careers": ["https://jobs.gecareers.com"],
     },
 }
 
