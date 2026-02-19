@@ -1,11 +1,28 @@
-import httpx
+"""
+CS3 Task 6.0b: ScoringIntegrationService
+
+Full pipeline: CS1/CS2 data → Org-AI-R score.
+
+Evidence flow:
+  CS1 API (company) + CS2 API (signals) + Glassdoor (S3) + Board (Snowflake)
+  → EvidenceMapper → 7 DimensionScores
+  → VRCalculator  → V^R score
+  → HRCalculator  → H^R score
+  → Synergy calc  → alignment-adjusted combined score
+  → CI calculator → confidence interval
+  → persist to CS1
+"""
+
+import json
 import structlog
 from typing import Dict, Any, List
 from decimal import Decimal
 from uuid import UUID, uuid4
-import json
 from datetime import date, datetime, timezone
+from app.config import get_settings
+from app.services.snowflake import get_connection
 from app.scoring.evidence_mapper import EvidenceMapper, EvidenceScore, SignalSource, Dimension
+from app.scoring.evidence_helpers import get_dimension_evidence
 from app.scoring.rubric_scorer import RubricScorer
 from app.scoring.talent_concentration import TalentConcentrationCalculator
 from app.scoring.position_factor import PositionFactorCalculator
@@ -28,6 +45,7 @@ class ScoringIntegrationService:
     CS3 Task 6.0b implementation.
     """
 
+
     def __init__(
         self,
         cs1_api_url: str = "http://localhost:8000"
@@ -35,6 +53,7 @@ class ScoringIntegrationService:
         self.cs1_url = cs1_api_url
 
         # Initialize all components
+
         self.evidence_mapper = EvidenceMapper()
         self.rubric_scorer = RubricScorer()
         self.tc_calculator = TalentConcentrationCalculator()
@@ -46,13 +65,8 @@ class ScoringIntegrationService:
         self.glassdoor_collector = GlassdoorCultureCollector()
         self.board_analyzer = BoardCompositionAnalyzer()
 
-        self.http = httpx.Client(timeout=30.0)
 
-    def score_company(
-        self, 
-        ticker: str,
-        market_cap_percentile: float = 0.5
-    ) -> Dict[str, Any]:
+    def score_company(self, ticker: str) -> Dict[str, Any]:
         """
         Run the full Org-AI-R scoring pipeline for a ticker.
 
@@ -63,20 +77,21 @@ class ScoringIntegrationService:
         Returns:
             Complete assessment with all calculation details
         """
-        logger.info("score_company_started", ticker=ticker, market_cap_percentile=market_cap_percentile)
+        logger.info("score_company_started", ticker=ticker)
 
         # Step 1: Fetch company ────────────────────────────────────────────
         company = self._fetch_company(ticker)
         company_id = company["id"]
-        sector = company.get("sector", "business_services")
         industry_id = company.get("industry_id")
+        sector = self._get_sector_from_db(company_id)
+        market_cap_percentile = float(company.get("market_cap_percentile", 0.5))
 
         logger.info(
             "company_fetched",
             ticker=ticker,
             company_id=company_id,
             sector=sector,
-            industry_id=industry_id,
+            market_cap_percentile=market_cap_percentile,
         )
 
         # Step 2: Fetch CS2 evidence ───────────────────────────────────────
@@ -112,7 +127,51 @@ class ScoringIntegrationService:
             for dim, ds in dimension_score_objects.items()
         }
 
-        # Step 7: Calculate talent concentration ───────────────────────────
+        # Step 6b: Run Rubric Scorer (Path B) and blend with Path A ─────────
+        path_a_scores = dict(dimension_scores)  # save raw Path A
+        path_b_scores: Dict[str, Any] = {}
+
+        BLEND_DIMENSIONS = [
+            "data_infrastructure", "ai_governance", "technology_stack",
+            "talent", "leadership", "use_case_portfolio", "culture",
+        ]
+        for dim_name in BLEND_DIMENSIONS:
+            try:
+                evidence_text, metrics = get_dimension_evidence(
+                    company_id, ticker, dim_name
+                )
+                if evidence_text:
+                    rubric_result = self.rubric_scorer.score_dimension(
+                        dim_name, evidence_text, metrics
+                    )
+                    path_b_scores[dim_name] = {
+                        "score": float(rubric_result.score),
+                        "level": str(rubric_result.level),
+                        "rationale": rubric_result.rationale,
+                    }
+            except Exception as e:
+                logger.warning(
+                    "rubric_scoring_failed_integration",
+                    dimension=dim_name,
+                    error=str(e),
+                )
+
+        # Blend: Combined = 0.6 * Path A + 0.4 * Path B
+        for dim_name in BLEND_DIMENSIONS:
+            if dim_name in path_b_scores:
+                pa = path_a_scores[dim_name]
+                pb = path_b_scores[dim_name]["score"]
+                blended = round(pa * 0.6 + pb * 0.4, 2)
+                dimension_scores[dim_name] = max(0.0, min(100.0, blended))
+
+        logger.info(
+            "path_ab_blended",
+            path_a_count=len(path_a_scores),
+            path_b_count=len(path_b_scores),
+            blended_dims=list(path_b_scores.keys()),
+        )
+
+        # Step 7: Talent concentration ────────────────────────────────────────
         job_postings_raw = cs2_evidence.get("job_postings", [])
         job_analysis = self.tc_calculator.analyze_job_postings(job_postings_raw)
         individual_mentions = int(glassdoor.get("individual_mentions", 0))
@@ -202,30 +261,43 @@ class ScoringIntegrationService:
             "company_id": company_id,
             "ticker": ticker,
             "sector": sector,
-            
+
             # Core scores
             "vr_score": float(vr_result.vr_score),
             "hr_score": float(hr_result.hr_score),
             "synergy_score": float(synergy_result.synergy_score),
+            "org_air_score": float(final_score),
             "final_score": float(final_score),
-            
-            "position_factor": position_factor,
+
+            # Alignment & contributing factors
+            "alignment": alignment,
             "talent_concentration": tc,
-            "market_cap_percentile": market_cap_percentile,
-            
-            # Confidence
+            "position_factor": position_factor,
+
+            # Confidence interval
             "ci_lower": float(ci_result.ci_lower),
             "ci_upper": float(ci_result.ci_upper),
             "confidence": float(ci_result.confidence),
-            "sem": float(ci_result.sem),
-            
-            # Evidence
+
+            # Dimension detail
+            "dimension_scores": dimension_scores,
+
+            # VR penalty breakdown for transparency
+            "vr_weighted_mean": float(vr_result.weighted_mean),
+            "vr_cv": float(vr_result.cv),
+            "vr_cv_penalty_amount": float(vr_result.cv_penalty_amount),
+            "vr_tc_penalty_amount": float(vr_result.tc_penalty_amount),
+
+            # Path A / Path B breakdown
+            "path_a_scores": path_a_scores,
+            "path_b_scores": path_b_scores,
+
+            # Evidence provenance
             "evidence_count": total_evidence,
             "evidence_breakdown": {k: v["evidence_count"] for k, v in evidence_breakdown_dict.items()},
-            
-            # Dimension scores
-            "dimension_scores": dimension_scores,
-            
+            "glassdoor_review_count": glassdoor.get("review_count", 0),
+            "board_governance_score": board.get("governance_score", 50.0),
+
             # V^R components (for calculation_details)
             "vr_components": {
                 "weighted_mean": float(vr_result.weighted_mean),
@@ -236,25 +308,25 @@ class ScoringIntegrationService:
                 "tc_penalty": float(vr_result.talent_risk_adj),
                 "tc_penalty_amount": float(vr_result.tc_penalty_amount),
             },
-            
+
             # H^R components (for calculation_details)
             "hr_components": {
                 "hr_base": float(hr_result.hr_base),
                 "position_adjustment": float(hr_result.position_adjustment),
             },
-            
+
             # Synergy components (for calculation_details)
             "synergy_components": {
                 "base_synergy": float(synergy_result.base_synergy),
                 "alignment": float(synergy_result.alignment),
                 "timing_factor": float(synergy_result.timing_factor),
             },
-            
+
             # Formula constants
             "formula_constants": {
                 "alpha": 0.60,
                 "beta": 0.12,
-            }
+            },
         }
 
         # Step 13: Persist
@@ -270,21 +342,63 @@ class ScoringIntegrationService:
         return result
 
 
+    def _get_sector_from_db(self, company_id: str) -> str:
+        """Look up sector by joining companies → industries in Snowflake."""
+        from app.services.snowflake import get_connection
+        from app.config import get_settings
+
+        settings = get_settings()
+        conn = get_connection()
+        cur = conn.cursor()
+        try:
+            cur.execute(f"""
+                SELECT i.sector
+                FROM {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.companies c
+                JOIN {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.industries i
+                  ON c.industry_id = i.id
+                WHERE c.id = %s AND c.is_deleted = FALSE
+            """, (str(company_id),))
+            row = cur.fetchone()
+            if row and row[0]:
+                sector = row[0].lower().strip()
+                logger.info("sector_resolved", company_id=company_id, sector=sector)
+                return sector
+        except Exception as exc:
+            logger.warning("sector_lookup_failed", company_id=company_id, error=str(exc))
+        finally:
+            cur.close()
+            conn.close()
+
+        logger.warning("sector_not_found_using_default", company_id=company_id)
+        return "business_services"
+
     def _fetch_company(self, ticker: str) -> Dict[str, Any]:
-        """Step 1: Fetch from CS1 API"""
-        url = f"{self.cs1_url}/api/v1/companies"
-        response = self.http.get(url, params={"page_size": 100})
-        response.raise_for_status()
-        data = response.json()
-
-        items = data.get("items", [])
-        for company in items:
-            if company.get("ticker", "").upper() == ticker.upper():
-                if "market_cap_percentile" not in company:
-                    company["market_cap_percentile"] = 0.5
-                return company
-
-        raise ValueError(f"Company not found in CS1 for ticker={ticker!r}")
+        """
+        Step 1: Query Snowflake directly for company by ticker.
+        """
+        settings = get_settings()
+        conn = get_connection()
+        cur = conn.cursor()
+        try:
+            cur.execute(f"""
+                SELECT id, name, ticker, industry_id, position_factor
+                FROM {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.companies
+                WHERE UPPER(ticker) = %s AND is_deleted = FALSE
+            """, (ticker.upper(),))
+            row = cur.fetchone()
+            if not row:
+                raise ValueError(f"Company not found for ticker={ticker!r}")
+            return {
+                "id": row[0],
+                "name": row[1],
+                "ticker": row[2],
+                "industry_id": row[3],
+                "position_factor": float(row[4]) if row[4] else 0.0,
+                "market_cap_percentile": 0.5,
+            }
+        finally:
+            cur.close()
+            conn.close()
 
     def _fetch_cs2_evidence(self, company_id: str) -> Dict[str, Any]:
         """Step 2: Fetch from CS2 API"""
@@ -296,7 +410,48 @@ class ScoringIntegrationService:
         response.raise_for_status()
         data = response.json()
 
-        all_items = data.get("items", [])
+        """
+        Step 2: Query Snowflake directly for external signals.
+        Returns dict with 'signals' (all items) and 'job_postings'
+        (items where category == 'technology_hiring').
+        """
+        settings = get_settings()
+        table = f"{settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.EXTERNAL_SIGNALS"
+        conn = get_connection()
+        cur = conn.cursor()
+        try:
+            cur.execute(f"""
+                SELECT id, company_id, category, source, signal_date,
+                       raw_value, normalized_score, confidence, metadata
+                FROM {table}
+                WHERE company_id = %s
+                ORDER BY signal_date DESC, created_at DESC
+                LIMIT 200
+            """, (str(company_id),))
+            rows = cur.fetchall()
+        finally:
+            cur.close()
+            conn.close()
+
+        all_items = []
+        for r in rows:
+            meta = r[8]
+            if isinstance(meta, str):
+                meta = json.loads(meta) if meta else {}
+            elif meta is None:
+                meta = {}
+            all_items.append({
+                "id": r[0],
+                "company_id": r[1],
+                "category": r[2],
+                "source": r[3],
+                "signal_date": str(r[4]) if r[4] else None,
+                "raw_value": r[5],
+                "normalized_score": float(r[6]) if r[6] is not None else 50.0,
+                "confidence": float(r[7]) if r[7] is not None else 0.5,
+                "metadata": meta,
+            })
+
         job_postings = [
             item for item in all_items
             if item.get("category") == "technology_hiring"
@@ -305,13 +460,74 @@ class ScoringIntegrationService:
         return {"signals": all_items, "job_postings": job_postings}
 
     def _collect_glassdoor(self, company_id: str, ticker: str) -> Dict[str, Any]:
-        """Step 3: Collect Glassdoor culture signal"""
+        """
+        Step 3: Load Glassdoor culture signal.
+        Priority: EXTERNAL_SIGNALS table → S3 reviews → neutral fallback.
+        """
         _fallback = {
             "overall_score": 50.0,
             "individual_mentions": 0,
             "review_count": 1,
             "confidence": 0.5,
         }
+
+        # --- Primary: read from EXTERNAL_SIGNALS table ---
+        try:
+            settings = get_settings()
+            conn = get_connection()
+            cur = conn.cursor()
+            try:
+                cur.execute(f"""
+                    SELECT normalized_score, confidence, metadata
+                    FROM {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.EXTERNAL_SIGNALS
+                    WHERE company_id = %s
+                      AND category = 'culture' AND source = 'glassdoor'
+                    ORDER BY signal_date DESC
+                    LIMIT 1
+                """, (str(company_id),))
+                row = cur.fetchone()
+            finally:
+                cur.close()
+                conn.close()
+
+            if row:
+                meta = row[2]
+                if isinstance(meta, str):
+                    meta = json.loads(meta) if meta else {}
+                elif meta is None:
+                    meta = {}
+
+                comp = meta.get("component_scores", {})
+                result = {
+                    "overall_score": float(row[0]) if row[0] is not None else 50.0,
+                    "confidence": float(row[1]) if row[1] is not None else 0.5,
+                    "review_count": int(meta.get("review_count", 1)),
+                    "avg_rating": float(meta.get("avg_rating", 0.0)),
+                    "current_employee_ratio": float(meta.get("current_employee_ratio", 0.0)),
+                    "innovation_score": float(comp.get("innovation", 50.0)),
+                    "data_driven_score": float(comp.get("data_driven", 50.0)),
+                    "change_readiness_score": float(comp.get("change_readiness", 50.0)),
+                    "ai_awareness_score": float(comp.get("ai_awareness", 50.0)),
+                    "individual_mentions": 0,
+                    "positive_keywords": meta.get("positive_keywords", []),
+                    "negative_keywords": meta.get("negative_keywords", []),
+                }
+                logger.info(
+                    "glassdoor_from_external_signals",
+                    company_id=company_id,
+                    ticker=ticker,
+                    overall_score=result["overall_score"],
+                    review_count=result["review_count"],
+                )
+                return result
+        except Exception as exc:
+            logger.warning(
+                "glassdoor_external_signals_lookup_failed",
+                company_id=company_id,
+                error=str(exc),
+            )
+
+        # --- Secondary: try S3 via GlassdoorCollectionPipeline ---
         try:
             pipeline = GlassdoorCollectionPipeline()
             signal = pipeline.collect_and_analyze(company_id, ticker)
@@ -329,7 +545,7 @@ class ScoringIntegrationService:
             }
         except Exception as exc:
             logger.warning(
-                "glassdoor_collection_failed",
+                "glassdoor_s3_collection_failed",
                 company_id=company_id,
                 ticker=ticker,
                 error=str(exc),
@@ -618,3 +834,43 @@ class ScoringIntegrationService:
                 cur.close()
             if conn:
                 conn.close()
+
+
+    def _persist_assessment(self, result: Dict[str, Any]) -> None:
+        """
+        Step 13: Insert assessment directly into Snowflake.
+        Logs on failure but does NOT raise — scoring result is still returned.
+        """
+        settings = get_settings()
+        table = f"{settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.ASSESSMENTS"
+        assessment_id = str(uuid4())
+        try:
+            conn = get_connection()
+            cur = conn.cursor()
+            try:
+                cur.execute(f"""
+                    INSERT INTO {table} (id, company_id, assessment_type, status, primary_assessor)
+                    VALUES (%s, %s, %s, %s, %s)
+                """, (
+                    assessment_id,
+                    str(result["company_id"]),
+                    "ai_readiness",
+                    "completed",
+                    "CS3_AutoScorer",
+                ))
+                conn.commit()
+                logger.info(
+                    "assessment_persisted",
+                    company_id=result["company_id"],
+                    ticker=result["ticker"],
+                    assessment_id=assessment_id,
+                )
+            finally:
+                cur.close()
+                conn.close()
+        except Exception as exc:
+            logger.error(
+                "assessment_persist_failed",
+                ticker=result["ticker"],
+                error=str(exc),
+            )

@@ -1,0 +1,4 @@
+# file: D:\Work\SEMESTER_3\BIG_DATA\Case Study\case study BD\Case study 3\BigDataIA-Sat-Spring26-Team-2\app\pipelines\document_parser.py
+# hypothesis_version: 6.151.6
+
+[200, 500, 10000, 250000, '&', '&amp;', '&nbsp;', '.pdf', '10-K', '10-Q', '8-K', 'ANNUAL REPORT', 'CURRENT REPORT', 'DEF 14A', 'DEF-14A', 'ITEM\\s*8\\.01', 'Item\\s*8\\.01', 'Item\\s+\\d', 'PROXY STATEMENT', 'QUARTERLY REPORT', 'SCHEDULE 14A', 'UNKNOWN', '[_]{3,}', '\\b10-K\\b', '\\b10-Q\\b', '\\b8-K\\b', '\\s+', 'head', 'html', 'html.parser', 'ignore', 'item_1_business', 'item_1a_risk_factors', 'item_2_mda', 'item_7_mda', 'item_8_01_other', 'link', 'meta', 'pdf', 'r', 'script', 'style', 'utf-8']

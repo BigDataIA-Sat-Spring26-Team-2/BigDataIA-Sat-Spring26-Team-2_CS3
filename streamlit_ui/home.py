@@ -191,30 +191,30 @@ col1, col2 = st.columns(2)
 
 with col1:
     health = api.health_check()
-    if health.get("status") == "healthy":
+    api_status = health.get("status", "offline")
+    if api_status in ("healthy", "degraded"):
         st.success("**API Status:** ✅ Connected")
-        
+
         # Show dependency status
         deps = health.get("dependencies", {})
         if deps:
             st.caption("**Dependencies:**")
-            for dep, status in deps.items():
-                emoji = "✅" if status == "healthy" else "❌"
-                st.caption(f"  {emoji} {dep.title()}: {status}")
+            for dep, dep_status in deps.items():
+                emoji = "✅" if dep_status == "healthy" else "❌"
+                st.caption(f"  {emoji} {dep.title()}: {dep_status}")
     else:
         st.error("**API Status:** ❌ Offline")
-    
+
     st.caption(f"Endpoint: {st.session_state.api_base}")
 
 with col2:
     # Database info
-    if health.get("status") == "healthy":
-        deps = health.get("dependencies", {})
-        if deps.get("snowflake") == "healthy":
-            st.success("**Database:** ✅ Operational")
-            st.caption("Snowflake connection active")
-        else:
-            st.warning("**Database:** ⚠️ Issues detected")
+    deps = health.get("dependencies", {})
+    if deps.get("snowflake") == "healthy":
+        st.success("**Database:** ✅ Operational")
+        st.caption("Snowflake connection active")
+    elif api_status in ("healthy", "degraded"):
+        st.warning("**Database:** ⚠️ Issues detected")
     else:
         st.error("**Database:** ❌ Cannot connect")
 

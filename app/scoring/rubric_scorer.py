@@ -50,7 +50,9 @@ class RubricScorer:
             'ai_governance': self._score_ai_governance,
             'technology_stack': self._score_technology_stack,
             'talent_skills': self._score_talent,
+            'talent': self._score_talent,                # alias
             'leadership_vision': self._score_leadership,
+            'leadership': self._score_leadership,        # alias
             'use_case_portfolio': self._score_use_case_portfolio,
             'culture': self._score_culture,
         }
