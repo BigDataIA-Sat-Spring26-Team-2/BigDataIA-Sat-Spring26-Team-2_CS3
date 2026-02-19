@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 """
 CS3 Task 6.0b: ScoringIntegrationService
 
@@ -14,10 +15,17 @@ Evidence flow:
 """
 
 import json
+=======
+import httpx
+>>>>>>> origin/main
 import structlog
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 from decimal import Decimal
+<<<<<<< HEAD
 from uuid import uuid4
+=======
+from uuid import UUID
+>>>>>>> origin/main
 
 from app.config import get_settings
 from app.services.snowflake import get_connection
@@ -28,67 +36,11 @@ from app.scoring.talent_concentration import TalentConcentrationCalculator
 from app.scoring.position_factor import PositionFactorCalculator
 from app.scoring.vr_calculator import VRCalculator
 from app.scoring.hr_calculator import HRCalculator
+from app.scoring.synergy_calculator import SynergyCalculator
+from app.scoring.confidence_calculator import ConfidenceCalculator
 from app.pipelines.glassdoor_collector import GlassdoorCultureCollector, GlassdoorCollectionPipeline
 from app.pipelines.board_analyzer import BoardCompositionAnalyzer
-
-
-# ---------------------------------------------------------------------------
-# Adapter wrappers — insulate this service from teammate naming changes
-# ---------------------------------------------------------------------------
-
-def _load_synergy_calculator():
-    """
-    Adapter: load synergy calculator regardless of class name.
-    Tries known names in order. Returns an object with a .calculate() method.
-    """
-    try:
-        from app.scoring.synergy_calculator import SynergyCalculator
-        return SynergyCalculator()
-    except ImportError:
-        pass
-    try:
-        # teammate may have named it differently
-        import importlib, inspect
-        mod = importlib.import_module("app.scoring.synergy_calculator")
-        for name, obj in inspect.getmembers(mod, inspect.isclass):
-            if "synergy" in name.lower() or "Synergy" in name:
-                return obj()
-        # last resort: return first class in module
-        classes = [obj for _, obj in inspect.getmembers(mod, inspect.isclass)]
-        if classes:
-            return classes[0]()
-    except Exception:
-        pass
-    return None
-
-
-def _load_confidence_calculator():
-    """
-    Adapter: load confidence calculator regardless of class name.
-    Tries known names in order. Returns an object with a .calculate() method.
-    """
-    try:
-        from app.scoring.confidence import ConfidenceCalculator
-        return ConfidenceCalculator()
-    except ImportError:
-        pass
-    try:
-        import importlib, inspect
-        mod = importlib.import_module("app.scoring.confidence")
-        for name, obj in inspect.getmembers(mod, inspect.isclass):
-            if "confidence" in name.lower() or "Confidence" in name:
-                return obj()
-        classes = [obj for _, obj in inspect.getmembers(mod, inspect.isclass)]
-        if classes:
-            return classes[0]()
-    except Exception:
-        pass
-    return None
-
-
-# ---------------------------------------------------------------------------
-# Service
-# ---------------------------------------------------------------------------
+from app.services.evidence_counter import get_total_evidence_count, get_evidence_breakdown  # ✅ NEW
 
 logger = structlog.get_logger()
 
@@ -107,6 +59,8 @@ class ScoringIntegrationService:
         self.pf_calculator = PositionFactorCalculator()
         self.vr_calculator = VRCalculator()
         self.hr_calculator = HRCalculator()
+        self.synergy_calculator = SynergyCalculator()
+        self.ci_calculator = ConfidenceCalculator()
         self.glassdoor_collector = GlassdoorCultureCollector()
         self.board_analyzer = BoardCompositionAnalyzer()
 
@@ -127,24 +81,16 @@ class ScoringIntegrationService:
         """
         Run the full Org-AI-R scoring pipeline for a ticker.
 
-        Steps:
-          1  Fetch company metadata from CS1
-          2  Fetch CS2 external signals
-          3  Collect Glassdoor culture signal
-          4  Collect board composition signal
-          5  Build EvidenceScore list
-          6  Map evidence → 7 dimension scores
-          7  Calculate talent concentration (TC)
-          8  Calculate V^R
-          9  Calculate H^R (requires position factor)
-          10 Calculate synergy / alignment → Org-AI-R score
-          11 Calculate confidence interval
-          12 Build result dict
-          13 Persist assessment to CS1
-        """
-        logger.info("score_company_started", ticker=ticker)
+        Args:
+            ticker: Company ticker symbol
+            market_cap_percentile: Market cap percentile within sector (0-1)
 
-        # Step 1 ─────────────────────────────────────────────────────────────
+        Returns:
+            Complete assessment with all calculation details
+        """
+        logger.info("score_company_started", ticker=ticker, market_cap_percentile=market_cap_percentile)
+
+        # Step 1: Fetch company ────────────────────────────────────────────
         company = self._fetch_company(ticker)
         company_id = company["id"]
         sector = self._get_sector_from_db(company_id)
@@ -155,18 +101,17 @@ class ScoringIntegrationService:
             ticker=ticker,
             company_id=company_id,
             sector=sector,
-            market_cap_percentile=market_cap_percentile,
+            industry_id=industry_id,
         )
 
-        # Step 2 ─────────────────────────────────────────────────────────────
+        # Step 2: Fetch CS2 evidence ───────────────────────────────────────
         cs2_evidence = self._fetch_cs2_evidence(company_id)
         logger.info(
             "cs2_evidence_fetched",
             signal_count=len(cs2_evidence.get("signals", [])),
-            job_signal_count=len(cs2_evidence.get("job_postings", [])),
         )
 
-        # Step 3 ─────────────────────────────────────────────────────────────
+        # Step 3: Collect Glassdoor ────────────────────────────────────────
         glassdoor = self._collect_glassdoor(company_id, ticker)
         logger.info(
             "glassdoor_collected",
@@ -174,24 +119,19 @@ class ScoringIntegrationService:
             review_count=glassdoor.get("review_count"),
         )
 
-        # Step 4 ─────────────────────────────────────────────────────────────
+        # Step 4: Collect Board ────────────────────────────────────────────
         board = self._collect_board(company_id, ticker)
         logger.info(
             "board_collected",
             governance_score=board.get("governance_score"),
         )
 
-        # Step 5 ─────────────────────────────────────────────────────────────
-        evidence_scores: List[EvidenceScore] = self._build_evidence_scores(
-            cs2_evidence, glassdoor, board
-        )
+        # Step 5: Build evidence scores ────────────────────────────────────
+        evidence_scores = self._build_evidence_scores(cs2_evidence, glassdoor, board)
         logger.info("evidence_scores_built", count=len(evidence_scores))
 
-        # Step 6 ─────────────────────────────────────────────────────────────
-        dimension_score_objects = self.evidence_mapper.map_evidence_to_dimensions(
-            evidence_scores
-        )
-        # VRCalculator expects Dict[str, float]
+        # Step 6: Map to dimensions ────────────────────────────────────────
+        dimension_score_objects = self.evidence_mapper.map_evidence_to_dimensions(evidence_scores)
         dimension_scores: Dict[str, float] = {
             dim.value: float(ds.score)
             for dim, ds in dimension_score_objects.items()
@@ -254,7 +194,7 @@ class ScoringIntegrationService:
         tc = float(tc_decimal)
         logger.info("talent_concentration_calculated", tc=tc)
 
-        # Step 8: V^R ─────────────────────────────────────────────────────────
+        # Step 8: Calculate V^R ────────────────────────────────────────────
         vr_result = self.vr_calculator.calculate(
             dimension_scores=dimension_scores,
             talent_concentration=tc,
@@ -262,17 +202,18 @@ class ScoringIntegrationService:
         )
         logger.info("vr_calculated", vr_score=float(vr_result.vr_score))
 
-        # Step 9: Position factor + H^R ───────────────────────────────────────
+        # Step 9: Calculate Position Factor + H^R ──────────────────────────
         position_factor_decimal = self.pf_calculator.calculate_position_factor(
             vr_score=float(vr_result.vr_score),
             sector=sector,
-            market_cap_percentile=market_cap_percentile,
+            market_cap_percentile=market_cap_percentile,  # ✅ Use user input
         )
         position_factor = float(position_factor_decimal)
 
         hr_result = self.hr_calculator.calculate(
             sector=sector,
             position_factor=position_factor,
+            industry_id=industry_id,
         )
         logger.info(
             "hr_calculated",
@@ -280,69 +221,63 @@ class ScoringIntegrationService:
             position_factor=position_factor,
         )
 
-        # Step 10: Alignment + synergy → Org-AI-R score ───────────────────────
+        # Step 10: Calculate Synergy ───────────────────────────────────────
         alignment = self._calculate_alignment(vr_result, hr_result)
 
-        if self.synergy_calculator is not None:
-            try:
-                synergy_result = self.synergy_calculator.calculate(
-                    vr_score=vr_result.vr_score,
-                    hr_score=hr_result.hr_score,
-                    alignment=alignment,
-                    timing_factor=Decimal("1.0"),
-                )
-                # Duck-type: try attribute then dict access
-                try:
-                    synergy_score = Decimal(str(synergy_result.synergy_score))
-                except AttributeError:
-                    try:
-                        synergy_score = Decimal(str(synergy_result["synergy_score"]))
-                    except (KeyError, TypeError):
-                        synergy_score = Decimal(str(synergy_result)) if synergy_result is not None else Decimal("0")
-            except Exception as exc:
-                logger.warning("synergy_calculator_failed", error=str(exc))
-                synergy_score = self._inline_synergy(vr_result, hr_result, alignment)
-        else:
-            synergy_score = self._inline_synergy(vr_result, hr_result, alignment)
+        synergy_result = self.synergy_calculator.calculate(
+            vr_score=float(vr_result.vr_score),
+            hr_score=float(hr_result.hr_score),
+            alignment=alignment,
+            timing_factor=1.0,
+        )
+        logger.info("synergy_calculated", synergy_score=float(synergy_result.synergy_score))
 
-        logger.info("synergy_calculated", synergy_score=float(synergy_score))
+        alpha = Decimal("0.60")  # Idiosyncratic weight
+        beta = Decimal("0.12")   # Synergy weight
 
-        # Org-AI-R = weighted combination adjusted by alignment
-        # VR carries 70% weight (company-specific readiness);
-        # HR carries 30% weight (industry context).
-        # Alignment multiplier: perfect alignment → full score, misalignment penalises.
-        alignment_multiplier = Decimal("0.80") + Decimal("0.20") * Decimal(str(alignment))
-        org_air_raw = (
-            Decimal("0.70") * vr_result.vr_score
-            + Decimal("0.30") * hr_result.hr_score
-        ) * alignment_multiplier
-        final_score = max(Decimal("0"), min(Decimal("100"), org_air_raw))
+        weighted_components = (
+            alpha * vr_result.vr_score + 
+            (Decimal("1") - alpha) * hr_result.hr_score
+        )
+        final_score = (
+            (Decimal("1") - beta) * weighted_components + 
+            beta * synergy_result.synergy_score
+        )
+        
+        # Clamp to [0, 100]
+        final_score = max(Decimal("0"), min(Decimal("100"), final_score))
+        
         logger.info("org_air_score_computed", final_score=float(final_score))
 
-        # Step 11: Confidence interval ────────────────────────────────────────
-        total_evidence = len(evidence_scores)
-        ci_lower, ci_upper, confidence = self._calculate_ci(
-            final_score=final_score,
+        # Step 11: Calculate Confidence Interval ───────────────────────────
+        total_evidence = get_total_evidence_count(UUID(company_id))
+        evidence_breakdown_dict = get_evidence_breakdown(UUID(company_id))
+        
+        logger.info(
+            "evidence_summary",
+            ticker=ticker,
             total_evidence=total_evidence,
+            breakdown={k: v["evidence_count"] for k, v in evidence_breakdown_dict.items()}
         )
 
-        # Step 12: Build result dict ──────────────────────────────────────────
+        ci_result = self.ci_calculator.calculate(
+            score=float(final_score),
+            score_type="org_air",
+            evidence_count=total_evidence,
+        )
+
+        # Step 12: Build result
         result = {
             "company_id": company_id,
             "ticker": ticker,
             "sector": sector,
+            
             # Core scores
             "vr_score": float(vr_result.vr_score),
             "hr_score": float(hr_result.hr_score),
-            "synergy_score": float(synergy_score),
-            "org_air_score": float(final_score),
-            # Confidence interval
-            "ci_lower": float(ci_lower),
-            "ci_upper": float(ci_upper),
-            "confidence": float(confidence),
-            # Contributing factors
-            "alignment": alignment,
-            "talent_concentration": tc,
+            "synergy_score": float(synergy_result.synergy_score),
+            "final_score": float(final_score),
+            
             "position_factor": position_factor,
             # Dimension detail
             "dimension_scores": dimension_scores,
@@ -356,24 +291,54 @@ class ScoringIntegrationService:
             "path_b_scores": path_b_scores,
             # Evidence provenance
             "evidence_count": total_evidence,
-            "glassdoor_review_count": review_count,
-            "board_governance_score": board.get("governance_score", 50.0),
+            "evidence_breakdown": {k: v["evidence_count"] for k, v in evidence_breakdown_dict.items()},
+            
+            # Dimension scores
+            "dimension_scores": dimension_scores,
+            
+            # V^R components (for calculation_details)
+            "vr_components": {
+                "weighted_mean": float(vr_result.weighted_mean),
+                "cv": float(vr_result.cv),
+                "cv_penalty": float(vr_result.cv_penalty),
+                "cv_penalty_amount": float(vr_result.cv_penalty_amount),
+                "tc": float(vr_result.talent_concentration),
+                "tc_penalty": float(vr_result.talent_risk_adj),
+                "tc_penalty_amount": float(vr_result.tc_penalty_amount),
+            },
+            
+            # H^R components (for calculation_details)
+            "hr_components": {
+                "hr_base": float(hr_result.hr_base),
+                "position_adjustment": float(hr_result.position_adjustment),
+            },
+            
+            # Synergy components (for calculation_details)
+            "synergy_components": {
+                "base_synergy": float(synergy_result.base_synergy),
+                "alignment": float(synergy_result.alignment),
+                "timing_factor": float(synergy_result.timing_factor),
+            },
+            
+            # Formula constants
+            "formula_constants": {
+                "alpha": 0.60,
+                "beta": 0.12,
+            }
         }
 
-        # Step 13: Persist ────────────────────────────────────────────────────
+        # Step 13: Persist
         self._persist_assessment(result)
 
         logger.info(
             "score_company_completed",
             ticker=ticker,
-            org_air_score=float(final_score),
-            confidence=float(confidence),
+            final_score=float(final_score),
+            evidence_count=total_evidence,
         )
+        
         return result
 
-    # -----------------------------------------------------------------------
-    # Step helpers
-    # -----------------------------------------------------------------------
 
     def _get_sector_from_db(self, company_id: str) -> str:
         """Look up sector by joining companies → industries in Snowflake."""
@@ -577,22 +542,12 @@ class ScoringIntegrationService:
             return _fallback
 
     def _collect_board(self, company_id: str, ticker: str) -> Dict[str, Any]:
-        """
-        Step 4: Analyze board composition from proxy filings in Snowflake.
-        Returns a plain dict for uniform downstream access.
-        Falls back to neutral defaults on any error or when no data found.
-        """
+        """Step 4: Collect board composition signal"""
         _fallback = {"governance_score": 50.0, "confidence": 0.5}
         try:
             result = self.board_analyzer.analyze_company_governance(ticker)
             if result is None:
-                logger.warning(
-                    "board_analysis_returned_none",
-                    company_id=company_id,
-                    ticker=ticker,
-                )
                 return _fallback
-            # GovernanceSignal is a Pydantic model; access attributes directly.
             return {
                 "governance_score": float(result.governance_score),
                 "confidence": float(result.confidence),
@@ -616,12 +571,10 @@ class ScoringIntegrationService:
         glassdoor: Dict[str, Any],
         board: Dict[str, Any],
     ) -> List[EvidenceScore]:
-        """
-        Step 5: Convert CS2 signals + Glassdoor + board dict into EvidenceScore list.
-        Skips signals whose 'category' field doesn't map to a known SignalSource.
-        """
+        """Step 5: Build EvidenceScore list from all sources"""
         evidence_scores: List[EvidenceScore] = []
 
+        # CS2 signals
         for signal in cs2_evidence.get("signals", []):
             try:
                 source = SignalSource(signal["category"])
@@ -639,12 +592,12 @@ class ScoringIntegrationService:
                     source=source,
                     score=score,
                     confidence=conf,
-                    raw_value=str(signal.get("id", "")),
-                    metadata={"evidence_count": 1},
+                    raw_value=str(signal.get("raw_value", "")),
+                    metadata=signal.get("metadata", {}),
                 )
             )
 
-        # Glassdoor culture signal
+        # Glassdoor
         glassdoor_score = Decimal(str(glassdoor.get("overall_score", 50)))
         glassdoor_conf = Decimal(str(glassdoor.get("confidence", 0.5)))
         evidence_scores.append(
@@ -653,11 +606,14 @@ class ScoringIntegrationService:
                 score=glassdoor_score,
                 confidence=glassdoor_conf,
                 raw_value="glassdoor_overall",
-                metadata={"evidence_count": 1},
+                metadata={
+                    "review_count": glassdoor.get("review_count", 0),
+                    "individual_mentions": glassdoor.get("individual_mentions", 0),
+                },
             )
         )
 
-        # Board composition signal
+        # Board composition
         board_score = Decimal(str(board.get("governance_score", 50)))
         board_conf = Decimal(str(board.get("confidence", 0.5)))
         evidence_scores.append(
@@ -666,81 +622,25 @@ class ScoringIntegrationService:
                 score=board_score,
                 confidence=board_conf,
                 raw_value="board_composition",
-                metadata={"evidence_count": 1},
+                metadata=board,
             )
         )
 
         return evidence_scores
 
-    # -----------------------------------------------------------------------
-    # Calculation helpers
-    # -----------------------------------------------------------------------
-
     def _calculate_alignment(self, vr_result, hr_result) -> float:
         """
-        Alignment = 1.0 - |VR - HR| / 100, clamped to [0.0, 1.0].
-        High alignment means company readiness mirrors industry expectations.
+        Calculate alignment between V^R and H^R.
+        
+        Formula: Alignment = 1.0 - |V^R - H^R| / 100
+        
+        Perfect alignment (same scores) = 1.0
+        Maximum misalignment (100 points apart) = 0.0
         """
-        raw = 1.0 - abs(float(vr_result.vr_score) - float(hr_result.hr_score)) / 100.0
-        return max(0.0, min(1.0, raw))
-
-    def _inline_synergy(self, vr_result, hr_result, alignment: float) -> Decimal:
-        """
-        Inline synergy when teammate's SynergyCalculator is unavailable.
-        Formula: synergy = (VR * HR / 100) * alignment * 1.0
-        Produces a value in [0, 100].
-        """
-        return (
-            vr_result.vr_score * hr_result.hr_score / Decimal("100")
-        ) * Decimal(str(alignment)) * Decimal("1.0")
-
-    def _calculate_ci(
-        self,
-        final_score: Decimal,
-        total_evidence: int,
-    ):
-        """
-        Step 11: Calculate confidence interval.
-        Delegates to teammate's ConfidenceCalculator when available.
-        Falls back to ±5 pt stub with confidence=0.7.
-
-        Returns (ci_lower, ci_upper, confidence) as Decimals, clamped to [0,100].
-        """
-        if self.ci_calculator is not None:
-            try:
-                ci_result = self.ci_calculator.calculate(
-                    score=final_score,
-                    score_type="org_air",
-                    evidence_count=total_evidence,
-                )
-                # Duck-type: try attribute access first, then dict
-                try:
-                    ci_lower = Decimal(str(ci_result.ci_lower))
-                    ci_upper = Decimal(str(ci_result.ci_upper))
-                    confidence = Decimal(str(ci_result.confidence))
-                except AttributeError:
-                    ci_lower = Decimal(str(ci_result["ci_lower"]))
-                    ci_upper = Decimal(str(ci_result["ci_upper"]))
-                    confidence = Decimal(str(ci_result["confidence"]))
-            except Exception as exc:
-                logger.warning("confidence_calculator_failed", error=str(exc))
-                ci_lower = final_score - Decimal("5")
-                ci_upper = final_score + Decimal("5")
-                confidence = Decimal("0.7")
-        else:
-            ci_lower = final_score - Decimal("5")
-            ci_upper = final_score + Decimal("5")
-            confidence = Decimal("0.7")
-
-        # Clamp to valid range
-        ci_lower = max(Decimal("0"), ci_lower)
-        ci_upper = min(Decimal("100"), ci_upper)
-
-        return ci_lower, ci_upper, confidence
-
-    # -----------------------------------------------------------------------
-    # Persistence
-    # -----------------------------------------------------------------------
+        vr = float(vr_result.vr_score)
+        hr = float(hr_result.hr_score)
+        alignment = 1.0 - abs(vr - hr) / 100.0
+        return max(0.0, min(1.0, alignment))
 
     def _persist_assessment(self, result: Dict[str, Any]) -> None:
         """
@@ -777,7 +677,6 @@ class ScoringIntegrationService:
         except Exception as exc:
             logger.error(
                 "assessment_persist_failed",
-                company_id=result["company_id"],
                 ticker=result["ticker"],
                 error=str(exc),
             )
