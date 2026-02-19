@@ -2,8 +2,9 @@ import httpx
 import structlog
 from typing import Dict, Any, List
 from decimal import Decimal
-from uuid import UUID
-
+from uuid import UUID, uuid4
+import json
+from datetime import date, datetime, timezone
 from app.scoring.evidence_mapper import EvidenceMapper, EvidenceScore, SignalSource, Dimension
 from app.scoring.rubric_scorer import RubricScorer
 from app.scoring.talent_concentration import TalentConcentrationCalculator
@@ -14,7 +15,9 @@ from app.scoring.synergy_calculator import SynergyCalculator
 from app.scoring.confidence_calculator import ConfidenceCalculator
 from app.pipelines.glassdoor_collector import GlassdoorCultureCollector, GlassdoorCollectionPipeline
 from app.pipelines.board_analyzer import BoardCompositionAnalyzer
-from app.services.evidence_counter import get_total_evidence_count, get_evidence_breakdown  # ✅ NEW
+from app.services.evidence_counter import get_total_evidence_count, get_evidence_breakdown
+from app.config import get_settings
+from app.services.snowflake import get_connection
 
 logger = structlog.get_logger()
 
@@ -27,11 +30,9 @@ class ScoringIntegrationService:
 
     def __init__(
         self,
-        cs1_api_url: str = "http://localhost:8000",
-        cs2_api_url: str = "http://localhost:8001",
+        cs1_api_url: str = "http://localhost:8000"
     ):
         self.cs1_url = cs1_api_url
-        self.cs2_url = cs2_api_url
 
         # Initialize all components
         self.evidence_mapper = EvidenceMapper()
@@ -287,7 +288,7 @@ class ScoringIntegrationService:
 
     def _fetch_cs2_evidence(self, company_id: str) -> Dict[str, Any]:
         """Step 2: Fetch from CS2 API"""
-        url = f"{self.cs2_url}/api/v1/signals"
+        url = f"{self.cs1_url}/api/v1/signals"
         response = self.http.get(
             url,
             params={"company_id": company_id, "limit": 200},
@@ -436,63 +437,185 @@ class ScoringIntegrationService:
         alignment = 1.0 - abs(vr - hr) / 100.0
         return max(0.0, min(1.0, alignment))
 
-    def _persist_assessment(self, result: Dict[str, Any]) -> None:
-        """
-        Step 13: Persist assessment to CS1 database.
-        
-        Creates assessment with all calculation details stored.
-        """
-        # Build calculation details JSON
-        calculation_details = {
-            "vr_components": result.get("vr_components", {}),
-            "hr_components": result.get("hr_components", {}),
-            "synergy_components": result.get("synergy_components", {}),
-            "evidence_breakdown": result.get("evidence_breakdown", {}),
-            "dimension_scores": result.get("dimension_scores", {}),
-            "formula_constants": result.get("formula_constants", {}),
-            "market_cap_percentile": result.get("market_cap_percentile"),
-        }
 
-        url = f"{self.cs1_url}/api/v1/assessments"
-        payload = {
-            "company_id": result["company_id"],
-            "assessment_type": "screening",
-            "assessment_date": "2026-02-18",
-            "primary_assessor": "CS3_Integration_Service",
-            "status": "submitted",
-            
-            # Scores
-            "v_r_score": result["vr_score"],
-            "hr_score": result["hr_score"],
-            "synergy_score": result["synergy_score"],
-            "final_score": result["final_score"],
-            
-            # Metrics
-            "position_factor": result["position_factor"],
-            "talent_concentration": result["talent_concentration"],
-            "evidence_count": result["evidence_count"],
-            
-            # Confidence
-            "confidence_lower": result["ci_lower"],
-            "confidence_upper": result["ci_upper"],
-            "confidence_level": result["confidence"],
-            
-            # Full breakdown
-            "calculation_details": calculation_details,
-        }
+    def _persist_assessment(self, result: Dict[str, Any]) -> str:
+        settings = get_settings()
+        conn = None
+        cur = None
 
         try:
-            resp = self.http.post(url, json=payload)
-            resp.raise_for_status()
-            assessment_id = resp.json().get("id")
+            conn = get_connection()
+            cur = conn.cursor()
+            
+            company_id = result["company_id"]
+            
+            # DEDUPLICATION: Check for existing assessment for this company
+            check_sql = f"""
+                SELECT id, created_at
+                FROM {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.assessments
+                WHERE company_id = %s
+                ORDER BY created_at DESC
+                LIMIT 1
+            """
+            
+            cur.execute(check_sql, (company_id,))
+            existing = cur.fetchone()
+            
+            # Build calculation details JSON
+            calculation_details = {
+                "vr_components": result.get("vr_components", {}),
+                "hr_components": result.get("hr_components", {}),
+                "synergy_components": result.get("synergy_components", {}),
+                "evidence_breakdown": result.get("evidence_breakdown", {}),
+                "dimension_scores": result.get("dimension_scores", {}),
+                "formula_constants": result.get("formula_constants", {}),
+            }
+            
+            if existing:
+                # UPDATE existing assessment
+                assessment_id = existing[0]
+                existing_created = existing[1]
+                
+                logger.info(
+                    "existing_assessment_found",
+                    company_id=company_id,
+                    assessment_id=assessment_id,
+                    existing_created=existing_created,
+                    action="updating"
+                )
+                
+                update_sql = f"""
+                    UPDATE {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.assessments
+                    SET
+                        assessment_date = %s,
+                        v_r_score = %s,
+                        hr_score = %s,
+                        synergy_score = %s,
+                        final_score = %s,
+                        position_factor = %s,
+                        talent_concentration = %s,
+                        market_cap_percentile = %s,
+                        evidence_count = %s,
+                        confidence_level = %s,
+                        sem = %s,
+                        ci_lower = %s,
+                        ci_upper = %s,
+                        calculation_details = PARSE_JSON(%s)
+                    WHERE id = %s
+                """
+                
+                cur.execute(
+                    update_sql,
+                    (
+                        date.today(),
+                        result["vr_score"],
+                        result["hr_score"],
+                        result["synergy_score"],
+                        result["final_score"],
+                        result["position_factor"],
+                        result["talent_concentration"],
+                        result["market_cap_percentile"],
+                        result["evidence_count"],
+                        result["confidence"],
+                        result["sem"],
+                        result["ci_lower"],
+                        result["ci_upper"],
+                        json.dumps(calculation_details),
+                        assessment_id,
+                    ),
+                )
+                
+                logger.info(
+                    "assessment_updated",
+                    ticker=result["ticker"],
+                    assessment_id=assessment_id,
+                    final_score=result["final_score"]
+                )
+                
+            else:
+                # INSERT new assessment
+                assessment_id = str(uuid4())
+                
+                logger.info(
+                    "no_existing_assessment",
+                    company_id=company_id,
+                    action="inserting_new"
+                )
+                
+                insert_sql = f"""
+                    INSERT INTO {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.assessments (
+                        id, company_id, assessment_date,
+                        v_r_score, hr_score, synergy_score, final_score,
+                        position_factor, talent_concentration, market_cap_percentile,
+                        evidence_count, confidence_level, sem, ci_lower, ci_upper,
+                        calculation_details,
+                        created_at
+                    )
+                    SELECT
+                        %s, %s, %s, %s,
+                        %s, %s, %s, %s,
+                        %s, %s, %s,
+                        %s, %s, %s, %s, %s,
+                        PARSE_JSON(%s),
+                        %s
+                """
+                
+                cur.execute(
+                    insert_sql,
+                    (
+                        assessment_id,
+                        company_id,
+                        date.today(),
+                        'submitted',
+                        result["vr_score"],
+                        result["hr_score"],
+                        result["synergy_score"],
+                        result["final_score"],
+                        result["position_factor"],
+                        result["talent_concentration"],
+                        result["market_cap_percentile"],
+                        result["evidence_count"],
+                        result["confidence"],
+                        result["sem"],
+                        result["ci_lower"],
+                        result["ci_upper"],
+                        json.dumps(calculation_details),
+                        datetime.now(timezone.utc),
+                    ),
+                )
+                
+                logger.info(
+                    "assessment_inserted",
+                    ticker=result["ticker"],
+                    assessment_id=assessment_id,
+                    final_score=result["final_score"]
+                )
+            
+            conn.commit()
+            
             logger.info(
                 "assessment_persisted",
                 ticker=result["ticker"],
                 assessment_id=assessment_id,
+                final_score=result["final_score"],
+                evidence_count=result["evidence_count"],
+                was_update=existing is not None
             )
-        except Exception as exc:
+            
+            return assessment_id
+            
+        except Exception as e:
+            if conn:
+                conn.rollback()
             logger.error(
                 "assessment_persist_failed",
-                ticker=result["ticker"],
-                error=str(exc),
+                ticker=result.get("ticker"),
+                error=str(e)
             )
+            raise
+            
+        finally:
+            if cur:
+                cur.close()
+            if conn:
+                conn.close()
