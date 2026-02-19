@@ -259,7 +259,7 @@ class APIClient:
         response = requests.get(
             f"{self.base_url}/scoring/companies/{company_id}/dimensions",
             params={"include_audit_trail": True},
-            timeout=30
+            timeout=300
         )
         return self._handle_response(response)
 
@@ -267,7 +267,7 @@ class APIClient:
         """Calculate full Org-AI-R score for a company"""
         response = requests.get(
             f"{self.base_url}/scoring/companies/{company_id}/org-air",
-            timeout=180
+            timeout=300
         )
         return self._handle_response(response)
 

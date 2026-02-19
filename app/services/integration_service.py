@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 """
 CS3 Task 6.0b: ScoringIntegrationService
 
@@ -15,17 +14,10 @@ Evidence flow:
 """
 
 import json
-=======
-import httpx
->>>>>>> origin/main
 import structlog
 from typing import Dict, Any, List
 from decimal import Decimal
-<<<<<<< HEAD
-from uuid import uuid4
-=======
-from uuid import UUID
->>>>>>> origin/main
+from uuid import UUID, uuid4
 
 from app.config import get_settings
 from app.services.snowflake import get_connection
@@ -40,7 +32,8 @@ from app.scoring.synergy_calculator import SynergyCalculator
 from app.scoring.confidence_calculator import ConfidenceCalculator
 from app.pipelines.glassdoor_collector import GlassdoorCultureCollector, GlassdoorCollectionPipeline
 from app.pipelines.board_analyzer import BoardCompositionAnalyzer
-from app.services.evidence_counter import get_total_evidence_count, get_evidence_breakdown  # ✅ NEW
+from app.services.evidence_counter import get_total_evidence_count, get_evidence_breakdown  
+
 
 logger = structlog.get_logger()
 
@@ -64,15 +57,6 @@ class ScoringIntegrationService:
         self.glassdoor_collector = GlassdoorCultureCollector()
         self.board_analyzer = BoardCompositionAnalyzer()
 
-        # Teammate modules — loaded via adapters, may be None if not yet created
-        self.synergy_calculator = _load_synergy_calculator()
-        self.ci_calculator = _load_confidence_calculator()
-
-        if not self.synergy_calculator:
-            logger.warning("synergy_calculator_not_available")
-        if not self.ci_calculator:
-            logger.warning("confidence_calculator_not_available")
-
     # -----------------------------------------------------------------------
     # Public entry point
     # -----------------------------------------------------------------------
@@ -88,11 +72,12 @@ class ScoringIntegrationService:
         Returns:
             Complete assessment with all calculation details
         """
-        logger.info("score_company_started", ticker=ticker, market_cap_percentile=market_cap_percentile)
+        logger.info("score_company_started", ticker=ticker)
 
         # Step 1: Fetch company ────────────────────────────────────────────
         company = self._fetch_company(ticker)
         company_id = company["id"]
+        industry_id = company.get("industry_id")
         sector = self._get_sector_from_db(company_id)
         market_cap_percentile = float(company.get("market_cap_percentile", 0.5))
 
@@ -101,7 +86,7 @@ class ScoringIntegrationService:
             ticker=ticker,
             company_id=company_id,
             sector=sector,
-            industry_id=industry_id,
+            market_cap_percentile=market_cap_percentile,
         )
 
         # Step 2: Fetch CS2 evidence ───────────────────────────────────────
@@ -271,31 +256,43 @@ class ScoringIntegrationService:
             "company_id": company_id,
             "ticker": ticker,
             "sector": sector,
-            
+
             # Core scores
             "vr_score": float(vr_result.vr_score),
             "hr_score": float(hr_result.hr_score),
             "synergy_score": float(synergy_result.synergy_score),
+            "org_air_score": float(final_score),
             "final_score": float(final_score),
-            
+
+            # Alignment & contributing factors
+            "alignment": alignment,
+            "talent_concentration": tc,
             "position_factor": position_factor,
+
+            # Confidence interval
+            "ci_lower": float(ci_result.ci_lower),
+            "ci_upper": float(ci_result.ci_upper),
+            "confidence": float(ci_result.confidence),
+
             # Dimension detail
             "dimension_scores": dimension_scores,
+
             # VR penalty breakdown for transparency
             "vr_weighted_mean": float(vr_result.weighted_mean),
             "vr_cv": float(vr_result.cv),
             "vr_cv_penalty_amount": float(vr_result.cv_penalty_amount),
             "vr_tc_penalty_amount": float(vr_result.tc_penalty_amount),
+
             # Path A / Path B breakdown
             "path_a_scores": path_a_scores,
             "path_b_scores": path_b_scores,
+
             # Evidence provenance
             "evidence_count": total_evidence,
             "evidence_breakdown": {k: v["evidence_count"] for k, v in evidence_breakdown_dict.items()},
-            
-            # Dimension scores
-            "dimension_scores": dimension_scores,
-            
+            "glassdoor_review_count": glassdoor.get("review_count", 0),
+            "board_governance_score": board.get("governance_score", 50.0),
+
             # V^R components (for calculation_details)
             "vr_components": {
                 "weighted_mean": float(vr_result.weighted_mean),
@@ -306,25 +303,25 @@ class ScoringIntegrationService:
                 "tc_penalty": float(vr_result.talent_risk_adj),
                 "tc_penalty_amount": float(vr_result.tc_penalty_amount),
             },
-            
+
             # H^R components (for calculation_details)
             "hr_components": {
                 "hr_base": float(hr_result.hr_base),
                 "position_adjustment": float(hr_result.position_adjustment),
             },
-            
+
             # Synergy components (for calculation_details)
             "synergy_components": {
                 "base_synergy": float(synergy_result.base_synergy),
                 "alignment": float(synergy_result.alignment),
                 "timing_factor": float(synergy_result.timing_factor),
             },
-            
+
             # Formula constants
             "formula_constants": {
                 "alpha": 0.60,
                 "beta": 0.12,
-            }
+            },
         }
 
         # Step 13: Persist
