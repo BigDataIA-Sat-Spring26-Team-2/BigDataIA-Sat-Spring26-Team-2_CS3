@@ -261,6 +261,14 @@ class APIClient:
         )
         return self._handle_response(response)
 
+    def get_org_air_score(self, company_id: str) -> Dict[str, Any]:
+        """Calculate full Org-AI-R score for a company"""
+        response = requests.get(
+            f"{self.base_url}/scoring/companies/{company_id}/org-air",
+            timeout=180
+        )
+        return self._handle_response(response)
+
     def get_cached_memo(self, ticker: str, company_id: str) -> Optional[Dict[str, Any]]:
         """Fetch the most recent memo from S3 if it exists. Returns None if not found."""
         try:

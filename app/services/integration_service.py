@@ -13,12 +13,16 @@ Evidence flow:
   → persist to CS1
 """
 
-import httpx
+import json
 import structlog
 from typing import Dict, Any, List, Optional
 from decimal import Decimal
+from uuid import uuid4
 
+from app.config import get_settings
+from app.services.snowflake import get_connection
 from app.scoring.evidence_mapper import EvidenceMapper, EvidenceScore, SignalSource, Dimension
+from app.scoring.evidence_helpers import get_dimension_evidence
 from app.scoring.rubric_scorer import RubricScorer
 from app.scoring.talent_concentration import TalentConcentrationCalculator
 from app.scoring.position_factor import PositionFactorCalculator
@@ -95,14 +99,7 @@ class ScoringIntegrationService:
     CS3 Task 6.0b implementation.
     """
 
-    def __init__(
-        self,
-        cs1_api_url: str = "http://localhost:8000",
-        cs2_api_url: str = "http://localhost:8001",
-    ):
-        self.cs1_url = cs1_api_url
-        self.cs2_url = cs2_api_url
-
+    def __init__(self):
         # Confirmed existing components
         self.evidence_mapper = EvidenceMapper()
         self.rubric_scorer = RubricScorer()
@@ -121,8 +118,6 @@ class ScoringIntegrationService:
             logger.warning("synergy_calculator_not_available")
         if not self.ci_calculator:
             logger.warning("confidence_calculator_not_available")
-
-        self.http = httpx.Client(timeout=30.0)
 
     # -----------------------------------------------------------------------
     # Public entry point
@@ -201,6 +196,50 @@ class ScoringIntegrationService:
             dim.value: float(ds.score)
             for dim, ds in dimension_score_objects.items()
         }
+
+        # Step 6b: Run Rubric Scorer (Path B) and blend with Path A ─────────
+        path_a_scores = dict(dimension_scores)  # save raw Path A
+        path_b_scores: Dict[str, Any] = {}
+
+        BLEND_DIMENSIONS = [
+            "data_infrastructure", "ai_governance", "technology_stack",
+            "talent", "leadership", "use_case_portfolio", "culture",
+        ]
+        for dim_name in BLEND_DIMENSIONS:
+            try:
+                evidence_text, metrics = get_dimension_evidence(
+                    company_id, ticker, dim_name
+                )
+                if evidence_text:
+                    rubric_result = self.rubric_scorer.score_dimension(
+                        dim_name, evidence_text, metrics
+                    )
+                    path_b_scores[dim_name] = {
+                        "score": float(rubric_result.score),
+                        "level": str(rubric_result.level),
+                        "rationale": rubric_result.rationale,
+                    }
+            except Exception as e:
+                logger.warning(
+                    "rubric_scoring_failed_integration",
+                    dimension=dim_name,
+                    error=str(e),
+                )
+
+        # Blend: Combined = 0.6 * Path A + 0.4 * Path B
+        for dim_name in BLEND_DIMENSIONS:
+            if dim_name in path_b_scores:
+                pa = path_a_scores[dim_name]
+                pb = path_b_scores[dim_name]["score"]
+                blended = round(pa * 0.6 + pb * 0.4, 2)
+                dimension_scores[dim_name] = max(0.0, min(100.0, blended))
+
+        logger.info(
+            "path_ab_blended",
+            path_a_count=len(path_a_scores),
+            path_b_count=len(path_b_scores),
+            blended_dims=list(path_b_scores.keys()),
+        )
 
         # Step 7: Talent concentration ────────────────────────────────────────
         job_postings_raw = cs2_evidence.get("job_postings", [])
@@ -312,6 +351,9 @@ class ScoringIntegrationService:
             "vr_cv": float(vr_result.cv),
             "vr_cv_penalty_amount": float(vr_result.cv_penalty_amount),
             "vr_tc_penalty_amount": float(vr_result.tc_penalty_amount),
+            # Path A / Path B breakdown
+            "path_a_scores": path_a_scores,
+            "path_b_scores": path_b_scores,
             # Evidence provenance
             "evidence_count": total_evidence,
             "glassdoor_review_count": review_count,
@@ -365,40 +407,75 @@ class ScoringIntegrationService:
 
     def _fetch_company(self, ticker: str) -> Dict[str, Any]:
         """
-        Step 1: GET {cs1_url}/api/v1/companies?ticker={ticker}
-        Returns first item from response 'items' list.
-        Adds market_cap_percentile defaulting to 0.5 if missing.
+        Step 1: Query Snowflake directly for company by ticker.
         """
-        url = f"{self.cs1_url}/api/v1/companies"
-        response = self.http.get(url, params={"ticker": ticker})
-        response.raise_for_status()
-        data = response.json()
-
-        items = data.get("items", [])
-        if not items:
-            raise ValueError(f"Company not found in CS1 for ticker={ticker!r}")
-
-        company = items[0]
-        if "market_cap_percentile" not in company:
-            company["market_cap_percentile"] = 0.5
-
-        return company
+        settings = get_settings()
+        conn = get_connection()
+        cur = conn.cursor()
+        try:
+            cur.execute(f"""
+                SELECT id, name, ticker, industry_id, position_factor
+                FROM {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.companies
+                WHERE UPPER(ticker) = %s AND is_deleted = FALSE
+            """, (ticker.upper(),))
+            row = cur.fetchone()
+            if not row:
+                raise ValueError(f"Company not found for ticker={ticker!r}")
+            return {
+                "id": row[0],
+                "name": row[1],
+                "ticker": row[2],
+                "industry_id": row[3],
+                "position_factor": float(row[4]) if row[4] else 0.0,
+                "market_cap_percentile": 0.5,
+            }
+        finally:
+            cur.close()
+            conn.close()
 
     def _fetch_cs2_evidence(self, company_id: str) -> Dict[str, Any]:
         """
-        Step 2: GET {cs2_url}/api/v1/signals?company_id={company_id}&limit=200
+        Step 2: Query Snowflake directly for external signals.
         Returns dict with 'signals' (all items) and 'job_postings'
         (items where category == 'technology_hiring').
         """
-        url = f"{self.cs2_url}/api/v1/signals"
-        response = self.http.get(
-            url,
-            params={"company_id": company_id, "limit": 200},
-        )
-        response.raise_for_status()
-        data = response.json()
+        settings = get_settings()
+        table = f"{settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.EXTERNAL_SIGNALS"
+        conn = get_connection()
+        cur = conn.cursor()
+        try:
+            cur.execute(f"""
+                SELECT id, company_id, category, source, signal_date,
+                       raw_value, normalized_score, confidence, metadata
+                FROM {table}
+                WHERE company_id = %s
+                ORDER BY signal_date DESC, created_at DESC
+                LIMIT 200
+            """, (str(company_id),))
+            rows = cur.fetchall()
+        finally:
+            cur.close()
+            conn.close()
 
-        all_items: List[Dict[str, Any]] = data.get("items", [])
+        all_items = []
+        for r in rows:
+            meta = r[8]
+            if isinstance(meta, str):
+                meta = json.loads(meta) if meta else {}
+            elif meta is None:
+                meta = {}
+            all_items.append({
+                "id": r[0],
+                "company_id": r[1],
+                "category": r[2],
+                "source": r[3],
+                "signal_date": str(r[4]) if r[4] else None,
+                "raw_value": r[5],
+                "normalized_score": float(r[6]) if r[6] is not None else 50.0,
+                "confidence": float(r[7]) if r[7] is not None else 0.5,
+                "metadata": meta,
+            })
+
         job_postings = [
             item for item in all_items
             if item.get("category") == "technology_hiring"
@@ -408,9 +485,8 @@ class ScoringIntegrationService:
 
     def _collect_glassdoor(self, company_id: str, ticker: str) -> Dict[str, Any]:
         """
-        Step 3: Load and analyze Glassdoor reviews from S3.
-        Returns a plain dict for uniform downstream access.
-        Falls back to neutral defaults on any error.
+        Step 3: Load Glassdoor culture signal.
+        Priority: EXTERNAL_SIGNALS table → S3 reviews → neutral fallback.
         """
         _fallback = {
             "overall_score": 50.0,
@@ -418,14 +494,68 @@ class ScoringIntegrationService:
             "review_count": 1,
             "confidence": 0.5,
         }
+
+        # --- Primary: read from EXTERNAL_SIGNALS table ---
+        try:
+            settings = get_settings()
+            conn = get_connection()
+            cur = conn.cursor()
+            try:
+                cur.execute(f"""
+                    SELECT normalized_score, confidence, metadata
+                    FROM {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.EXTERNAL_SIGNALS
+                    WHERE company_id = %s
+                      AND category = 'culture' AND source = 'glassdoor'
+                    ORDER BY signal_date DESC
+                    LIMIT 1
+                """, (str(company_id),))
+                row = cur.fetchone()
+            finally:
+                cur.close()
+                conn.close()
+
+            if row:
+                meta = row[2]
+                if isinstance(meta, str):
+                    meta = json.loads(meta) if meta else {}
+                elif meta is None:
+                    meta = {}
+
+                comp = meta.get("component_scores", {})
+                result = {
+                    "overall_score": float(row[0]) if row[0] is not None else 50.0,
+                    "confidence": float(row[1]) if row[1] is not None else 0.5,
+                    "review_count": int(meta.get("review_count", 1)),
+                    "avg_rating": float(meta.get("avg_rating", 0.0)),
+                    "current_employee_ratio": float(meta.get("current_employee_ratio", 0.0)),
+                    "innovation_score": float(comp.get("innovation", 50.0)),
+                    "data_driven_score": float(comp.get("data_driven", 50.0)),
+                    "change_readiness_score": float(comp.get("change_readiness", 50.0)),
+                    "ai_awareness_score": float(comp.get("ai_awareness", 50.0)),
+                    "individual_mentions": 0,
+                    "positive_keywords": meta.get("positive_keywords", []),
+                    "negative_keywords": meta.get("negative_keywords", []),
+                }
+                logger.info(
+                    "glassdoor_from_external_signals",
+                    company_id=company_id,
+                    ticker=ticker,
+                    overall_score=result["overall_score"],
+                    review_count=result["review_count"],
+                )
+                return result
+        except Exception as exc:
+            logger.warning(
+                "glassdoor_external_signals_lookup_failed",
+                company_id=company_id,
+                error=str(exc),
+            )
+
+        # --- Secondary: try S3 via GlassdoorCollectionPipeline ---
         try:
             pipeline = GlassdoorCollectionPipeline()
             signal = pipeline.collect_and_analyze(company_id, ticker)
-            # Convert CultureSignal dataclass → dict
             raw = signal.__dict__
-            # Normalise Decimal fields to float so downstream .get() arithmetic
-            # stays consistent regardless of whether they come from live data or
-            # the fallback dict.
             return {
                 "overall_score": float(raw.get("overall_score", 50.0)),
                 "innovation_score": float(raw.get("innovation_score", 50.0)),
@@ -439,7 +569,7 @@ class ScoringIntegrationService:
             }
         except Exception as exc:
             logger.warning(
-                "glassdoor_collection_failed",
+                "glassdoor_s3_collection_failed",
                 company_id=company_id,
                 ticker=ticker,
                 error=str(exc),
@@ -614,24 +744,36 @@ class ScoringIntegrationService:
 
     def _persist_assessment(self, result: Dict[str, Any]) -> None:
         """
-        Step 13: POST assessment to CS1 API.
+        Step 13: Insert assessment directly into Snowflake.
         Logs on failure but does NOT raise — scoring result is still returned.
         """
-        url = f"{self.cs1_url}/api/v1/assessments"
-        payload = {
-            "company_id": result["company_id"],
-            "assessment_type": "ai_readiness",
-            "primary_assessor": "CS3_AutoScorer",
-        }
+        settings = get_settings()
+        table = f"{settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.ASSESSMENTS"
+        assessment_id = str(uuid4())
         try:
-            resp = self.http.post(url, json=payload)
-            resp.raise_for_status()
-            logger.info(
-                "assessment_persisted",
-                company_id=result["company_id"],
-                ticker=result["ticker"],
-                assessment_id=resp.json().get("id"),
-            )
+            conn = get_connection()
+            cur = conn.cursor()
+            try:
+                cur.execute(f"""
+                    INSERT INTO {table} (id, company_id, assessment_type, status, primary_assessor)
+                    VALUES (%s, %s, %s, %s, %s)
+                """, (
+                    assessment_id,
+                    str(result["company_id"]),
+                    "ai_readiness",
+                    "completed",
+                    "CS3_AutoScorer",
+                ))
+                conn.commit()
+                logger.info(
+                    "assessment_persisted",
+                    company_id=result["company_id"],
+                    ticker=result["ticker"],
+                    assessment_id=assessment_id,
+                )
+            finally:
+                cur.close()
+                conn.close()
         except Exception as exc:
             logger.error(
                 "assessment_persist_failed",
@@ -639,6 +781,3 @@ class ScoringIntegrationService:
                 ticker=result["ticker"],
                 error=str(exc),
             )
-
-
-# To verify: python -c "from app.services.integration_service import ScoringIntegrationService; s = ScoringIntegrationService(); print('OK')"
