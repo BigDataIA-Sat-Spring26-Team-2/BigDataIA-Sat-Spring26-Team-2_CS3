@@ -37,11 +37,6 @@ DIMENSION_LABELS = {
     "culture": "Culture & Change",
 }
 
-REC_COLORS = {
-    "BUY": ("#2e7d32", "#d4edda"),
-    "HOLD": ("#f57f17", "#fff3cd"),
-    "PASS": ("#c62828", "#f8d7da"),
-}
 
 st.title("AI Readiness Scoring & Investment Memo")
 st.caption("Calculate V^R scores and generate PE-style investment memos")
@@ -79,6 +74,7 @@ if calculate_clicked:
         st.session_state.pop("memo_result", None)
         st.session_state.pop("cached_vr", None)
         st.session_state.pop("cached_dims", None)
+        st.session_state.pop("cached_org_air", None)
     else:
         st.error(f"Company **{selected_ticker}** not found in the database. Run the Collection Dashboard first to register it.")
         st.stop()
@@ -93,24 +89,41 @@ ticker = st.session_state["score_ticker"]
 company_name = st.session_state["score_company_name"]
 
 # ── Fetch scores (session-state cached, cleared on company switch) ──
-if "cached_vr" not in st.session_state or "cached_dims" not in st.session_state:
-    with st.spinner("Calculating scores..."):
+if "cached_org_air" not in st.session_state or "cached_dims" not in st.session_state:
+    with st.spinner("Calculating Org-AI-R scores (full pipeline)..."):
         try:
-            vr_result = api.get_vr_score(company_id)
+            org_air_result = api.get_org_air_score(str(company_id))
             dim_result = api.get_dimension_scores(company_id)
         except Exception as e:
             st.error(f"Connection error: {e}")
             st.stop()
 
-    if not vr_result or "vr_score" not in vr_result:
-        st.error("Failed to calculate V^R score. Ensure evidence has been collected for this company.")
+    if not org_air_result or "org_air_score" not in org_air_result:
+        st.error("Failed to calculate Org-AI-R score. Ensure evidence has been collected and CS1 API is running.")
         st.stop()
     if not dim_result or "dimension_scores" not in dim_result:
         st.error("Failed to calculate dimension scores. Ensure evidence has been collected for this company.")
         st.stop()
 
-    st.session_state["cached_vr"] = vr_result
+    st.session_state["cached_org_air"] = org_air_result
     st.session_state["cached_dims"] = dim_result
+
+    # Build a vr_result-shaped dict from org-air result for backward compatibility
+    st.session_state["cached_vr"] = {
+        "vr_score": org_air_result.get("vr_score", 0),
+        "ticker": org_air_result.get("ticker"),
+        "sector": org_air_result.get("sector"),
+        "dimension_scores": org_air_result.get("dimension_scores", {}),
+        "vr_components": {
+            "base_score": org_air_result.get("vr_weighted_mean", 0),
+            "cv": org_air_result.get("vr_cv", 0),
+            "cv_penalty": org_air_result.get("vr_cv", 0),
+            "cv_penalty_amount": org_air_result.get("vr_cv_penalty_amount", 0),
+            "talent_concentration": org_air_result.get("talent_concentration", 0),
+            "talent_risk_adj": 1.0,
+            "tc_penalty_amount": org_air_result.get("vr_tc_penalty_amount", 0),
+        },
+    }
 
 vr_result = st.session_state["cached_vr"]
 dim_result = st.session_state["cached_dims"]
@@ -130,22 +143,55 @@ with tab_overview:
     vr_score = vr_result.get("vr_score", 0)
     vr_comp = vr_result.get("vr_components", {})
 
-    if vr_score >= 60:
-        rec_label, rec_color = "BUY", "#2e7d32"
-    elif vr_score >= 35:
-        rec_label, rec_color = "HOLD", "#f57f17"
-    else:
-        rec_label, rec_color = "PASS", "#c62828"
-
-    m1, m2, m3, m4 = st.columns(4)
+    m1, m2, m3 = st.columns(3)
     m1.metric("V^R Score", f"{vr_score:.1f} / 100")
-    m2.markdown(
-        f"**Recommendation**<br>"
-        f"<span style='color:{rec_color}; font-size:1.8rem; font-weight:bold'>{rec_label}</span>",
-        unsafe_allow_html=True,
-    )
-    m3.metric("CV Penalty", f"-{vr_comp.get('cv_penalty_amount', 0):.1f} pts")
-    m4.metric("TC Penalty", f"-{vr_comp.get('tc_penalty_amount', 0):.1f} pts")
+    m2.metric("CV Penalty", f"-{vr_comp.get('cv_penalty_amount', 0):.1f} pts")
+    m3.metric("TC Penalty", f"-{vr_comp.get('tc_penalty_amount', 0):.1f} pts")
+
+    # Show Org-AI-R / HR / alignment if available
+    org_air_data = st.session_state.get("cached_org_air", {})
+    org_air = org_air_data.get("org_air_score")
+    hr = org_air_data.get("hr_score")
+    alignment_val = org_air_data.get("alignment")
+    board_gov = org_air_data.get("board_governance_score")
+    ci_lower = org_air_data.get("ci_lower")
+    ci_upper = org_air_data.get("ci_upper")
+
+    if org_air is not None or hr is not None:
+        st.divider()
+        st.markdown("#### Full Org-AI-R Context")
+        o1, o2, o3, o4 = st.columns(4)
+        o1.metric(
+            "Org-AI-R Score",
+            f"{org_air:.1f} / 100" if isinstance(org_air, (int, float)) else "N/A",
+        )
+        o2.metric(
+            "H^R (Industry Baseline)",
+            f"{hr:.1f} / 100" if isinstance(hr, (int, float)) else "N/A",
+        )
+        if isinstance(alignment_val, (int, float)):
+            o3.metric("Alignment", f"{alignment_val:.2f}")
+        if isinstance(board_gov, (int, float)):
+            o4.metric("Board Governance", f"{board_gov:.1f} / 100")
+
+        # Second row: confidence interval + extra details
+        if ci_lower is not None and ci_upper is not None:
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric(
+                "Confidence Interval",
+                f"[{ci_lower:.1f}, {ci_upper:.1f}]",
+            )
+            synergy = org_air_data.get("synergy_score")
+            if isinstance(synergy, (int, float)):
+                c2.metric("Synergy Score", f"{synergy:.1f}")
+            tc = org_air_data.get("talent_concentration")
+            if isinstance(tc, (int, float)):
+                c3.metric("Talent Concentration", f"{tc:.3f}")
+            pf = org_air_data.get("position_factor")
+            if isinstance(pf, (int, float)):
+                c4.metric("Position Factor", f"{pf:.3f}")
+    else:
+        st.caption("Org-AI-R scores could not be loaded. Check that the integration service dependencies are available.")
 
     st.divider()
 
@@ -220,14 +266,20 @@ with tab_overview:
         rb = rubric_details.get(dim_key, {})
         path_b = rb.get("score", None) if isinstance(rb, dict) else None
 
-        # Combined from VR result
-        combined = float(vr_dim) if vr_dim is not None else path_a
+        # Combined = 0.6 * Path A + 0.4 * Path B (consistent blending)
+        if path_b is not None:
+            combined = round(path_a * 0.6 + path_b * 0.4, 1)
+        else:
+            combined = path_a
+
+        delta = abs(path_a - path_b) if path_b is not None else None
 
         table_rows.append({
             "Dimension": label,
             "Path A (Quantitative)": f"{path_a:.1f}",
             "Path B (Qualitative)": f"{path_b:.1f}" if path_b is not None else "N/A",
-            "Combined": f"{combined:.1f}",
+            "Combined (0.6A+0.4B)": f"{combined:.1f}",
+            "Delta": f"{delta:.1f}" if delta is not None else "N/A",
             "Confidence": f"{confidence:.2f}" if confidence is not None else "N/A",
         })
 
@@ -253,41 +305,45 @@ with tab_overview:
 with tab_memo:
     st.subheader(f"Investment Memo — {company_name} ({ticker})")
 
-    if st.button("Generate Investment Memo", type="primary"):
-        with st.spinner("Generating memo via Claude AI... this may take up to 60 seconds"):
-            try:
-                memo_result = api.generate_memo(company_id)
-            except Exception as e:
-                memo_result = None
-                st.error(f"Connection error while generating memo: {e}")
+    btn_col1, btn_col2 = st.columns([1, 1])
+    with btn_col1:
+        generate_clicked = st.button("Generate Investment Memo", type="primary", use_container_width=True)
+    with btn_col2:
+        regenerate_clicked = st.button("Regenerate (Fresh Claude Call)", use_container_width=True)
 
-            if memo_result and "markdown" in memo_result:
-                st.session_state["memo_result"] = memo_result
-            elif memo_result:
-                st.error(f"Memo generation returned unexpected response. Check API logs.")
+    if generate_clicked or regenerate_clicked:
+        # If "Generate" → check S3 cache first; if "Regenerate" → skip cache
+        memo_result = None
+        served_from_cache = False
+
+        if generate_clicked and not regenerate_clicked:
+            with st.spinner("Checking for existing memo in S3..."):
+                cached = api.get_cached_memo(ticker=ticker, company_id=str(company_id))
+                if cached and "markdown" in cached:
+                    memo_result = cached
+                    served_from_cache = True
+
+        if not memo_result:
+            with st.spinner("Generating memo via Claude AI... this may take up to 60 seconds"):
+                try:
+                    memo_result = api.generate_memo(company_id)
+                except Exception as e:
+                    memo_result = None
+                    st.error(f"Connection error while generating memo: {e}")
+
+        if memo_result and "markdown" in memo_result:
+            st.session_state["memo_result"] = memo_result
+            if served_from_cache:
+                st.success(f"Memo loaded from cache (generated at {memo_result.get('generated_at', 'unknown')})")
+            else:
+                st.success("New memo generated via Claude AI and saved to S3.")
+        elif memo_result:
+            st.error(f"Memo generation returned unexpected response. Check API logs.")
 
     if "memo_result" in st.session_state:
         memo = st.session_state["memo_result"]
         summary = memo.get("summary", {})
         markdown_text = memo.get("markdown", "")
-
-        # Summary card
-        rec = summary.get("recommendation", "N/A")
-        text_color, bg_color = REC_COLORS.get(rec, ("#333", "#f5f5f5"))
-
-        st.markdown(
-            f"""
-            <div style="background:{bg_color}; padding:1rem; border-radius:8px; margin-bottom:1rem;">
-                <span style="font-size:1.4rem; font-weight:bold; color:{text_color};">
-                    Recommendation: {rec}
-                </span>
-                &nbsp;&nbsp;|&nbsp;&nbsp;V^R: <b>{summary.get('vr_score', 'N/A')}</b>
-                &nbsp;&nbsp;|&nbsp;&nbsp;Strength: <b>{summary.get('top_strength', 'N/A')}</b>
-                &nbsp;&nbsp;|&nbsp;&nbsp;Weakness: <b>{summary.get('top_weakness', 'N/A')}</b>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
 
         discrepancies = summary.get("discrepancy_flags", [])
         if discrepancies:

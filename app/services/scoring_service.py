@@ -92,7 +92,7 @@ class ScoringService:
         ticker = company_info["ticker"]
         dimensions = [
             "data_infrastructure", "ai_governance", "technology_stack",
-            "talent_skills", "leadership_vision", "use_case_portfolio", "culture"
+            "talent", "leadership", "use_case_portfolio", "culture"
         ]
         for dim in dimensions:
             try:
@@ -101,6 +101,12 @@ class ScoringService:
                     rubric_results[dim] = self.rubric_scorer.score_dimension(dim, evidence_text, metrics)
             except Exception as e:
                 logger.warning("rubric_scoring_failed", dimension=dim, error=str(e))
+
+        # Store raw Path A scores before blending overwrites them
+        path_a_raw = {
+            dim_enum.value: float(path_a_score.score)
+            for dim_enum, path_a_score in dimension_scores.items()
+        }
 
         # Step 5: Combine Path A + Path B (60% Path A, 40% Path B)
         for dim_enum, path_a_score in dimension_scores.items():
@@ -137,6 +143,7 @@ class ScoringService:
 
         if include_audit_trail:
             response["audit_trail"] = {
+                "path_a_raw": path_a_raw,
                 "raw_signals": self._format_evidence_scores(evidence_scores),
                 "explanations": self.mapper.explain_calculation(dimension_scores),
                 "contribution_breakdown": self._build_contribution_breakdown(dimension_scores),

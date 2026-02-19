@@ -1,0 +1,4 @@
+# file: D:\Work\SEMESTER_3\BIG_DATA\Case Study\case study BD\Case study 3\BigDataIA-Sat-Spring26-Team-2\app\config.py
+# hypothesis_version: 6.151.6
+
+[6379, '.env', '1.0.0', 'AWS Access Key ID', 'AWS Region', 'AWS Secret Key', 'App version string', 'S3 Bucket name', 'Snowflake password', 'Snowflake username', 'ignore', 'local', 'localhost', 'us-east-1', 'utf-8']

@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional
 import structlog
 
 from app.services.scoring_service import ScoringService
+from app.services.integration_service import ScoringIntegrationService
 from app.services.s3_storage import upload_memo_to_s3
 from app.scoring.evidence_mapper import Dimension
 from app.scoring.investment_memo_generator import InvestmentMemoGenerator
@@ -19,7 +20,29 @@ logger = structlog.get_logger()
 
 # Initialize services
 scoring_service = ScoringService()
+integration_service = ScoringIntegrationService()
 memo_generator = InvestmentMemoGenerator()
+
+
+def _get_ticker(company_id: UUID) -> str:
+    """Look up a company's ticker symbol from Snowflake by company_id."""
+    from app.services.snowflake import get_connection
+    from app.config import get_settings
+    settings = get_settings()
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(f"""
+            SELECT ticker FROM {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.companies
+            WHERE id = %s AND is_deleted = FALSE
+        """, (str(company_id),))
+        row = cur.fetchone()
+        if not row:
+            raise ValueError(f"Company {company_id} not found")
+        return row[0]
+    finally:
+        cur.close()
+        conn.close()
 
 @router.get(
     "/companies/{company_id}/vr",
@@ -484,6 +507,40 @@ async def compare_companies(
         )
 
 
+@router.get(
+    "/companies/{company_id}/org-air",
+    summary="Calculate full Org-AI-R score (VR + HR + alignment + board governance)",
+    response_model=Dict[str, Any],
+)
+async def calculate_org_air_score(company_id: UUID):
+    """
+    Calculate Org-AI-R score for a company via ScoringIntegrationService.
+
+    Runs the full pipeline: CS1/CS2 evidence → VR → HR → alignment → Org-AI-R.
+    """
+    try:
+        ticker = _get_ticker(company_id)
+        result = integration_service.score_company(ticker)
+        return result
+    except ValueError as e:
+        logger.error("org_air_data_error", company_id=str(company_id), error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.error(
+            "org_air_calculation_error",
+            company_id=str(company_id),
+            error=str(e),
+            error_type=type(e).__name__,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Org-AI-R calculation failed: {type(e).__name__}: {str(e)}",
+        )
+
+
 @router.post(
     "/companies/{company_id}/memo",
     summary="Generate PE-style investment memo",
@@ -513,15 +570,12 @@ async def generate_investment_memo(company_id: UUID):
     ```
     """
     try:
-        # Step 1: Get dimension scores (combined Path A + B)
+        # Step 1: Get dimension scores (combined Path A + B) with audit trail
         dimension_result = scoring_service.score_company(
             company_id=company_id, include_audit_trail=True
         )
 
-        # Step 2: Calculate V^R
-        vr_result = scoring_service.calculate_vr(company_id=company_id)
-
-        # Step 3: Extract Path A and Path B scores separately
+        # Step 2: Extract Path A and Path B scores separately
         path_a_scores: Dict[str, float] = {}
         path_b_scores: Dict[str, Any] = {}
         evidence_metadata: Dict[str, str] = {}
@@ -529,24 +583,63 @@ async def generate_investment_memo(company_id: UUID):
         audit = dimension_result.get("audit_trail", {})
         rubric_details = audit.get("rubric_details", {})
 
+        path_a_raw = audit.get("path_a_raw", {})
         for dim_name, dim_data in dimension_result["dimension_scores"].items():
-            path_a_scores[dim_name] = dim_data["score"]
+            path_a_scores[dim_name] = path_a_raw.get(dim_name, dim_data["score"])
             if dim_name in rubric_details:
                 path_b_scores[dim_name] = rubric_details[dim_name]
 
-        # Step 4: Generate memo
+        # Step 3: Run full Org-AI-R pipeline via integration service
+        ticker = dimension_result["ticker"]
+        try:
+            full_result = integration_service.score_company(ticker)
+        except Exception as e:
+            logger.warning(
+                "integration_service_failed",
+                ticker=ticker,
+                error=str(e),
+            )
+            full_result = None
+
+        # Step 4: Build vr_result dict that memo generator expects
+        # (keys: vr_score, vr_components, dimension_scores, ticker, sector)
+        if full_result:
+            vr_result = {
+                "vr_score": full_result["vr_score"],
+                "ticker": full_result["ticker"],
+                "sector": full_result["sector"],
+                "dimension_scores": full_result["dimension_scores"],
+                "vr_components": {
+                    "base_score": full_result.get("vr_weighted_mean", 0.0),
+                    "cv": full_result.get("vr_cv", 0.0),
+                    "cv_penalty_amount": full_result.get("vr_cv_penalty_amount", 0.0),
+                    "talent_concentration": full_result.get("talent_concentration", 0.0),
+                    "tc_penalty_amount": full_result.get("vr_tc_penalty_amount", 0.0),
+                },
+            }
+            # Use integration service's Path A/B for consistency with Combined
+            if "path_a_scores" in full_result:
+                path_a_scores = full_result["path_a_scores"]
+            if "path_b_scores" in full_result:
+                path_b_scores = full_result["path_b_scores"]
+        else:
+            # Fallback: compute VR via scoring_service if integration failed
+            vr_result = scoring_service.calculate_vr(company_id=company_id)
+
+        # Step 5: Generate memo
         markdown, summary = memo_generator.generate_memo(
-            ticker=dimension_result["ticker"],
+            ticker=ticker,
             company_name=dimension_result["company_name"],
             path_a_scores=path_a_scores,
             path_b_scores=path_b_scores,
             vr_result=vr_result,
             evidence_metadata=evidence_metadata or None,
+            full_scores=full_result,
         )
 
-        # Step 5: Persist memo to S3
+        # Step 6: Persist memo to S3
         s3_uri = upload_memo_to_s3(
-            ticker=dimension_result["ticker"],
+            ticker=ticker,
             company_id=str(company_id),
             markdown=markdown,
             json_summary=summary,

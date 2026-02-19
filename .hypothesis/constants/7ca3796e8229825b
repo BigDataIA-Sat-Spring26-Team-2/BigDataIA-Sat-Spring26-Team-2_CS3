@@ -1,0 +1,4 @@
+# file: D:\Work\SEMESTER_3\BIG_DATA\Case Study\case study BD\Case study 3\BigDataIA-Sat-Spring26-Team-2\app\models\enums.py
+# hypothesis_version: 6.151.6
+
+['Energy', 'Financial', 'Healthcare', 'Industrials', 'LinkedIn_Indeed', 'Manufacturing', 'Retail', 'Services', 'Technology', 'ai_governance', 'approved', 'board_composition', 'chunked', 'company_website', 'culture', 'culture_change', 'data_infrastructure', 'digital_presence', 'downloaded', 'draft', 'due_diligence', 'exit_prep', 'failed', 'glassdoor', 'google_patents', 'in_progress', 'indeed', 'indexed', 'innovation_activity', 'leadership_signals', 'leadership_vision', 'linkedin', 'parsed', 'pending', 'quarterly', 'screening', 'sec_item_1_business', 'sec_item_7_mda', 'submitted', 'superseded', 'talent_skills', 'tech_stack_scrape', 'technology_hiring', 'technology_stack', 'use_case_portfolio']

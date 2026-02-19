@@ -329,5 +329,92 @@ class TestADPPathScores:
         assert len(path_b_scores) > 0, "Path B produced no scores for ADP"
 
 
+# ============================================================
+# TEST 6: Property-Based Tests for EvidenceMapper (Hypothesis)
+# ============================================================
+
+from hypothesis import given, strategies as st, settings as hyp_settings
+from app.scoring.evidence_mapper import EvidenceMapper, EvidenceScore, SignalSource, Dimension
+
+# Strategy: generate a valid EvidenceScore with random source, score, confidence
+evidence_score_strategy = st.builds(
+    EvidenceScore,
+    source=st.sampled_from(list(SignalSource)),
+    score=st.decimals(min_value=0, max_value=100, places=2, allow_nan=False, allow_infinity=False),
+    confidence=st.decimals(min_value=Decimal("0.01"), max_value=1, places=2, allow_nan=False, allow_infinity=False),
+    raw_value=st.just("test"),
+)
+
+
+class TestEvidenceMapperProperties:
+    """Property-based tests using Hypothesis — pure unit tests, no DB required."""
+
+    @given(evidence_list=st.lists(evidence_score_strategy, min_size=0, max_size=10))
+    @hyp_settings(max_examples=500)
+    def test_all_dimensions_returned(self, evidence_list):
+        """Mapper must ALWAYS return exactly 7 dimensions, regardless of input."""
+        mapper = EvidenceMapper()
+        result = mapper.map_evidence_to_dimensions(evidence_list)
+
+        assert len(result) == 7, f"Expected 7 dimensions, got {len(result)}"
+        for dim in Dimension:
+            assert dim in result, f"Missing dimension: {dim.value}"
+
+    @hyp_settings(max_examples=500)
+    @given(st.just([]))
+    def test_missing_evidence_defaults_to_50(self, empty_list):
+        """With no evidence, ALL 7 dimensions must default to 50.0."""
+        mapper = EvidenceMapper()
+        result = mapper.map_evidence_to_dimensions(empty_list)
+
+        for dim in Dimension:
+            score = float(result[dim].score)
+            assert score == 50.0, f"{dim.value} expected 50.0, got {score}"
+            assert result[dim].method == "default"
+
+    @given(
+        single_source=st.sampled_from(list(SignalSource)),
+        multi_sources=st.lists(
+            st.sampled_from(list(SignalSource)),
+            min_size=3,
+            max_size=6,
+            unique=True,
+        ),
+        score=st.decimals(min_value=10, max_value=90, places=2, allow_nan=False, allow_infinity=False),
+        confidence=st.decimals(min_value=Decimal("0.5"), max_value=1, places=2, allow_nan=False, allow_infinity=False),
+    )
+    @hyp_settings(max_examples=500)
+    def test_more_evidence_higher_confidence(self, single_source, multi_sources, score, confidence):
+        """More evidence sources should produce equal or higher average confidence."""
+        mapper = EvidenceMapper()
+
+        # Single source
+        single_evidence = [
+            EvidenceScore(source=single_source, score=score, confidence=confidence, raw_value="test")
+        ]
+        result_single = mapper.map_evidence_to_dimensions(single_evidence)
+
+        # Multiple sources
+        multi_evidence = [
+            EvidenceScore(source=src, score=score, confidence=confidence, raw_value="test")
+            for src in multi_sources
+        ]
+        result_multi = mapper.map_evidence_to_dimensions(multi_evidence)
+
+        # Average confidence across non-default dimensions should be >= with more evidence
+        def avg_confidence(result):
+            scored = [float(ds.confidence) for ds in result.values() if ds.method != "default"]
+            return sum(scored) / len(scored) if scored else 0.5
+
+        conf_single = avg_confidence(result_single)
+        conf_multi = avg_confidence(result_multi)
+
+        # Allow tiny floating-point tolerance (1e-9)
+        assert conf_multi >= conf_single - 1e-9, (
+            f"More evidence ({len(multi_sources)} sources) gave lower confidence "
+            f"({conf_multi:.3f}) than single source ({conf_single:.3f})"
+        )
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])
