@@ -60,7 +60,7 @@ class ScoringIntegrationService:
         self.ci_calculator = ConfidenceCalculator()
         self.glassdoor_collector = GlassdoorCultureCollector()
         self.board_analyzer = BoardCompositionAnalyzer()
-        self.http = httpx.Client(timeout=30.0)
+        self.http = httpx.Client(timeout=300.0)
 
 
     def score_company(self, ticker: str,  market_cap_percentile: float = 0.5) -> Dict[str, Any]:
@@ -168,8 +168,21 @@ class ScoringIntegrationService:
         )
 
         # Step 7: Talent concentration ────────────────────────────────────────
+        # Build JobAnalysis from pre-aggregated metadata in EXTERNAL_SIGNALS
         job_postings_raw = cs2_evidence.get("job_postings", [])
-        job_analysis = self.tc_calculator.analyze_job_postings(job_postings_raw)
+        if job_postings_raw and isinstance(job_postings_raw[0].get("metadata"), dict):
+            meta = job_postings_raw[0]["metadata"]
+            seniority = meta.get("seniority_distribution", {})
+            from app.scoring.talent_concentration import JobAnalysis
+            job_analysis = JobAnalysis(
+                total_ai_jobs=int(meta.get("ai_jobs", 0)),
+                senior_ai_jobs=int(seniority.get("senior", 0)) + int(seniority.get("executive", 0)),
+                mid_ai_jobs=int(seniority.get("mid", 0)),
+                entry_ai_jobs=int(seniority.get("entry", 0)),
+                unique_skills=set(meta.get("skills_found", [])),
+            )
+        else:
+            job_analysis = self.tc_calculator.analyze_job_postings(job_postings_raw)
         individual_mentions = int(glassdoor.get("individual_mentions", 0))
         review_count = max(1, int(glassdoor.get("review_count", 1)))
         tc_decimal = self.tc_calculator.calculate_tc(
@@ -399,15 +412,6 @@ class ScoringIntegrationService:
             conn.close()
 
     def _fetch_cs2_evidence(self, company_id: str) -> Dict[str, Any]:
-        """Step 2: Fetch from CS2 API"""
-        url = f"{self.cs1_url}/api/v1/signals/companies/{company_id}"
-        response = self.http.get(
-            url,
-            params={"limit": 200},
-        )
-        response.raise_for_status()
-        data = response.json()
-
         """
         Step 2: Query Snowflake directly for external signals.
         Returns dict with 'signals' (all items) and 'job_postings'

@@ -236,7 +236,7 @@ if calc_clicked:
     with st.spinner("Calculating dimension scores and V^R (this may take a minute)..."):
         try:
             dim_result = api.get_dimension_scores(company_id)
-            vr_result = api.get_vr_score(company_id)
+            org_air_result = api.get_org_air_score(company_id)
         except Exception as e:
             st.error(f"API connection error: {e}")
             st.stop()
@@ -245,9 +245,26 @@ if calc_clicked:
         st.error("Failed to calculate dimension scores. Ensure evidence has been collected for this company.")
         st.stop()
 
-    if not vr_result or "vr_score" not in vr_result:
+    if not org_air_result or "vr_score" not in org_air_result:
         st.error("Failed to calculate V^R score. Check that the scoring API is running and evidence exists.")
         st.stop()
+
+    # Build vr_result from org_air_result (same as scoring_memo.py)
+    vr_result = {
+        "vr_score": org_air_result.get("vr_score", 0),
+        "ticker": org_air_result.get("ticker"),
+        "sector": org_air_result.get("sector"),
+        "dimension_scores": org_air_result.get("dimension_scores", {}),
+        "vr_components": {
+            "base_score": org_air_result.get("vr_weighted_mean", 0),
+            "cv": org_air_result.get("vr_cv", 0),
+            "cv_penalty": org_air_result.get("vr_cv", 0),
+            "cv_penalty_amount": org_air_result.get("vr_cv_penalty_amount", 0),
+            "talent_concentration": org_air_result.get("talent_concentration", 0),
+            "talent_risk_adj": 1.0,
+            "tc_penalty_amount": org_air_result.get("vr_tc_penalty_amount", 0),
+        },
+    }
 
     st.session_state["vr_dim_result"] = dim_result
     st.session_state["vr_vr_result"] = vr_result
