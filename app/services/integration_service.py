@@ -42,13 +42,22 @@ logger = structlog.get_logger()
 
 class ScoringIntegrationService:
 
+    SECTOR_MARKET_CAP_PERCENTILE: Dict[str, float] = {
+        "technology":           0.99,   
+        "financial":            0.80,   
+        "healthcare":           0.70,   
+        "retail":               0.60,   
+        "consumer":             0.60,   
+        "manufacturing":        0.40,
+        "industrials":          0.40,   
+        "services":             0.30,   
+    }
+
     def __init__(
         self,
         cs1_api_url: str = "http://localhost:8000"
     ):
         self.cs1_url = cs1_api_url
-
-        # Initialize all components
 
         self.evidence_mapper = EvidenceMapper()
         self.rubric_scorer = RubricScorer()
@@ -63,7 +72,25 @@ class ScoringIntegrationService:
         self.http = httpx.Client(timeout=300.0)
 
 
-    def score_company(self, ticker: str,  market_cap_percentile: float = 0.5) -> Dict[str, Any]:
+    def _get_market_cap_percentile(self, sector: str) -> float:
+        sector_key = sector.lower().strip().replace(" ", "_").replace("-", "_")
+
+        percentile = self.SECTOR_MARKET_CAP_PERCENTILE.get(
+            sector_key,
+            self.SECTOR_MARKET_CAP_PERCENTILE.get(sector.lower().strip(), 0.5)
+        )
+
+        logger.info(
+            "market_cap_percentile_resolved",
+            sector=sector,
+            sector_key=sector_key,
+            percentile=percentile,
+        )
+
+        return percentile
+
+
+    def score_company(self, ticker: str,  market_cap_percentile: float = None) -> Dict[str, Any]:
         """
         Run the full Org-AI-R scoring pipeline for a ticker.
 
@@ -81,7 +108,10 @@ class ScoringIntegrationService:
         company_id = company["id"]
         industry_id = company.get("industry_id")
         sector = self._get_sector_from_db(company_id)
-
+        
+        if market_cap_percentile is None:
+            market_cap_percentile = self._get_market_cap_percentile(sector)
+        
         logger.info(
             "company_fetched",
             ticker=ticker,

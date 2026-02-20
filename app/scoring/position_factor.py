@@ -36,6 +36,12 @@ class PositionFactorCalculator:
             market_cap_percentile=market_cap_percentile
         )
         
+        if market_cap_percentile is None:
+            raise ValueError(
+                "market_cap_percentile cannot be None. "
+                "Resolve it in integration_service before calling this method."
+            )
+    
         if not (0 <= vr_score <= 100):
             raise ValueError(f"V^R score must be in [0, 100], got {vr_score}")
         
