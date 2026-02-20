@@ -1,857 +1,814 @@
 # PE Org-AI-R Platform
 
-**AI Readiness Assessment Platform for Private Equity**
+> **Private Equity AI Readiness Assessment Platform**
+> Quantifying the Say-Do Gap Between AI Claims and AI Investment
 
-A production-grade API system designed to assess and score the AI-readiness of portfolio companies and acquisition targets through comprehensive evidence collection and analysis.
+**Authors:** Prachi Pradhan · Samiksh Gupta · Siddharth Shukla
+**Course:** Big Data and Intelligent Analytics — Northeastern University, Spring 2026
+**Instructor:** Sri Krishnamurthy
 
-**Authors:** Prachi Pradhan, Samiksh Gupta, Siddharth Shukla  
-**Course:** Big Data and Intelligent Analytics  
-**Codelab Link** https://codelabs-preview.appspot.com/?file_id=1M1qy9K_uIb4iEWX_q6jUartn6D3v5NVLpBwZ-TPpm9c#10
-**Video Presentation:** [Watch here](https://northeastern-my.sharepoint.com/personal/shukla_sid_northeastern_edu/_layouts/15/stream.aspx?id=%2Fpersonal%2Fshukla%5Fsid%5Fnortheastern%5Fedu%2FDocuments%2FRecordings%2FMeeting%20in%20Big%20Data%2D20260206%5F052700%2DMeeting%20Recording%2Emp4)
-**Deployed Applicatiom**: https://pe-orgair-ui.onrender.com/ 
-(If you get API disconnected error, kindly refresh the webpage)
-**Swagger API** https://pe-orgair-api.onrender.com/docs 
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.110-009688?logo=fastapi)](https://fastapi.tiangolo.com)
+[![Snowflake](https://img.shields.io/badge/Snowflake-Database-29B5E8?logo=snowflake)](https://snowflake.com)
+[![Streamlit](https://img.shields.io/badge/Streamlit-UI-FF4B4B?logo=streamlit)](https://streamlit.io)
+[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python)](https://python.org)
 
+---
 
 ## Table of Contents
 
 - [Overview](#overview)
-- [Business Context](#business-context)
+- [The Org-AI-R Formula](#the-org-ai-r-formula)
 - [Architecture](#architecture)
 - [Project Structure](#project-structure)
+- [Case Studies](#case-studies)
+- [Target Companies](#target-companies)
 - [Prerequisites](#prerequisites)
-- [Installation and Setup](#installation-and-setup)
-- [Data Model](#data-model)
-- [API Documentation](#api-documentation)
-- [Evidence Collection](#evidence-collection)
-- [Running Tests](#running-tests)
+- [Installation & Setup](#installation--setup)
 - [Configuration](#configuration)
-- [Troubleshooting](#troubleshooting)
+- [Running the Platform](#running-the-platform)
+- [API Documentation](#api-documentation)
+- [Scoring Pipeline](#scoring-pipeline)
+- [Evidence Collection](#evidence-collection)
+- [Testing](#testing)
 - [Deployment](#deployment)
 - [Known Limitations](#known-limitations)
+- [AI Tools Disclosure](#ai-tools-disclosure)
+- [Team Contributions](#team-contributions)
+- [Resources](#resources)
 
+---
 
 ## Overview
 
-The PE Org-AI-R (Private Equity Organizational AI-Readiness) Platform evaluates organizations across seven critical dimensions of AI capability and provides quantitative readiness scores to support investment decisions.
+The PE Org-AI-R platform helps private equity firms assess the **AI readiness** of portfolio companies and acquisition targets. It exposes the **Say-Do Gap** — the difference between what companies claim about AI in SEC filings versus their actual AI investment signals.
 
-### Key Capabilities
+### Core Capabilities
 
-- **Say-Do Gap Analysis**: Compare what companies claim in SEC filings versus actual AI investment
-- **Multi-dimensional Scoring**: Evaluate AI readiness across 7 weighted dimensions
-- **Evidence Collection**: Automated ingestion of SEC filings and external signals
-- **Signal Analysis**: Job postings, patents, technology stack, and leadership commitment tracking
+| Capability | Description |
+|---|---|
+| Say-Do Gap Analysis | Compares AI rhetoric in SEC filings vs. actual investment signals |
+| Multi-Dimensional Scoring | Evaluates 7 weighted AI-readiness dimensions |
+| Full Org-AI-R Pipeline | End-to-end: evidence → V^R → H^R → Synergy → Final Score |
+| Evidence Collection | Automated ingestion from SEC EDGAR, job boards, patents, websites |
+| Investment Memo Generation | PE-style memos via Claude AI (Anthropic) |
 
-### Completed Case Studies
+### Deployed Links
 
-**Case Study 1: Platform Foundation**
-- FastAPI application with RESTful endpoints
-- Pydantic data models with validation
-- Snowflake data warehouse integration
-- Redis caching layer
-- Docker containerization
+| Resource | URL |
+|---|---|
+| Live Application | https://pe-orgair-ui.onrender.com |
+| Swagger API | https://pe-orgair-api.onrender.com/docs |
+| Codelab | https://codelabs-preview.appspot.com/?file_id=1M1qy9K_uIb4iEWX_q6jUartn6D3v5NVLpBwZ-TPpm9c#10 |
+| Video Presentation | [Watch on SharePoint](https://northeastern-my.sharepoint.com/personal/shukla_sid_northeastern_edu/_layouts/15/stream.aspx?id=%2Fpersonal%2Fshukla%5Fsid%5Fnortheastern%5Fedu%2FDocuments%2FRecordings%2FMeeting%20in%20Big%20Data%2D20260206%5F052700%2DMeeting%20Recording%2Emp4) |
 
-**Case Study 2: Evidence Collection**
-- SEC EDGAR filing download and parsing
-- External signal collection (jobs, patents, tech stack, leadership)
-- Document chunking for LLM processing
-- S3 document storage
-- Signal scoring algorithms
+---
 
+## The Org-AI-R Formula
 
-## Business Context
+```
+Org-AI-Rⱼ,ₜ = (1 − β) · [α · V^R_org,j(t) + (1 − α) · H^R_org,k(t)] + β · Synergy(V^R, H^R)
+```
 
-### The Say-Do Gap Problem
+| Symbol | Value | Description |
+|:---:|:---:|---|
+| α | 0.60 | Idiosyncratic weight (company-specific factors) |
+| β | 0.12 | Synergy weight (alignment effects) |
+| λ | 0.25 | Non-compensatory CV penalty coefficient |
+| δ | 0.15 | Position adjustment coefficient |
 
-73% of companies mention "AI" in 10-K filings, but only 23% have deployed AI in production. This platform quantifies the gap between rhetoric and reality.
+### V^R Formula (Venture Readiness)
 
-### Evidence Types
+```
+V^R = D̄_w × (1 − 0.25 × CV_D) × TalentRiskAdj
 
-**What Companies SAY (SEC Filings)**
-- 10-K annual reports: Strategy, risk factors, MD&A
-- 10-Q quarterly reports: Recent developments
-- 8-K material events: AI announcements, executive changes
-- DEF-14A proxy statements: Executive compensation tied to technology
+TalentRiskAdj = 1 − 0.15 × max(0, TC − 0.25)
+```
 
-**What Companies DO (External Signals)**
-- Technology Hiring: AI/ML job postings analysis (Weight: 30%)
-- Innovation Activity: Patent filings in AI domains (Weight: 25%)
-- Digital Presence: Technology stack analysis (Weight: 25%)
-- Leadership Signals: Executive AI backgrounds (Weight: 20%)
+### H^R Formula (Industry Readiness)
 
-### Target Companies
-
-The platform tracks 10 companies across 5 sectors:
-
-| Sector | Companies |
-|--------|-----------|
-| Manufacturing | CAT (Caterpillar), DE (Deere & Company) |
-| Healthcare | UNH (UnitedHealth Group), HCA (HCA Healthcare) |
-| Services | ADP (Automatic Data Processing), PAYX (Paychex Inc.) |
-| Retail | WMT (Walmart Inc.), TGT (Target Corporation) |
-| Financial | JPM (JPMorgan Chase), GS (Goldman Sachs) |
+```
+H^R = H^R_base × (1 + 0.15 × PositionFactor)
+```
 
 ---
 
 ## Architecture
 
-### System Overview
-
-  
-┌─────────────────────────────────────────────────┐
-│           Streamlit UI                          │
-│   Home | Dashboard | Signals | Reports          │
-└─────────────────────────────────────────────────┘
-                       │
-┌─────────────────────────────────────────────────┐
-│           FastAPI Application                    │
-│  ┌──────────────┐  ┌──────────────────────────┐ │
-│  │   Routers    │  │   Pydantic Models        │ │
-│  │  (Endpoints) │  │  (Validation)            │ │
-│  └──────────────┘  └──────────────────────────┘ │
-│  ┌──────────────┐  ┌──────────────────────────┐ │
-│  │   Services   │  │   Pipelines              │ │
-│  │  (Business)  │  │  (Evidence Collection)   │ │
-│  └──────────────┘  └──────────────────────────┘ │
-└─────────────────────────────────────────────────┘
-           │                │              │
-           ▼                ▼              ▼
-    ┌───────────┐    ┌─────────┐    ┌─────────┐
-    │ Snowflake │    │  Redis  │    │   S3    │
-    │ (Primary) │    │ (Cache) │    │  (Docs) │
-    └───────────┘    └─────────┘    └─────────┘
-  
-
-### Evidence Collection Flow
-
-  
-SEC EDGAR → Document Pipeline → S3 (Raw) → Snowflake (Metadata)
-Job Boards → Signal Pipeline → External Signals → Summary Scores
-Patents → Patent Pipeline → Innovation Scores
-Websites → Tech Pipeline → Digital Presence
-  
+```
+Diagram: https://drive.google.com/file/d/1Lf1HIuNp9F5kZNLsNwiyC-fTdwWLm-es/view?usp=sharing 
 
 ---
 
+
 ## Project Structure
 
-  
+```text
 pe-org-air-platform/
+│
 ├── app/
-│   ├── main.py                      # FastAPI application entry point
-│   ├── config.py                    # Configuration management
-│   ├── errors.py                    # Global error handlers
-│   ├── logging_config.py            # Structured logging setup
-│   ├── models/                      # Pydantic data models
-│   │   ├── assessment.py            # Assessment models
-│   │   ├── company.py               # Company models
-│   │   ├── dimension.py             # Dimension scores
-│   │   ├── document.py              # SEC filing models
-│   │   ├── evidence.py              # Evidence chunks
-│   │   ├── signal.py                # External signals
-│   │   ├── leadership.py            # Leadership evidence
-│   │   ├── enums.py                 # Shared enumerations
-│   │   └── assessment_state_machine.py  # Status transitions
-│   ├── routers/                     # API endpoint definitions
-│   │   ├── assessments.py           # Assessment CRUD
-│   │   ├── companies.py             # Company CRUD
-│   │   ├── dimension_scores.py      # Dimension scoring
-│   │   ├── industries.py            # Industry reference
-│   │   ├── documents.py             # SEC filing access
-│   │   ├── signal.py                # Signal collection
-│   │   └── health.py                # Health checks
-│   ├── services/                    # Business logic
+│   ├── main.py
+│   ├── config.py
+│   ├── errors.py
+│   ├── logging_config.py
+│   │
+│   ├── models/
+│   │   ├── assessment.py
+│   │   ├── assessment_state_machine.py
+│   │   ├── board.py
+│   │   ├── company.py
+│   │   ├── dimension.py
+│   │   ├── document.py
+│   │   ├── enums.py
+│   │   ├── evidence.py
+│   │   ├── health.py
+│   │   ├── industry.py
+│   │   ├── leadership.py
+│   │   ├── pagination.py
+│   │   └── signal.py
+│   │
+│   ├── routers/
+│   │   ├── assessments.py
+│   │   ├── companies.py
+│   │   ├── dimension_scores.py
+│   │   ├── documents.py
+│   │   ├── health.py
+│   │   ├── industries.py
+│   │   ├── scoring.py
+│   │   └── signal.py
+│   │
+│   ├── services/
 │   │   ├── assessments_service.py
 │   │   ├── company_service.py
 │   │   ├── dimension_scores_service.py
+│   │   ├── evidence_counter.py
 │   │   ├── industry_service.py
-│   │   ├── signal_service.py
+│   │   ├── integration_service.py
+│   │   ├── leadership_signal_service.py
+│   │   ├── redis_cache.py
+│   │   ├── s3_storage.py
+│   │   ├── scoring_service.py
 │   │   ├── sec_edgar_service.py
-│   │   ├── snowflake.py             # Database connection
-│   │   ├── redis_cache.py           # Caching layer
-│   │   └── s3_storage.py            # Document storage
-│   ├── pipelines/                   # Evidence collection
-│   │   ├── sec_edgar.py             # SEC filing downloader
-│   │   ├── document_parser.py       # PDF/HTML extraction
-│   │   ├── chunker.py               # Semantic chunking
-│   │   ├── job_signals.py           # Job posting analysis
-│   │   ├── tech_signals.py          # Tech stack detection
-│   │   ├── patent_signals.py        # Patent analysis
-│   │   ├── leadership_signals.py    # Executive backgrounds
-│   │   ├── say_score_analyzer.py    # AI rhetoric measurement
-│   │   └── collectors/              # Pluggable collectors
+│   │   ├── signal_service.py
+│   │   └── snowflake.py
+│   │
+│   ├── pipelines/
+│   │   ├── board_analyzer.py
+│   │   ├── chunker.py
+│   │   ├── document_parser.py
+│   │   ├── glassdoor_collector.py
+│   │   ├── job_signals.py
+│   │   ├── leadership_signals.py
+│   │   ├── patent_signals.py
+│   │   ├── say_score_analyzer.py
+│   │   ├── sec_edgar.py
+│   │   ├── sec_item_analyzer.py
+│   │   ├── tech_signals.py
+│   │   └── collectors/
 │   │       ├── base_collector.py
-│   │       ├── website_collector.py
+│   │       ├── hardcoded_collector.py
 │   │       ├── news_collector.py
-│   │       └── hardcoded_collector.py
-│   ├── reports/                     # Report generation
+│   │       └── website_collector.py
+│   │
+│   ├── scoring/
+│   │   ├── __init__.py
+│   │   ├── confidence_calculator.py
+│   │   ├── evidence_helpers.py
+│   │   ├── evidence_mapper.py
+│   │   ├── hr_calculator.py
+│   │   ├── investment_memo_generator.py
+│   │   ├── position_factor.py
+│   │   ├── rubric_scorer.py
+│   │   ├── synergy_calculator.py
+│   │   ├── talent_concentration.py
+│   │   ├── utils.py
+│   │   └── vr_calculator.py
+│   │
+│   ├── reports/
 │   │   └── patent_report.py
+│   │
 │   └── database/
-│       └── schema.sql               # Snowflake DDL
-├── streamlit_ui/                    # User interface
-│   ├── home.py                      # Dashboard home
+│       └── schema.sql
+│
+├── streamlit_ui/
+│   ├── home.py
 │   ├── pages/
-│   │   ├── collection_dashboard.py  # Evidence collection
-│   │   ├── company_reports.py       # Company analysis
-│   │   └── signal_analysis.py       # Signal comparison
+│   │   ├── collection_dashboard.py
+│   │   ├── data_management.py
+│   │   ├── hr_calculator.py
+│   │   ├── scoring_memo.py
+│   │   ├── signal_analysis.py
+│   │   ├── streamlit_app.py
+│   │   └── vr_calculator.py
 │   └── utils/
-│       └── api_client.py            # API wrapper
-├── scripts/                         # Automation scripts
-│   ├── collect_evidence.py          # Main collection orchestrator
-│   ├── calculate_say_scores.py      # Say score calculation
-│   └── fetch_evidence_stats.py      # Report generation
-├── tests/                           # Test suite
-│   ├── api/                         # API endpoint tests
-│   ├── integration/                 # Snowflake integration tests
-│   ├── unit/                        # Model validation tests
-│   └── conftest.py                  # Pytest fixtures
-├── docker/
-│   ├── Dockerfile                   # Container image
-│   └── docker-compose.yml           # Service orchestration
-├── reports/                         # Generated reports
-│   ├── evidence_stats.md            # Summary statistics
-│   └── patent_signals/              # Patent analysis reports
-├── .env.example                     # Environment template
-├── pyproject.toml                   # Poetry dependencies
-├── requirements.txt                 # Pip dependencies
-└── README.md                        # This file
-  
+│       └── api_client.py
+│
+├── scripts/
+│   ├── calculate_say_scores.py
+│   ├── collect_evidence.py
+│   ├── fetch_evidence_stats.py
+│   ├── integration_service_scripts.py
+│   ├── sample_JSON.py
+│   └── upload_to_s3.py
+│
+├── tests/
+│   ├── api/
+│   │   ├── test_assessments_api.py
+│   │   ├── test_companies_api.py
+│   │   └── test_dimension_scores_api.py
+│   ├── integration/
+│   │   ├── test_snowflake_assessments.py
+│   │   ├── test_snowflake_companies.py
+│   │   └── test_snowflake_dimension_scores.py
+│   ├── unit/
+│   │   ├── test_models_assessment.py
+│   │   ├── test_models_company.py
+│   │   ├── test_models_dimension_score.py
+│   │   └── test_rubric_scorer.py
+│   ├── conftest.py
+│   ├── test_board_analyzer.py
+│   ├── test_evidence_mapper_integration.py
+│   ├── test_leadership.py
+│   ├── test_scoring_pipeline.py
+│   ├── test_talent_concetration.py
+│   └── test_tc_standalone.py
+│
+├── reports/
+│   └── evidence_stats.md
+│
+├── .env.example
+├── pyproject.toml
+├── requirements.txt
+├── render.yaml
+└── README.md
+```
+
+---
+
+## Case Studies
+
+### Case Study 1 — Platform Foundation
+
+| Component | Description |
+|---|---|
+| FastAPI Application | RESTful endpoints with auto-generated OpenAPI docs |
+| Pydantic v2 Models | Type-safe validation at API boundaries |
+| Snowflake Integration | Companies, industries, assessments, dimension scores |
+| Redis Caching | TTL-based read-through cache with pattern invalidation |
+| Assessment State Machine | DRAFT → IN_PROGRESS → SUBMITTED → APPROVED → SUPERSEDED |
+
+### Case Study 2 — Evidence Collection
+
+| Component | Description |
+|---|---|
+| SEC EDGAR Pipeline | Download, parse, and chunk 10-K, 10-Q, 8-K, DEF 14A filings |
+| Job Signal Collector | LinkedIn + Indeed AI/ML job posting analysis |
+| Patent Signal Collector | Google Patents CPC G06N filtering via Playwright |
+| Tech Stack Collector | Company website + GitHub technology detection |
+| Leadership Collector | Executive AI background scoring |
+| Say Score Analyzer | AI keyword density measurement in SEC filings |
+
+### Case Study 3 — AI Scoring Engine
+
+| Task | Component | Description |
+|---|---|---|
+| 5.0a | Evidence Mapper | 9 signal sources → 7 dimensions with primary/secondary weights |
+| 5.0b | Rubric Scorer | 5-level qualitative rubrics for all 7 dimensions |
+| 5.0c | Glassdoor Collector | Employee review culture signal analysis |
+| 5.0d | Board Analyzer | DEF 14A proxy statement governance scoring |
+| 5.0e | Talent Concentration | Key-person risk from job metadata |
+| 5.1 | Decimal Utilities | Weighted mean, std dev, CV with Decimal precision |
+| 5.2 | V^R Calculator | Full venture readiness formula with audit logging |
+| 5.3 | Property-Based Tests | Hypothesis tests (500 examples each) |
+| 6.0a | Position Factor | Company position relative to sector peers |
+| 6.0b | Integration Service | End-to-end CS1/CS2 → Org-AI-R pipeline |
+| 6.1 | H^R Calculator | Industry AI readiness with position adjustment |
+| 6.2 | Confidence Calculator | SEM-based 95% confidence intervals |
+| 6.3 | Synergy Calculator | Alignment × timing factor synergy score |
+| 6.4 | Org-AI-R Calculator | Final weighted composite score |
+| 6.5 | Portfolio Results | 13-company scored portfolio |
+
+---
+
+## Target Companies
+
+| Sector | Ticker | Company |
+|---|:---:|---|
+| Manufacturing | CAT | Caterpillar Inc. |
+| Manufacturing | DE | Deere & Company |
+| Manufacturing | GE | General Electric Co. |
+| Healthcare | UNH | UnitedHealth Group |
+| Healthcare | HCA | HCA Healthcare |
+| Services | ADP | Automatic Data Processing |
+| Services | PAYX | Paychex Inc. |
+| Retail | WMT | Walmart Inc. |
+| Retail | TGT | Target Corporation |
+| Retail | DG | Dollar General Corp. |
+| Financial | JPM | JPMorgan Chase |
+| Financial | GS | Goldman Sachs |
+| Technology | NVDA | NVIDIA Corporation |
 
 ---
 
 ## Prerequisites
 
-### Required Software
-- Python 3.11 or higher
-- Docker 20.10 or higher
-- Docker Compose 2.0 or higher
-- Git
-- Poetry (recommended) or pip
-
-### Required Accounts
-- **Snowflake**: Active warehouse, database and schema access
-- **AWS**: S3 bucket with IAM user permissions
-- **Redis**: Provided via Docker Compose
-- **NewsAPI**: Optional, for leadership signal enrichment
+- Python 3.11+
+- Docker & Docker Compose 2.0+
+- Snowflake account (warehouse, database, schema)
+- AWS account (S3 bucket + IAM credentials)
+- Anthropic API key (for investment memo generation)
 
 ---
 
-## Installation and Setup
+## Installation & Setup
 
-### 1. Clone Repository
+### 1. Clone the Repository
 
- 
+```bash
 git clone <repository-url>
 cd pe-org-air-platform
-  
+```
 
-### 2. Configure Environment
+### 2. Configure Environment Variables
 
+```bash
 cp .env.example .env
+```
 
 Edit `.env` with your credentials:
 
-# Snowflake Configuration
+```env
+# Snowflake
 SNOWFLAKE_ACCOUNT=your_account_identifier
 SNOWFLAKE_USER=your_username
 SNOWFLAKE_PASSWORD=your_password
 SNOWFLAKE_DATABASE=PE_ORGAIR
 SNOWFLAKE_SCHEMA=PUBLIC
 SNOWFLAKE_WAREHOUSE=COMPUTE_WH
-SNOWFLAKE_ROLE=your_role  # Optional
+SNOWFLAKE_ROLE=your_role          # optional
 
-# Redis Configuration
-REDIS_HOST=redis  # Use 'localhost' for local development
+# Redis
+REDIS_HOST=redis                  # use 'localhost' for local dev
 REDIS_PORT=6379
 REDIS_DB=0
 
-# AWS S3 Configuration
+# AWS S3
 AWS_ACCESS_KEY_ID=your_access_key_id
 AWS_SECRET_ACCESS_KEY=your_secret_access_key
 AWS_REGION=us-east-1
 S3_BUCKET=your_s3_bucket_name
 
-# Optional: NewsAPI for leadership signals
-NEWS_API_KEY=your_news_api_key
+# Anthropic (for investment memo generation)
+ANTHROPIC_API_KEY=your_anthropic_api_key
+CLAUDE_MODEL=claude-haiku-4-5-20251001
 
 # Application
 APP_ENV=local
 APP_VERSION=1.0.0
+```
 
-### 3. Initialize Snowflake Database
+### 3. Initialize Snowflake Schema
 
-Execute the SQL schema in your Snowflake account:
+Run `app/database/schema.sql` in your Snowflake worksheet or via SnowSQL:
 
-**Using Snowflake Web UI:**
-1. Log in to Snowflake
-2. Navigate to Worksheets
-3. Open and execute `app/database/schema.sql`
-
-**Using SnowSQL CLI:**
+```bash
 snowsql -a <account> -u <user> -f app/database/schema.sql
-
-Verify tables:
-USE DATABASE PE_ORGAIR;
-USE SCHEMA PUBLIC;
-SHOW TABLES;
+```
 
 ### 4. Install Dependencies
 
-**Using Poetry (Recommended):**
+```bash
+# Using Poetry (recommended)
 poetry install
 
-**Using pip:**
+# Using pip
 pip install -r requirements.txt
 
-**Install Playwright (for patent signals):**
+# Install Playwright for patent signals
 playwright install chromium
+```
 
 ### 5. Run with Docker
 
-
+```bash
 cd docker
-
-# Build and start services
 docker-compose up -d
+```
 
-# Verify containers
-docker-compose ps
-
-# View logs
-docker-compose logs -f api
-API available at: `http://localhost:8000`
+API available at `http://localhost:8000`
 
 ### 6. Run Locally (Development)
 
-# Start Redis via Docker
-cd docker
+```bash
+# Start Redis only
 docker-compose up -d redis
-cd ..
 
-# Update .env: Set REDIS_HOST=localhost
+# Update .env: set REDIS_HOST=localhost
 
-# Run FastAPI
+# Start FastAPI
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
 
-### 7. Run Streamlit UI
-# In a separate terminal
+### 7. Start the Streamlit UI
+
+```bash
 streamlit run streamlit_ui/home.py
+```
 
-UI available at: `http://localhost:8501`
+UI available at `http://localhost:8501`
 
+---
 
-## Data Model
+## Configuration
 
-### Core Entities
+### Environment Variables Reference
 
-**Industry**
-- Reference data for company categorization
-- Base AI-readiness score (h_r_base) by sector
-- Sectors: Healthcare, Financial, Manufacturing, Services, Retail
+| Variable | Required | Description |
+|---|:---:|---|
+| SNOWFLAKE_ACCOUNT | Yes | Snowflake account identifier |
+| SNOWFLAKE_USER | Yes | Username |
+| SNOWFLAKE_PASSWORD | Yes | Password |
+| SNOWFLAKE_DATABASE | Yes | Database name (PE_ORGAIR) |
+| SNOWFLAKE_SCHEMA | Yes | Schema name (PUBLIC) |
+| SNOWFLAKE_WAREHOUSE | Yes | Warehouse name |
+| SNOWFLAKE_ROLE | No | Role (optional) |
+| REDIS_HOST | Yes | Redis hostname |
+| REDIS_PORT | Yes | Redis port (6379) |
+| AWS_ACCESS_KEY_ID | Yes | AWS access key |
+| AWS_SECRET_ACCESS_KEY | Yes | AWS secret key |
+| AWS_REGION | Yes | AWS region |
+| S3_BUCKET | Yes | S3 bucket name |
+| ANTHROPIC_API_KEY | Yes | Anthropic API key for Claude |
+| CLAUDE_MODEL | No | Claude model ID (defaults to haiku) |
 
-**Company**
-- Portfolio companies or acquisition targets
-- Links to industry for context
-- Position factor (-1.0 to 1.0) for market position adjustment
-- Soft delete support
+### Caching Strategy
 
-**Assessment**
-- AI-readiness evaluation instances
-- Types: screening, due_diligence, quarterly, exit_prep
-- Status workflow with state machine validation
-- VR score with confidence intervals
+| Data | TTL | Invalidation Trigger |
+|---|:---:|---|
+| Company by ID | 5 min | On update or delete |
+| Industry list | 1 hour | On create |
+| Assessment | 2 min | On status change |
+| Dimension weights | 24 hours | Configuration change |
 
-**Dimension Score**
-- Individual dimension evaluations (7 dimensions)
-- Weighted scoring system
-- Evidence tracking
-- Confidence levels
+---
 
-**Document**
-- SEC filings (10-K, 10-Q, 8-K, DEF-14A)
-- Content hashing for deduplication
-- S3 storage integration
-- Section extraction tracking
+## Running the Platform
 
-**Document Chunks**
-- Semantic chunking with overlap
-- Section-aware chunking
-- Ready for LLM processing and vector search
+### Collect Evidence for All Companies
 
-**External Signals**
-- Job postings, patents, tech stack, leadership
-- Normalized scores (0-100)
-- Metadata in JSON format
-- Signal summaries by company
-
-### AI-Readiness Dimensions
-
-| Dimension | Weight | Description |
-|-----------|--------|-------------|
-| Data Infrastructure | 0.25 | Quality, accessibility, and governance of data assets |
-| AI Governance | 0.20 | Policies, ethics frameworks, compliance readiness |
-| Technology Stack | 0.15 | Cloud infrastructure, ML tooling, API architecture |
-| Talent & Skills | 0.15 | AI/ML talent density, retention, training programs |
-| Leadership & Vision | 0.10 | Executive commitment, AI strategy, investment appetite |
-| Use Case Portfolio | 0.10 | AI projects in production, pipeline, ROI tracking |
-| Culture & Change | 0.05 | Innovation culture, change readiness, adoption rates |
-
-### Assessment Status State Machine
-
-  
-DRAFT ──────> IN_PROGRESS ──────> SUBMITTED ──────> APPROVED
-                                       │                │
-                                       └────> SUPERSEDED <┘
-
-
-## API Documentation
-
-### Interactive Documentation
-
-Once running, access API documentation:
-
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
-
-### Core Endpoints
-
-**Health**
-- `GET /api/v1/health` - System health check with dependency status
-
-**Companies**
-- `POST /api/v1/companies` - Create company
-- `GET /api/v1/companies` - List companies (paginated, filterable)
-- `GET /api/v1/companies/{id}` - Get company by ID
-- `PUT /api/v1/companies/{id}` - Update company
-- `DELETE /api/v1/companies/{id}` - Soft delete company
-
-**Assessments**
-- `POST /api/v1/assessments` - Create assessment
-- `GET /api/v1/assessments` - List assessments (paginated, filterable)
-- `GET /api/v1/assessments/{id}` - Get assessment with scores
-- `PATCH /api/v1/assessments/{id}/status` - Update status
-
-**Dimension Scores**
-- `POST /api/v1/assessments/{id}/scores` - Add dimension scores
-- `GET /api/v1/assessments/{id}/scores` - Get scores (paginated)
-- `PUT /api/v1/scores/{id}` - Update score
-- `GET /api/v1/dimension-weights` - Get weight configuration
-
-**Documents**
-- `POST /api/v1/documents/sec-edgar/download` - Download SEC filings
-- `GET /api/v1/documents/sec-edgar/download-zip` - Download as ZIP
-- `GET /api/v1/documents/file` - Download local file
-
-**Signals**
-- `POST /api/v1/signals/collect-job-signals` - Collect job signals
-- `POST /api/v1/signals/collect-tech-signals` - Collect tech signals
-- `POST /api/v1/signals/collect-patent-signals` - Collect patent signals
-- `POST /api/v1/signals/collect-leadership-signals` - Collect leadership signals
-- `GET /api/v1/signals/companies/{id}` - Get company signals
-- `GET /api/v1/signals/companies/{id}/summary` - Get signal summary
-- `POST /api/v1/signals/companies/{id}/summary/refresh` - Refresh summary
-
-**Industries**
-- `POST /api/v1/industries` - Create industry
-- `GET /api/v1/industries` - List industries (paginated, filterable)
-- `GET /api/v1/industries/{id}` - Get industry by ID
-- `GET /api/v1/sectors` - List available sectors
-
-### Example Usage
-
-**Create Company:**
-curl -X POST http://localhost:8000/api/v1/companies \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "TechCorp Inc",
-    "ticker": "TECH",
-    "industry_id": "550e8400-e29b-41d4-a716-446655440003",
-    "position_factor": 0.5
-  }'
-
-**Download SEC Filings:**
-
-curl -X POST "http://localhost:8000/api/v1/documents/sec-edgar/download?company_id={uuid}&ticker=AAPL&filing_types=10-K&filing_types=10-Q&after=2023-01-01&limit=5"
-
-**Collect Job Signals:**
-curl -X POST "http://localhost:8000/api/v1/signals/collect-job-signals?company_id={uuid}&company_name=Apple%20Inc&max_results=20"
-
-## Evidence Collection
-
-### Automated Collection Script
-
-Run evidence collection for all target companies:
-
+```bash
 # Collect all signal types for all companies
 python scripts/collect_evidence.py --companies all --signals all
 
-# Collect specific signals
+# Collect specific signals for specific tickers
 python scripts/collect_evidence.py --companies JPM,GS --signals job,leadership
 
-# Single company collection
+# Single company, all signals
 python scripts/collect_evidence.py --ticker WMT --signals all
+```
 
+Available signal types: `job`, `leadership`, `tech`, `patent`, `board`
 
-### Signal Types
+### Calculate Say Scores
 
-**Technology Hiring Signals**
-- Scrapes LinkedIn, Indeed using JobSpy
-- AI relevance scoring based on keywords and skills
-- Seniority distribution analysis
-- Normalized score: 0-100
+```bash
+python scripts/calculate_say_scores.py
+```
 
-**Innovation Activity Signals**
-- Google Patents search via Playwright
-- CPC code filtering (G06N family for AI)
-- Recency bonus for recent patents
-- Category diversity scoring
+### Generate Evidence Report
 
-**Digital Presence Signals**
-- Company website, tech blogs, GitHub scraping
-- AI technology detection
-- Tech stack categorization
-- Multi-source evidence aggregation
+```bash
+python scripts/fetch_evidence_stats.py
+# Output: reports/evidence_stats.md
+```
 
-**Leadership Signals**
-- Executive profile scraping
-- AI background detection
-- Role weight calculation
-- Two-tier scoring (AI leadership present/absent)
+---
+
+## API Documentation
+
+Interactive docs available at runtime:
+- **Swagger UI**: `http://localhost:8000/docs`
+- **ReDoc**: `http://localhost:8000/redoc`
+
+### Core Endpoints
+
+#### Health
+```
+GET /api/v1/health
+```
+
+#### Companies
+```
+POST   /api/v1/companies
+GET    /api/v1/companies
+GET    /api/v1/companies/{id}
+PUT    /api/v1/companies/{id}
+DELETE /api/v1/companies/{id}
+```
+
+#### Assessments
+```
+POST   /api/v1/assessments
+GET    /api/v1/assessments
+GET    /api/v1/assessments/{id}
+PATCH  /api/v1/assessments/{id}/status
+```
+
+#### Dimension Scores
+```
+POST  /api/v1/assessments/{id}/scores
+GET   /api/v1/assessments/{id}/scores
+PUT   /api/v1/scores/{id}
+GET   /api/v1/dimension-weights
+```
+
+#### Documents
+```
+POST /api/v1/documents/sec-edgar/download
+GET  /api/v1/documents/sec-edgar/download-zip
+```
+
+#### Signals
+```
+POST /api/v1/signals/collect-job-signals
+POST /api/v1/signals/collect-tech-signals
+POST /api/v1/signals/collect-patent-signals
+POST /api/v1/signals/collect-leadership-signals
+POST /api/v1/signals/collect-board-signals
+POST /api/v1/signals/collect-sec-item1-signals
+POST /api/v1/signals/collect-sec-item1a-signals
+POST /api/v1/signals/collect-sec-item7-signals
+GET  /api/v1/signals/companies/{id}
+GET  /api/v1/signals/companies/{id}/summary
+POST /api/v1/signals/companies/{id}/summary/refresh
+```
+
+#### Scoring (CS3)
+```
+GET  /api/v1/scoring/companies/{id}/dimensions
+GET  /api/v1/scoring/companies/{id}/vr
+GET  /api/v1/scoring/companies/{id}/org-air
+POST /api/v1/scoring/companies/{id}/memo
+POST /api/v1/scoring/companies/vr/batch
+POST /api/v1/scoring/companies/compare
+```
+
+---
+
+## Scoring Pipeline
+
+### 7 AI-Readiness Dimensions
+
+| Dimension | Default Weight | Description |
+|---|:---:|---|
+| Data Infrastructure | 0.25 | Data storage, pipelines, quality |
+| AI Governance | 0.20 | Policies, ethics, risk controls |
+| Technology Stack | 0.15 | ML tooling, MLOps, cloud platforms |
+| Talent & Skills | 0.15 | AI/ML hiring depth and skill diversity |
+| Leadership & Vision | 0.10 | Executive commitment, AI strategy |
+| Use Case Portfolio | 0.10 | Deployed AI use cases and ROI |
+| Culture & Change | 0.05 | Innovation culture and agility |
+
+### Signal-to-Dimension Mapping (Table 1)
+
+> `(P)` = Primary contribution. All weights per source sum to 1.0.
+
+| CS2 Source | Data Infra | AI Gov | Tech Stack | Talent | Leadership | Use Case | Culture |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| technology_hiring | 0.10 | — | 0.20 | 0.70 (P) | — | — | — |
+| innovation_activity | 0.20 | — | 0.50 (P) | — | — | 0.30 | — |
+| digital_presence | 0.60 (P) | — | 0.40 | — | — | — | — |
+| leadership_signals | — | 0.25 | — | — | 0.60 (P) | — | 0.15 |
+| sec_item_1_business | — | — | 0.30 | — | — | 0.70 (P) | — |
+| sec_item_1a_risk | 0.20 | 0.80 (P) | — | — | — | — | — |
+| sec_item_7_mda | 0.20 | — | — | — | 0.50 (P) | 0.30 | — |
+| glassdoor_reviews | — | — | — | 0.10 | 0.10 | — | 0.80 (P) |
+| board_composition | — | 0.70 (P) | — | — | 0.30 | — | — |
+
+### Path A + Path B Score Combination
+
+```
+Combined Score = 0.60 × Path A (quantitative) + 0.40 × Path B (qualitative)
+```
+
+| Path | Method | Description |
+|---|---|---|
+| Path A | Evidence Mapper | Weighted contributions from CS2 signal scores |
+| Path B | Rubric Scorer | 5-level qualitative rubrics evaluated against extracted evidence text |
+
+### 5-Level Rubric (Example: Talent Dimension)
+
+| Level | Score Range | Criteria |
+|:---:|:---:|---|
+| 5 | 80 - 100 | ML platform team, 20+ specialists, AI research capability |
+| 4 | 60 - 79 | Established team (10-20), active hiring, retention programs |
+| 3 | 40 - 59 | Small team (3-10 data scientists), growing capability |
+| 2 | 20 - 39 | 1-2 data scientists, high turnover, limited depth |
+| 1 | 0 - 19 | No AI talent, vendor-dependent |
+
+### Sector-Specific V^R Weights
+
+| Sector | Data Infra | AI Gov | Tech Stack | Talent | Leadership | Use Case | Culture |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| Technology | 0.25 | 0.15 | 0.20 | 0.20 | 0.10 | 0.05 | 0.05 |
+| Financial | 0.25 | 0.25 | 0.15 | 0.15 | 0.10 | 0.05 | 0.05 |
+| Healthcare | 0.25 | 0.25 | 0.15 | 0.15 | 0.10 | 0.05 | 0.05 |
+| Retail | 0.25 | 0.15 | 0.15 | 0.15 | 0.10 | 0.15 | 0.05 |
+| Manufacturing | 0.25 | 0.20 | 0.15 | 0.15 | 0.10 | 0.10 | 0.05 |
+| Business Services | 0.25 | 0.20 | 0.15 | 0.15 | 0.10 | 0.10 | 0.05 |
+
+### Confidence Interval (Spearman-Brown Reliability)
+
+```
+ρ = (n × r) / (1 + (n − 1) × r)
+SEM = σ × √(1 − ρ)
+95% CI = score ± 1.96 × SEM
+```
+
+---
+
+## Evidence Collection
+
+### What Companies SAY (SEC Filings)
+
+| Filing | Sections Extracted | Purpose |
+|---|---|---|
+| 10-K | Item 1 (Business), Item 1A (Risk), Item 7 (MD&A) | Strategy, risks, investment |
+| 10-Q | Item 1A, Item 2 (MD&A) | Quarterly updates |
+| 8-K | Item 8.01 | Material AI announcements |
+| DEF 14A | Executive Compensation, Board Bios | Governance, leadership |
+
+### What Companies DO (External Signals)
+
+| Signal | Source | Composite Weight | Description |
+|---|---|:---:|---|
+| Technology Hiring | LinkedIn + Indeed | 30% | AI/ML job posting analysis |
+| Innovation Activity | Google Patents | 25% | CPC G06N AI patent filings |
+| Digital Presence | Tech blogs + GitHub | 25% | AI technology stack detection |
+| Leadership Signals | Company websites | 20% | Executive AI backgrounds |
+| Board Governance | DEF 14A Proxy Statements | — | Board AI expertise, tech committee presence, data officer roles |
+| SEC Item 1 | 10-K Business Section | — | AI use case mentions, production deployments, product diversity |
+| SEC Item 1A | 10-K Risk Factors | — | AI risk disclosure, cybersecurity, regulatory compliance |
+| SEC Item 7 | 10-K / 10-Q MD&A | — | AI strategy discussion, technology investment, executive priorities |
+| Culture Signals | Glassdoor Reviews (S3) | — | Innovation culture, data-driven mindset, change readiness |
+
 
 ### Say Score Calculation
 
-Measures AI rhetoric in SEC filings:
+Measures AI rhetoric density across ~90 weighted keywords in SEC filings:
 
-python scripts/calculate_say_scores.py
+```
+mention_density = weighted_mentions / total_words × 1000
+say_score       = min(√(mention_density) × 95, 100)
+```
 
-Output: Say scores (0-100) based on AI keyword density in filing text
+---
 
-### Evidence Statistics
+## Testing
 
-Generate comprehensive evidence report:
+### Run All Tests
 
-python scripts/fetch_evidence_stats.py
-
-
-Output: `reports/evidence_stats.md` with:
-- Document counts by company and filing type
-- Chunk statistics
-- Say vs. Do score comparison
-- Sector analysis
-- Latest signals detail
-
-
-## Running Tests
-
-### Full Test Suite
-
-
+```bash
 pytest tests/ -v
+```
 
 ### Test Categories
 
-
-# Unit tests (fast, no external dependencies)
+```bash
+# Unit tests (no external dependencies)
 pytest tests/unit/ -v
 
-# API tests (mocked services)
+# API tests (monkeypatched services)
 pytest tests/api/ -v
 
 # Integration tests (requires Snowflake)
 pytest tests/integration/ -v -m integration
 
+# Scoring pipeline tests
+pytest tests/test_scoring_pipeline.py -v -s
+
+# Talent concentration standalone (no DB required)
+pytest tests/test_tc_standalone.py -v
+
+# Property-based tests (Hypothesis, 500 examples)
+pytest tests/test_talent_concetration.py -v
+
 # With coverage report
 pytest tests/ --cov=app --cov-report=html
+```
 
-## Configuration
+### Property-Based Tests (Hypothesis)
 
-### Environment Variables
-
-**Snowflake (Required)**
-- `SNOWFLAKE_ACCOUNT`: Account identifier
-- `SNOWFLAKE_USER`: Username
-- `SNOWFLAKE_PASSWORD`: Password
-- `SNOWFLAKE_DATABASE`: Database name (default: PE_ORGAIR)
-- `SNOWFLAKE_SCHEMA`: Schema name (default: PUBLIC)
-- `SNOWFLAKE_WAREHOUSE`: Warehouse name
-- `SNOWFLAKE_ROLE`: Role name (optional)
-
-**Redis (Required)**
-- `REDIS_HOST`: Hostname (redis for Docker, localhost for local)
-- `REDIS_PORT`: Port (default: 6379)
-- `REDIS_DB`: Database number (default: 0)
-
-**AWS S3 (Required)**
-- `AWS_ACCESS_KEY_ID`: IAM access key
-- `AWS_SECRET_ACCESS_KEY`: IAM secret key
-- `AWS_REGION`: AWS region (default: us-east-1)
-- `S3_BUCKET`: S3 bucket name
-
-**Application**
-- `APP_ENV`: Environment (local/dev/prod)
-- `APP_VERSION`: Version string
-
-### Caching Strategy
-
-| Data | TTL | Invalidation |
-|------|-----|--------------|
-| Company by ID | 5 minutes | On update/delete |
-| Industry list | 1 hour | On create |
-| Assessment | 2 minutes | On status change |
-| Dimension weights | 24 hours | Configuration change |
-
-
-
-## Troubleshooting
-
-### Container Issues
-
-**Container fails to start:**
- 
-docker-compose logs api
-  
-
-Common causes:
-- Missing environment variables
-- Invalid Snowflake credentials
-- Port conflicts
-
-**Port already in use:**
- 
-# Mac/Linux
-lsof -i :8000
-
-# Windows
-netstat -ano | findstr :8000
-  
-
-### Database Connection
-
-**Snowflake connection fails:**
-- Verify warehouse is running (not suspended)
-- Check role permissions
-- Confirm network connectivity
-
-  sql
-ALTER WAREHOUSE COMPUTE_WH RESUME;
-  
-
-**Redis unhealthy:**
- 
-docker exec -it pe_orgair_redis redis-cli ping
-# Should return: PING
-  
-
-### S3 Connection
-
-**S3 not configured:**
-- Verify bucket exists
-- Check IAM permissions (s3:HeadBucket, s3:GetObject, s3:PutObject)
-- Confirm access key is active
-
-
-### Common Errors
-
-**"Industry not found"** - Run seed data from schema.sql
-
-**"Invalid status transition"** - Check allowed transitions in assessment_state_machine.py
-
-**"assessment_id mismatch"** - Ensure body assessment_id matches URL parameter
-
-**"No chunks found"** - Verify SEC filings were downloaded and parsed successfully
+| Property | Description |
+|---|---|
+| test_all_dimensions_returned | EvidenceMapper always returns exactly 7 dimensions |
+| test_missing_evidence_defaults_to_50 | No evidence returns default score of 50.0 |
+| test_more_evidence_higher_confidence | More sources gives equal or higher confidence |
+| test_tc_always_bounded | Talent Concentration always in [0, 1] |
+| test_larger_teams_lower_concentration | Larger team produces lower TC score |
+| test_vr_always_bounded | V^R always in [0, 100] |
+| test_score_within_level_bounds | Rubric score always within its level's min/max range |
+| test_deterministic | Same inputs always produce identical output |
 
 ---
 
+## Deployment
 
-### Scaling Considerations
+The platform is deployed on [Render](https://render.com) using `render.yaml`.
 
-- FastAPI is stateless (horizontal scaling ready)
-- Consider connection pooling for Snowflake
-- Redis can be sharded if cache grows
-- S3 provides unlimited storage
-- Rate limiting on collection endpoints (10/hour for downloads, 100/minute for file access)
+### Services
+
+| Service | Type | Description |
+|---|---|---|
+| pe-orgair-api | Web (Python) | FastAPI backend |
+| pe-orgair-ui | Web (Python) | Streamlit frontend |
+| pe-orgair-redis | Redis | Cache layer |
+
+### Health Check
+
+```bash
+curl https://pe-orgair-api.onrender.com/health
+```
+
+### Rate Limits
+
+| Endpoint | Limit |
+|---|---|
+| SEC EDGAR download | 10 requests / hour |
+| ZIP file download | 10 requests / hour |
+| Local file access | 100 requests / minute |
+
+---
+
+## Data Model
+
+### Assessment Status State Machine
+
+```
+DRAFT ──→ IN_PROGRESS ──→ SUBMITTED ──→ APPROVED
+                               │              │
+                               └──→ SUPERSEDED ←┘
+```
+
+### Database Tables
+
+| Table | Description |
+|---|---|
+| industries | Reference data with H^R base by sector |
+| companies | Portfolio companies with position factor |
+| assessments | AI readiness assessments per company |
+| dimension_scores | 7-dimension scores per assessment |
+| documents | SEC filing metadata |
+| document_chunks | Section-aware text chunks |
+| external_signals | CS2 + CS3 evidence signals |
+| company_signal_summaries | Materialized composite scores |
 
 ---
 
 ## Known Limitations
 
-### Current Scope
-
-1. **Authentication**: Not implemented - production requires JWT and RBAC
-2. **VR Score Calculation**: Formula defined but not implemented (Case Study 3)
-3. **Rate Limiting**: Basic limits on document endpoints only
-4. **Audit Logging**: Changes not tracked
-5. **NewsAPI**: Disabled due to free tier limitations (HTTP 426)
-6. **Patent Collection**: Synchronous (can be slow for large patent portfolios)
-
-### Data Quality
-
-- **Say Scores**: Only 4/10 companies have complete SEC data retrieval
-- **Leadership Signals**: Some companies require hardcoded executive data
-- **Job Signals**: Subject to scraping availability and rate limits
-- **Patent Signals**: Relies on Google Patents UI (no official API)
-
-### Performance
-
-- Pagination capped at 100 records
-- SEC downloads rate-limited by SEC (10/second)
-- Job scraping can take 2-5 minutes per company
-- Patent analysis requires browser automation (Playwright)
+| Limitation | Description |
+|---|---|
+| Authentication | Not implemented — production requires JWT + RBAC |
+| NewsAPI | Disabled (HTTP 426 on free tier) |
+| Patent Collection | Synchronous Playwright browser — slow for large portfolios |
+| Rate Limits | SEC downloads: 10/hour; ZIP downloads: 10/hour |
+| SEC Data Coverage | Some companies have partial multi-year filing history |
 
 ---
-
-## Design Decisions
-
-### Architecture
-
-**Snowflake for Primary Persistence**
-- Analytical query performance
-- Semi-structured data support (VARIANT for JSON)
-- Compute/storage separation
-
-**Redis for Caching**
-- Read-through cache pattern
-- TTL-based invalidation
-- Pattern-based bulk invalidation
-
-**FastAPI Framework**
-- Auto-generated OpenAPI docs
-- Built-in validation via Pydantic
-- Async support for I/O operations
-
-**Pydantic for Data Validation**
-- Type safety at API boundaries
-- Automatic serialization
-- Clear error messages
-
-### Data Modeling
-
-**Soft Deletes** - Maintains referential integrity, supports audit trails
-
-**UUID Primary Keys** - Distributed system friendly, no coordination needed
-
-**Weighted Scoring** - Configurable dimension weights, transparent logic
-
-**State Machine** - Enforces workflow integrity, prevents invalid transitions
-
-**Section-Level Deduplication** - Prevents duplicate chunks from TOC matches
-
-**Signal Summaries** - Materialized view pattern for fast composite score access
-
-### Evidence Collection
-
-**Modular Collectors** - Base class pattern for extensible signal sources
-
-**Multi-Source Aggregation** - Combines website, GitHub, news for comprehensive evidence
-
-**Two-Tier Leadership Scoring** - Full credit for AI leadership, 50% penalty without
-
-**AI Relevance Scoring** - Composite score from title keywords and skill count
-
-**CPC-Based Patent Filtering** - Uses G06N family codes for AI classification
-
----
-
-## Evidence Statistics
-
-### Document Collection (as of February 2026)
-
-- **Companies**: 10
-- **Total Documents**: 53 (20 × 10-K, 11 × 10-Q, 11 × 8-K, 11 × DEF-14A)
-- **Total Chunks**: 2,602
-- **Total Words**: 2,587,824
-
-### Signal Collection
-
-- **Total Signals**: 38
-- **Companies with Signals**: 10
-- **Average Composite Score**: 42.9/100
-
-### Top Companies by Do Score
-
-1. **WMT** - 68.2 (Quiet builder, Do > Say)
-2. **UNH** - 66.3
-3. **GS** - 57.0
-
-### Biggest Say-Do Gaps
-
-1. **ADP** - Say: 100.0, Do: 31.8 (Gap: +68.2)
-2. **PAYX** - Say: 93.7, Do: 28.4 (Gap: +65.3)
-3. **HCA** - Say: 76.1, Do: 40.2 (Gap: +35.8)
-
----
-
-## Development Workflow
-
-### Adding New Endpoints
-
-1. Define Pydantic models in `app/models/`
-2. Implement business logic in `app/services/`
-3. Create router in `app/routers/`
-4. Register router in `app/main.py`
-5. Add tests in `tests/api/`
-
-### Adding New Signal Collectors
-
-1. Create collector class inheriting from `BaseLeadershipCollector` or similar
-2. Implement `collect_leadership_data()` method
-3. Add to orchestrator in relevant pipeline
-4. Add endpoint in `app/routers/signal.py`
-5. Update `scripts/collect_evidence.py`
-
-### Database Changes
-
-1. Update `app/database/schema.sql`
-2. Run migration in Snowflake
-3. Update Pydantic models
-4. Update service layer queries
-5. Clear relevant Redis caches
-
----
-
-## Key Findings
-
-### Say-Do Gap Analysis
-
-Companies with positive gaps (more talk than action):
-- ADP, PAYX, HCA show high AI rhetoric but limited actual investment
-- Common in services sector
-
-Companies with negative gaps (quiet builders):
-- WMT, JPM show more AI activity than filing rhetoric
-- Indicates operational focus over marketing
-
-### Sector Trends
-
-- **Healthcare**: Highest average composite (53.3) - Strong leadership signals
-- **Retail**: Second highest (50.8) - Balanced across all dimensions
-- **Services**: Lowest (30.1) - High say scores but weak execution signals
-
-## Team Contributions
-
-| Name | Email | Role |
-|------|-------|------|
-| Prachi Pradhan | pradhanprac@northeastern.edu | SEC EDGAR pipeline, document parser, chunking logic, S3 storage, Snowflake schema, Say Score analyzer, leadership signals, Redis caching, documentation |
-| Samiksha Gupta | gupta.samik@northeastern.edu | Job signal pipeline, evidence collection script, Streamlit signal analysis page, Docker setup, UI changes, Snowflake setup, S3 setup |
-| Siddharth Shukla | shukla.sid@northeastern.edu | FastAPI endpoints, Pydantic models, Redis caching, assessment state machine, health check, Streamlit company reports page, tech signal pipeline, patent signal pipeline, signal scoring |
 
 ## AI Tools Disclosure
 
 | Tool | Usage |
-|------|-------|
-| Claude (Anthropic) | Code debugging, architecture discussions, documentation drafting |
+|---|---|
+| Claude (Anthropic) | Code debugging, architecture design, documentation, investment memo generation |
 | GitHub Copilot | Code autocompletion during development |
 
 All code was reviewed, understood, and tested by team members before inclusion.
 
+---
+
+## Team Contributions
+
+| Name | Email | Contributions |
+|---|---|---|
+| Prachi Pradhan | pradhanprac@northeastern.edu | SEC EDGAR pipeline, document parser, chunking, S3 storage, Snowflake schema, Say Score analyzer, leadership signals, Redis caching, CS3 scoring engine (evidence mapper, rubric scorer, VR calculator),Board analyer composition, investment memo generator using claude anthropic, documentation |
+| Samiksh Gupta | gupta.samik@northeastern.edu | Job signal pipeline, evidence collection script, Streamlit signal analysis page, Docker setup, UI improvements, Snowflake setup, S3 setup,HR/synergy calculators, confidence CI,glassdoor reviews collection, ruberics scorer, integration service|
+| Siddharth Shukla | shukla.sid@northeastern.edu | FastAPI endpoints, Pydantic models, Redis caching, assessment state machine, health check, Streamlit company reports, tech signal pipeline, patent signal pipeline, signal scoring,HR/synergy calculators, confidence CI , talent concentration, ruberic scorer,integration service, Airflow implementation for sec edgar pipeline|
+
+---
+
 ## Resources
 
-### Documentation
+| Resource | Link |
+|---|---|
+| FastAPI | https://fastapi.tiangolo.com |
+| Pydantic v2 | https://docs.pydantic.dev |
+| Snowflake Python Connector | https://docs.snowflake.com/en/developer-guide/python-connector |
+| Redis-py | https://redis-py.readthedocs.io |
+| sec-edgar-downloader | https://sec-edgar-downloader.readthedocs.io |
+| JobSpy | https://github.com/Bumsly/JobSpy |
+| Hypothesis | https://hypothesis.readthedocs.io |
+| Anthropic API | https://docs.anthropic.com |
 
-- FastAPI: https://fastapi.tiangolo.com
-- Pydantic v2: https://docs.pydantic.dev
-- Snowflake Python: https://docs.snowflake.com/en/developer-guide/python-connector
-- Redis-py: https://redis-py.readthedocs.io
-- sec-edgar-downloader: https://sec-edgar-downloader.readthedocs.io
-- JobSpy: https://github.com/Bunsly/JobSpy
+---
 

@@ -35,7 +35,7 @@ class CompanyWebsiteCollector(BaseLeadershipCollector):
     ]
     
     # Companies known to need Playwright (JavaScript-heavy sites)
-    REQUIRES_PLAYWRIGHT = ['UNH', 'GS', 'CAT', 'DE']
+    REQUIRES_PLAYWRIGHT = ['UNH', 'GS', 'CAT', 'DE', 'NVDA', 'GE', 'DG']
     
     def __init__(self):
         super().__init__("Company Website", weight=1.00)
@@ -190,6 +190,9 @@ class CompanyWebsiteCollector(BaseLeadershipCollector):
             'HCA': [],
             'CAT': ['https://www.caterpillar.com/en/company/governance/officers.html'],
             'DE': ['https://about.deere.com/en-us/explore-john-deere/leadership'],
+            'NVDA': ['https://www.nvidia.com/en-us/about-nvidia/leadership/'],
+            'GE': ['https://www.geaerospace.com/company/leadership'],
+            'DG': ['https://newscenter.dollargeneral.com/leadership-team/'],
         }.get(ticker.upper(), [])
     
     def _extract_structured(self, soup: BeautifulSoup) -> List[ExecutiveProfile]:
@@ -334,9 +337,20 @@ class CompanyWebsiteCollector(BaseLeadershipCollector):
                 return False
         
         name_lower = name.lower()
-        
-        bad = ['investor', 'committee', 'home', 'about', 'global']
+
+        # Substring-level bad strings (navigation text, section headers, etc.)
+        bad = ['investor', 'committee', 'home', 'about', 'global', '|', 'http']
         if any(b in name_lower for b in bad):
+            return False
+
+        # Word-level bad words — catches "All Leadership", "Aerospace Leadership", "Our Team", etc.
+        bad_words = {
+            'leadership', 'team', 'all', 'our', 'aerospace', 'contact',
+            'news', 'management', 'board', 'corporate', 'executives',
+            'overview', 'navigate', 'skip', 'menu', 'footer', 'header',
+        }
+        name_words_lower = {w.lower().strip('.,') for w in words if w}
+        if name_words_lower & bad_words:
             return False
         
         if name.isupper():
@@ -386,6 +400,7 @@ class CompanyWebsiteCollector(BaseLeadershipCollector):
             'data science', 'chief data', 'chief analytics',
             'analytics, and ai', 'analytics and ai', ', ai', 'data, analytics',
             'head of ai', 'vp of ai', 'vp ai', 'svp ai',
+            'chief scientist', 'chief research officer', 'vp of research', 'svp of research',
         ]
         
         if any(kw in title_lower for kw in ai_titles):
@@ -427,6 +442,16 @@ class CompanyWebsiteCollector(BaseLeadershipCollector):
                 confidence=0.85
             ))
         
+        if re.search(r'chief scientist|chief research officer|vp of research|svp of research', t):
+            if not indicators:
+                indicators.append(AIIndicator(
+                    type=AIIndicatorType.AI_ROLE_TITLE,
+                    evidence=title,
+                    score=0.9,
+                    source='Company Website',
+                    confidence=0.85
+                ))
+
         if re.search(r'chief data|chief analytics|data.*analytics', t):
             if not indicators:
                 indicators.append(AIIndicator(
