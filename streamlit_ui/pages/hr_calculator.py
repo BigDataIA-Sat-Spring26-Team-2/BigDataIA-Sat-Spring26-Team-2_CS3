@@ -334,6 +334,48 @@ with col_right:
             f"VR_comp formula: `(V^R − {sector_avg_vr:.1f}) / 50`"
         )
 
+        # Clear cached VR when company changes (same logic as V^R Calculator)
+        company_id = selected_co["id"]
+        if st.session_state.get("hr_vr_last_company_id") != company_id:
+            for _k in ("hr_vr_input", "hr_vr_fetch_status"):
+                st.session_state.pop(_k, None)
+            st.session_state["hr_vr_last_company_id"] = company_id
+
+        fb_col, fs_col = st.columns([1, 2])
+        with fb_col:
+            fetch_vr_clicked = st.button(
+                "📡 Fetch V^R from API",
+                key="hr_fetch_vr_btn",
+                use_container_width=True,
+                help="Auto-populate V^R using the scoring API — identical to the V^R Calculator page",
+            )
+
+        if fetch_vr_clicked:
+            with st.spinner("Fetching V^R score..."):
+                try:
+                    org_air = api.get_org_air_score(company_id)
+                    if org_air and "vr_score" in org_air:
+                        st.session_state["hr_vr_input"] = float(org_air["vr_score"])
+                        st.session_state["hr_vr_fetch_status"] = (
+                            "success",
+                            f"Fetched V^R: {org_air['vr_score']:.2f}",
+                        )
+                    else:
+                        st.session_state["hr_vr_fetch_status"] = (
+                            "warning",
+                            "No V^R score returned. Enter manually below.",
+                        )
+                except Exception as e:
+                    st.session_state["hr_vr_fetch_status"] = ("warning", f"API error: {e}")
+
+        with fs_col:
+            if "hr_vr_fetch_status" in st.session_state:
+                _stype, _smsg = st.session_state["hr_vr_fetch_status"]
+                if _stype == "success":
+                    st.success(f"✅ {_smsg}")
+                else:
+                    st.warning(f"⚠️ {_smsg}")
+
         vr_input = st.number_input(
             "V^R Score",
             min_value=0.0,
@@ -341,7 +383,7 @@ with col_right:
             value=65.0,
             step=0.5,
             key="hr_vr_input",
-            help="Venture Readiness score for this company (0–100)",
+            help="Venture Readiness score (0–100). Click '📡 Fetch V^R from API' to auto-populate via the scoring API.",
         )
         mcap_pct = st.slider(
             "Market Cap Percentile (0 = smallest in sector, 1 = largest)",
