@@ -575,15 +575,15 @@ class GlassdoorCultureCollector:
         return CultureSignal(
             company_id=company_id,
             ticker=ticker,
-            innovation_score=Decimal("50.0"),
-            data_driven_score=Decimal("50.0"),
-            change_readiness_score=Decimal("50.0"),
-            ai_awareness_score=Decimal("50.0"),
-            overall_score=Decimal("50.0"),
+            innovation_score=Decimal("10.0"),
+            data_driven_score=Decimal("10.0"),
+            change_readiness_score=Decimal("10.0"),
+            ai_awareness_score=Decimal("10.0"),
+            overall_score=Decimal("10.0"),
             review_count=0,
             avg_rating=Decimal("0"),
             current_employee_ratio=Decimal("0"),
-            confidence=Decimal("0.50"),
+            confidence=Decimal("0.10"),
         )
 
 
@@ -672,177 +672,177 @@ def batch_analyze_glassdoor(
     return results
 
 
-def example_single_company():
-    """
-    Example: Collect and store Glassdoor signal for NVIDIA.
-    """
-    from app.services.snowflake import get_connection
+# def example_single_company():
+#     """
+#     Example: Collect and store Glassdoor signal for NVIDIA.
+#     """
+#     from app.services.snowflake import get_connection
     
-    print("=" * 70)
-    print("EXAMPLE: Collect Glassdoor Signal for NVIDIA")
-    print("=" * 70)
+#     print("=" * 70)
+#     print("EXAMPLE: Collect Glassdoor Signal for NVIDIA")
+#     print("=" * 70)
     
-    # Step 1: Get company_id from database
-    print("\nStep 1: Getting company_id...")
+#     # Step 1: Get company_id from database
+#     print("\nStep 1: Getting company_id...")
     
-    settings = get_settings()
-    conn = get_connection()
-    cur = conn.cursor()
+#     settings = get_settings()
+#     conn = get_connection()
+#     cur = conn.cursor()
     
-    cur.execute(f"""
-        SELECT id, name, ticker
-        FROM {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.companies
-        WHERE ticker = 'WMT'
-        LIMIT 1
-    """)
+#     cur.execute(f"""
+#         SELECT id, name, ticker
+#         FROM {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.companies
+#         WHERE ticker = 'CAT'
+#         LIMIT 1
+#     """)
     
-    row = cur.fetchone()
+#     row = cur.fetchone()
     
-    if not row:
-        print("✗ NVDA not found in database")
-        cur.close()
-        conn.close()
-        return
+#     if not row:
+#         print("✗ NVDA not found in database")
+#         cur.close()
+#         conn.close()
+#         return
     
-    company_id = row[0]
-    company_name = row[1]
-    ticker = row[2]
+#     company_id = row[0]
+#     company_name = row[1]
+#     ticker = row[2]
     
-    print(f"✓ Found: {company_name} (ID: {company_id})")
+#     print(f"✓ Found: {company_name} (ID: {company_id})")
     
-    cur.close()
-    conn.close()
+#     cur.close()
+#     conn.close()
     
-    # Step 2: Run Glassdoor pipeline
-    print("\nStep 2: Running Glassdoor collection pipeline...")
+#     # Step 2: Run Glassdoor pipeline
+#     print("\nStep 2: Running Glassdoor collection pipeline...")
     
-    pipeline = GlassdoorCollectionPipeline()
+#     pipeline = GlassdoorCollectionPipeline()
     
-    culture_signal = pipeline.collect_and_analyze(
-        company_id=company_id,
-        ticker=ticker,
-        filter_tech_roles=True
-    )
+#     culture_signal = pipeline.collect_and_analyze(
+#         company_id=company_id,
+#         ticker=ticker,
+#         filter_tech_roles=True
+#     )
     
-    # Step 3: Display results
-    print("\n" + "=" * 70)
-    print("RESULTS")
-    print("=" * 70)
+#     # Step 3: Display results
+#     print("\n" + "=" * 70)
+#     print("RESULTS")
+#     print("=" * 70)
     
-    print(f"\n📊 Culture Scores:")
-    print(f"   Overall:          {culture_signal.overall_score:.1f}/100")
-    print(f"   Innovation:       {culture_signal.innovation_score:.1f}/100")
-    print(f"   Data-Driven:      {culture_signal.data_driven_score:.1f}/100")
-    print(f"   AI Awareness:     {culture_signal.ai_awareness_score:.1f}/100")
-    print(f"   Change Readiness: {culture_signal.change_readiness_score:.1f}/100")
+#     print(f"\n📊 Culture Scores:")
+#     print(f"   Overall:          {culture_signal.overall_score:.1f}/100")
+#     print(f"   Innovation:       {culture_signal.innovation_score:.1f}/100")
+#     print(f"   Data-Driven:      {culture_signal.data_driven_score:.1f}/100")
+#     print(f"   AI Awareness:     {culture_signal.ai_awareness_score:.1f}/100")
+#     print(f"   Change Readiness: {culture_signal.change_readiness_score:.1f}/100")
     
-    print(f"\n📝 Review Info:")
-    print(f"   Reviews Analyzed: {culture_signal.review_count}")
-    print(f"   Average Rating:   {culture_signal.avg_rating:.1f}/5.0")
-    print(f"   Confidence:       {culture_signal.confidence:.2f}")
+#     print(f"\n📝 Review Info:")
+#     print(f"   Reviews Analyzed: {culture_signal.review_count}")
+#     print(f"   Average Rating:   {culture_signal.avg_rating:.1f}/5.0")
+#     print(f"   Confidence:       {culture_signal.confidence:.2f}")
     
-    # Step 4: Verify it's stored
-    print("\n" + "=" * 70)
-    print("VERIFICATION")
-    print("=" * 70)
+#     # Step 4: Verify it's stored
+#     print("\n" + "=" * 70)
+#     print("VERIFICATION")
+#     print("=" * 70)
     
-    conn = get_connection()
-    cur = conn.cursor()
+#     conn = get_connection()
+#     cur = conn.cursor()
     
-    cur.execute(f"""
-        SELECT id, category, source, normalized_score, confidence, created_at
-        FROM {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.external_signals
-        WHERE company_id = %s AND category = 'culture'
-        ORDER BY created_at DESC
-        LIMIT 1
-    """, (company_id,))
+#     cur.execute(f"""
+#         SELECT id, category, source, normalized_score, confidence, created_at
+#         FROM {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.external_signals
+#         WHERE company_id = %s AND category = 'culture'
+#         ORDER BY created_at DESC
+#         LIMIT 1
+#     """, (company_id,))
     
-    row = cur.fetchone()
+#     row = cur.fetchone()
     
-    if row:
-        print(f"\n✓ Signal stored in external_signals table")
-        print(f"  Signal ID:  {row[0]}")
-        print(f"  Category:   {row[1]}")
-        print(f"  Source:     {row[2]}")
-        print(f"  Score:      {row[3]:.1f}/100")
-        print(f"  Confidence: {row[4]:.2f}")
-        print(f"  Created:    {row[5]}")
-    else:
-        print(f"\n⚠ Signal NOT found in database - check for errors above")
+#     if row:
+#         print(f"\n✓ Signal stored in external_signals table")
+#         print(f"  Signal ID:  {row[0]}")
+#         print(f"  Category:   {row[1]}")
+#         print(f"  Source:     {row[2]}")
+#         print(f"  Score:      {row[3]:.1f}/100")
+#         print(f"  Confidence: {row[4]:.2f}")
+#         print(f"  Created:    {row[5]}")
+#     else:
+#         print(f"\n⚠ Signal NOT found in database - check for errors above")
     
-    cur.close()
-    conn.close()
+#     cur.close()
+#     conn.close()
     
-    print("\n" + "=" * 70)
-    print("✅ EXAMPLE COMPLETE")
-    print("=" * 70)
+#     print("\n" + "=" * 70)
+#     print("✅ EXAMPLE COMPLETE")
+#     print("=" * 70)
 
 
-def example_batch_companies():
-    """
-    Example: Collect and store Glassdoor signals for all CS3 companies.
-    """
-    print("=" * 70)
-    print("EXAMPLE: Batch Collect All CS3 Companies")
-    print("=" * 70)
+# def example_batch_companies():
+#     """
+#     Example: Collect and store Glassdoor signals for all CS3 companies.
+#     """
+#     print("=" * 70)
+#     print("EXAMPLE: Batch Collect All CS3 Companies")
+#     print("=" * 70)
     
-    # CS3 portfolio companies
-    tickers = ["NVDA", "JPM", "WMT", "GE", "DG"]
+#     # CS3 portfolio companies
+#     tickers = ["NVDA", "JPM", "WMT", "GE", "DG"]
     
-    from app.services.snowflake import get_connection
-    settings = get_settings()
+#     from app.services.snowflake import get_connection
+#     settings = get_settings()
     
-    for ticker in tickers:
-        print(f"\n{'─'*70}")
-        print(f"Processing: {ticker}")
-        print('─'*70)
+#     for ticker in tickers:
+#         print(f"\n{'─'*70}")
+#         print(f"Processing: {ticker}")
+#         print('─'*70)
         
-        try:
-            # Get company_id
-            conn = get_connection()
-            cur = conn.cursor()
+#         try:
+#             # Get company_id
+#             conn = get_connection()
+#             cur = conn.cursor()
             
-            cur.execute(f"""
-                SELECT id, name
-                FROM {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.companies
-                WHERE ticker = %s
-            """, (ticker,))
+#             cur.execute(f"""
+#                 SELECT id, name
+#                 FROM {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.companies
+#                 WHERE ticker = %s
+#             """, (ticker,))
             
-            row = cur.fetchone()
+#             row = cur.fetchone()
             
-            if not row:
-                print(f"✗ {ticker} not found in database - skipping")
-                cur.close()
-                conn.close()
-                continue
+#             if not row:
+#                 print(f"✗ {ticker} not found in database - skipping")
+#                 cur.close()
+#                 conn.close()
+#                 continue
             
-            company_id = row[0]
-            company_name = row[1]
+#             company_id = row[0]
+#             company_name = row[1]
             
-            cur.close()
-            conn.close()
+#             cur.close()
+#             conn.close()
             
-            print(f"✓ Found: {company_name}")
+#             print(f"✓ Found: {company_name}")
             
-            # Run pipeline
-            pipeline = GlassdoorCollectionPipeline()
-            culture_signal = pipeline.collect_and_analyze(
-                company_id=company_id,
-                ticker=ticker,
-                filter_tech_roles=True
-            )
+#             # Run pipeline
+#             pipeline = GlassdoorCollectionPipeline()
+#             culture_signal = pipeline.collect_and_analyze(
+#                 company_id=company_id,
+#                 ticker=ticker,
+#                 filter_tech_roles=True
+#             )
             
-            print(f"✓ Score: {culture_signal.overall_score:.1f}/100 ({culture_signal.review_count} reviews)")
+#             print(f"✓ Score: {culture_signal.overall_score:.1f}/100 ({culture_signal.review_count} reviews)")
             
-        except Exception as e:
-            print(f"✗ Failed: {str(e)}")
+#         except Exception as e:
+#             print(f"✗ Failed: {str(e)}")
     
-    print("\n" + "=" * 70)
-    print("BATCH COMPLETE")
-    print("=" * 70)
+#     print("\n" + "=" * 70)
+#     print("BATCH COMPLETE")
+#     print("=" * 70)
 
 
-if __name__ == "__main__":
-    # Run single company example
-    #example_single_company()
-    example_batch_companies()
+# if __name__ == "__main__":
+#     # Run single company example
+#     example_single_company()
+#     #example_batch_companies()
