@@ -2,31 +2,31 @@
   "company_id": "0c5c7684-48a4-4e3c-8e24-98c96a18f2f0",
   "ticker": "JPM",
   "sector": "financial",
-  "vr_score": 45.48171405,
-  "hr_score": 82.9496,
-  "synergy_score": 23.589855198,
-  "org_air_score": 56.04338684216,
-  "final_score": 56.04338684216,
-  "alignment": 0.6253211405,
+  "vr_score": 52.0206504,
+  "hr_score": 83.8904,
+  "synergy_score": 29.7316444914,
+  "org_air_score": 60.564121550168,
+  "final_score": 60.564121550168,
+  "alignment": 0.681302504,
   "talent_concentration": 0.2124,
-  "position_factor": 0.24576,
+  "position_factor": 0.32424,
   "market_cap_percentile": 0.8,
-  "ci_lower": 54.7268,
-  "ci_upper": 57.3532,
+  "ci_lower": 59.2468,
+  "ci_upper": 61.8732,
   "confidence": 0.9977041653000984,
   "sem": 0.67,
   "dimension_scores": {
     "data_infrastructure": 37.28,
-    "ai_governance": 43.3,
+    "ai_governance": 64.46,
     "technology_stack": 55.59,
-    "talent": 86.05,
+    "talent": 86.41,
     "leadership": 57.05,
     "use_case_portfolio": 26.6,
-    "culture": 28.64
+    "culture": 50.04
   },
-  "vr_weighted_mean": 49.858,
-  "vr_cv": 0.3511,
-  "vr_cv_penalty_amount": 4.37628595,
+  "vr_weighted_mean": 56.272,
+  "vr_cv": 0.3022,
+  "vr_cv_penalty_amount": 4.2513496,
   "vr_tc_penalty_amount": 0.0,
   "path_a_scores": {
     "data_infrastructure": 30.525072674418606,
@@ -44,9 +44,9 @@
       "rationale": "Matched 7/18 keywords at Adequate level"
     },
     "ai_governance": {
-      "score": 10.0,
-      "level": "ScoreLevel.LEVEL_1",
-      "rationale": "No rubric criteria met"
+      "score": 62.9,
+      "level": "ScoreLevel.LEVEL_4",
+      "rationale": "Matched 2/13 keywords at Good level"
     },
     "technology_stack": {
       "score": 86.7,
@@ -54,9 +54,9 @@
       "rationale": "Matched 4/12 keywords at Excellent level"
     },
     "talent": {
-      "score": 86.4,
+      "score": 87.3,
       "level": "ScoreLevel.LEVEL_5",
-      "rationale": "Matched 7/22 keywords at Excellent level"
+      "rationale": "Matched 8/22 keywords at Excellent level"
     },
     "leadership": {
       "score": 62.9,
@@ -69,9 +69,9 @@
       "rationale": "Matched 2/12 keywords at Adequate level"
     },
     "culture": {
-      "score": 10.0,
-      "level": "ScoreLevel.LEVEL_1",
-      "rationale": "No rubric criteria met"
+      "score": 63.5,
+      "level": "ScoreLevel.LEVEL_4",
+      "rationale": "Matched 2/11 keywords at Good level"
     }
   },
   "evidence_count": 234,
@@ -87,26 +87,26 @@
   "glassdoor_review_count": 17,
   "board_governance_score": 70.0,
   "vr_components": {
-    "weighted_mean": 49.858,
-    "cv": 0.3511,
-    "cv_penalty": 0.912225,
-    "cv_penalty_amount": 4.37628595,
+    "weighted_mean": 56.272,
+    "cv": 0.3022,
+    "cv_penalty": 0.92445,
+    "cv_penalty_amount": 4.2513496,
     "tc": 0.2124,
     "tc_penalty": 1.0,
     "tc_penalty_amount": 0.0
   },
   "hr_components": {
     "hr_base": 80.0,
-    "position_adjustment": 1.03687
+    "position_adjustment": 1.04863
   },
   "synergy_components": {
-    "base_synergy": 37.72566,
-    "alignment": 0.6253,
+    "base_synergy": 43.639578,
+    "alignment": 0.6813,
     "timing_factor": 1.0
   },
   "formula_constants": {
     "alpha": 0.6,
     "beta": 0.12
   },
-  "generated_at": "2026-02-20T08:32:14.468544+00:00"
+  "generated_at": "2026-02-20T10:19:55.669641+00:00"
 }

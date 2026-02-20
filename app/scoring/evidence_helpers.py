@@ -36,7 +36,8 @@ def get_data_infrastructure_evidence(company_id: UUID, ticker: str) -> Tuple[str
     
     evidence_parts = []
     all_scores = {}
-    
+    digital_metadata = {}
+
     try:
         cur.execute(f"""
             SELECT category, source, raw_value, normalized_score, metadata
@@ -57,6 +58,7 @@ def get_data_infrastructure_evidence(company_id: UUID, ticker: str) -> Tuple[str
             all_scores[category or source] = score
 
             if category == "digital_presence" or source == "tech_stack_scrape":
+                digital_metadata = metadata
 
                 evidence_parts.append(raw_value)
 
@@ -107,8 +109,7 @@ def get_data_infrastructure_evidence(company_id: UUID, ticker: str) -> Tuple[str
         digital_score = all_scores.get("digital_presence", 0)
         innovation_score = all_scores.get("innovation_activity", 0)
         
-        tech_count = len(metadata.get("ai_technologies", []) 
-                        if category == "digital_presence" else [])
+        tech_count = len(digital_metadata.get("ai_technologies", []))
         
         base_quality = (digital_score / 100) * 0.5 + (innovation_score / 100) * 0.3
         tech_bonus = min(0.2, tech_count * 0.05) 
@@ -135,10 +136,10 @@ def get_data_infrastructure_evidence(company_id: UUID, ticker: str) -> Tuple[str
 def get_technology_stack_evidence(company_id: UUID, ticker: str) -> Tuple[str, Dict[str, float]]:
     """
     Extract Technology Stack evidence from:
-    - innovation_activity (PRIMARY - 50% weight)
-    - digital_presence (40% weight)
+    - innovation_activity (PRIMARY - 40% weight)
+    - digital_presence (30% weight)
     - technology_hiring (20% weight)
-    - sec_item_1_business (30% weight)
+    - sec_item_1_business (10% weight)
     """
 
     conn = get_connection()
@@ -146,6 +147,9 @@ def get_technology_stack_evidence(company_id: UUID, ticker: str) -> Tuple[str, D
     settings = get_settings()
 
     evidence_parts = []
+    innovation_score = 0.0
+    digital_score = 0.0
+    tech_count = 0
 
     try:
         cur.execute(f"""
@@ -160,15 +164,19 @@ def get_technology_stack_evidence(company_id: UUID, ticker: str) -> Tuple[str, D
         for row in rows:
             category = row[0] or ""
             source = row[1] or ""
+            score = float(row[3]) if row[3] else 0.0
             metadata = json.loads(row[4]) if isinstance(row[4], str) else (row[4] or {})
 
             if category == "innovation_activity" or source == "google_patents":
+                innovation_score = score
                 keyword_matches = metadata.get("keyword_matches", {})
                 for keywords in keyword_matches.values():
                     evidence_parts.extend(keywords)
 
             elif category == "digital_presence" or source == "tech_stack_scrape":
+                digital_score = score
                 tech_list = metadata.get("ai_technologies", [])
+                tech_count = len(tech_list)
                 for tech in tech_list:
                     evidence_parts.append(tech.get("name", ""))
 
@@ -190,7 +198,10 @@ def get_technology_stack_evidence(company_id: UUID, ticker: str) -> Tuple[str, D
         mlops_count = sum(1 for kw in mlops_keywords if kw in evidence_text.lower())
 
         metrics = {
-            "mlops_maturity": min(1.0, mlops_count / 2)  # mature
+            "mlops_maturity": min(1.0, mlops_count / 2),
+            "innovation_score": innovation_score / 100,
+            "digital_score": digital_score / 100,
+            "tech_count": float(tech_count),
         }
 
         return (evidence_text, metrics)
@@ -235,7 +246,39 @@ def get_ai_governance_evidence(company_id: UUID, ticker: str) -> Tuple[str, Dict
             score = float(row[3]) if row[3] else 0.0
             metadata = json.loads(row[4]) if isinstance(row[4], str) else (row[4] or {})
 
-            if source == "board_composition" or category == "board_composition":
+            if category == "ai_governance":
+                # Rows with category='ai_governance' always carry governance-specific
+                # keywords_matched — extract them first regardless of source.
+                evidence_parts.append(raw_value)
+                kw_matched = metadata.get("keywords_matched", {})
+                for kws in kw_matched.values():
+                    if isinstance(kws, list):
+                        evidence_parts.extend(kws)
+
+                # Also extract source-specific structured metadata
+                if source == "board_composition":
+                    governance_score = score
+                    has_tech_committee = metadata.get("has_tech_committee", False)
+                    has_ai_expertise = metadata.get("has_ai_expertise", False)
+                    has_data_officer = metadata.get("has_data_officer", False)
+                    if has_tech_committee:
+                        evidence_parts.append("board committee")
+                    if has_ai_expertise:
+                        evidence_parts.append("ai expertise on board")
+                    if has_data_officer:
+                        evidence_parts.append("chief data officer")
+                    ai_experts = metadata.get("ai_experts", [])
+                    for expert in ai_experts:
+                        if isinstance(expert, str):
+                            evidence_parts.append(expert)
+                    committees = metadata.get("relevant_committees", [])
+                    evidence_parts.extend(committees)
+                elif source == "sec_item_1a_risk_factors":
+                    risk_score = score
+                    if kw_matched.get("ai_risk"):
+                        evidence_parts.append("risk framework")
+
+            elif source == "board_composition" or category == "board_composition":
                 governance_score = score
                 evidence_parts.append(raw_value)
 
@@ -338,7 +381,7 @@ def get_leadership_evidence(company_id: UUID, ticker: str) -> Tuple[str, Dict[st
                         evidence_parts.append(indicator.get("evidence", ""))
 
             elif source == "sec_item_7_mda" or category == "sec_item_7_mda":
-                evidence_parts.append(raw_value)
+                # Do NOT append raw_value — it is full MD&A text and floods evidence with noise
                 kw_matched = metadata.get("keywords_matched", {})
                 evidence_parts.extend(kw_matched.get("strategy", []))
                 evidence_parts.extend(kw_matched.get("executive_priority", []))
@@ -353,7 +396,8 @@ def get_leadership_evidence(company_id: UUID, ticker: str) -> Tuple[str, Dict[st
                     evidence_parts.append("chief technology officer")
                     evidence_parts.append("chief data officer")
 
-            elif source == "glassdoor_reviews" or source == "glassdoor":
+            elif (source == "glassdoor_reviews" or source == "glassdoor"
+                  or category == "glassdoor_reviews"):
                 evidence_parts.append(raw_value)
 
         evidence_text = " ".join(evidence_parts)
@@ -414,11 +458,31 @@ def get_talent_evidence(company_id: UUID, ticker: str) -> Tuple[str, Dict[str, f
                 total_jobs = metadata.get("total_jobs", 0)
                 ai_jobs = metadata.get("ai_jobs", 0)
 
-                job_titles = metadata.get("job_titles", [])
+                # 5a: try multiple possible key names for job titles
+                job_titles = (
+                    metadata.get("job_titles")
+                    or metadata.get("titles")
+                    or metadata.get("job_title_list")
+                    or []
+                )
                 evidence_parts.extend(job_titles)
 
-            elif source == "glassdoor_reviews" or source == "glassdoor":
-                evidence_parts.append(raw_value)
+                # 5b: surface seniority levels as text so rubric scorer can see them
+                seniority_dist = metadata.get("seniority_distribution", {})
+                for level, count in seniority_dist.items():
+                    if isinstance(count, (int, float)) and count > 0:
+                        evidence_parts.append(f"{level} engineer")
+
+            elif (source == "glassdoor_reviews" or source == "glassdoor"
+                  or category == "glassdoor_reviews"):
+                # 5c: extract skills-related keywords only — do not dump full raw_value
+                kw_matched = metadata.get("keywords_matched", {})
+                for kws in kw_matched.values():
+                    if isinstance(kws, list):
+                        evidence_parts.extend(kws)
+                skills_mentioned = metadata.get("skills_mentioned", [])
+                if isinstance(skills_mentioned, list):
+                    evidence_parts.extend(skills_mentioned)
 
         evidence_text = " ".join(evidence_parts)
 
@@ -482,7 +546,13 @@ def get_use_case_portfolio_evidence(company_id: UUID, ticker: str) -> Tuple[str,
                 evidence_parts.extend(kw_matched.get("roi", []))
                 evidence_parts.extend(kw_matched.get("product", []))
 
-                production_use_cases = metadata.get("keyword_counts", {}).get("use_case", 0)
+                # Multi-fallback: different SEC analyzers store production signals under different keys
+                production_use_cases = int(
+                    len(metadata.get("keywords_matched", {}).get("production", []))
+                    or len(metadata.get("keywords_matched", {}).get("use_case", []))
+                    or metadata.get("keyword_counts", {}).get("production", 0)
+                    or metadata.get("keyword_counts", {}).get("use_case", 0)
+                )
 
             elif category == "innovation_activity" or source == "google_patents":
                 innovation_score = score

@@ -2,32 +2,32 @@
   "company_id": "b639dc1f-eb62-424e-b850-7abf05b093d8",
   "ticker": "WMT",
   "sector": "retail",
-  "vr_score": 53.76656864950875,
-  "hr_score": 71.9446,
-  "synergy_score": 31.6497253116,
-  "org_air_score": 57.51121448433262,
-  "final_score": 57.51121448433262,
-  "alignment": 0.8182196864950876,
+  "vr_score": 60.2551664364475,
+  "hr_score": 72.76255,
+  "synergy_score": 38.3601444824,
+  "org_air_score": 62.03036281633228,
+  "final_score": 62.03036281633228,
+  "alignment": 0.874926164364475,
   "talent_concentration": 0.2515,
-  "position_factor": 0.18518,
+  "position_factor": 0.26306,
   "market_cap_percentile": 0.6,
-  "ci_lower": 56.3536,
-  "ci_upper": 58.6664,
+  "ci_lower": 60.8736,
+  "ci_upper": 63.1864,
   "confidence": 0.9982083439979524,
   "sem": 0.59,
   "dimension_scores": {
     "data_infrastructure": 66.49,
-    "ai_governance": 49.18,
+    "ai_governance": 70.34,
     "technology_stack": 75.58,
-    "talent": 85.38,
+    "talent": 85.74,
     "leadership": 56.81,
-    "use_case_portfolio": 24.19,
-    "culture": 27.33
+    "use_case_portfolio": 37.47,
+    "culture": 32.41
   },
-  "vr_weighted_mean": 58.8195,
-  "vr_cv": 0.3428,
-  "vr_cv_penalty_amount": 5.04083115,
-  "vr_tc_penalty_amount": 0.01210020049125,
+  "vr_weighted_mean": 64.2935,
+  "vr_cv": 0.2504,
+  "vr_cv_penalty_amount": 4.0247731,
+  "vr_tc_penalty_amount": 0.0135604635525,
   "path_a_scores": {
     "data_infrastructure": 67.01812235475182,
     "ai_governance": 75.30035026269702,
@@ -44,9 +44,9 @@
       "rationale": "Matched 6/20 keywords at Good level"
     },
     "ai_governance": {
-      "score": 10.0,
-      "level": "ScoreLevel.LEVEL_1",
-      "rationale": "No rubric criteria met"
+      "score": 62.9,
+      "level": "ScoreLevel.LEVEL_4",
+      "rationale": "Matched 2/13 keywords at Good level"
     },
     "technology_stack": {
       "score": 85.0,
@@ -54,9 +54,9 @@
       "rationale": "Matched 3/12 keywords at Excellent level"
     },
     "talent": {
-      "score": 85.5,
+      "score": 86.4,
       "level": "ScoreLevel.LEVEL_5",
-      "rationale": "Matched 6/22 keywords at Excellent level"
+      "rationale": "Matched 7/22 keywords at Excellent level"
     },
     "leadership": {
       "score": 65.8,
@@ -64,14 +64,14 @@
       "rationale": "Matched 4/13 keywords at Good level"
     },
     "use_case_portfolio": {
-      "score": 10.0,
-      "level": "ScoreLevel.LEVEL_1",
-      "rationale": "No rubric criteria met"
+      "score": 43.2,
+      "level": "ScoreLevel.LEVEL_3",
+      "rationale": "Matched 2/12 keywords at Adequate level"
     },
     "culture": {
-      "score": 10.0,
-      "level": "ScoreLevel.LEVEL_1",
-      "rationale": "No rubric criteria met"
+      "score": 22.7,
+      "level": "ScoreLevel.LEVEL_2",
+      "rationale": "Matched 1/7 keywords at Developing level"
     }
   },
   "evidence_count": 300,
@@ -87,26 +87,26 @@
   "glassdoor_review_count": 2,
   "board_governance_score": 85.0,
   "vr_components": {
-    "weighted_mean": 58.8195,
-    "cv": 0.3428,
-    "cv_penalty": 0.9143,
-    "cv_penalty_amount": 5.04083115,
+    "weighted_mean": 64.2935,
+    "cv": 0.2504,
+    "cv_penalty": 0.9374,
+    "cv_penalty_amount": 4.0247731,
     "tc": 0.2515,
     "tc_penalty": 0.999775,
-    "tc_penalty_amount": 0.01210020049125
+    "tc_penalty_amount": 0.0135604635525
   },
   "hr_components": {
     "hr_base": 70.0,
-    "position_adjustment": 1.02778
+    "position_adjustment": 1.039465
   },
   "synergy_components": {
-    "base_synergy": 38.682138,
-    "alignment": 0.8182,
+    "base_synergy": 43.845176,
+    "alignment": 0.8749,
     "timing_factor": 1.0
   },
   "formula_constants": {
     "alpha": 0.6,
     "beta": 0.12
   },
-  "generated_at": "2026-02-20T08:32:46.095903+00:00"
+  "generated_at": "2026-02-20T10:20:27.918399+00:00"
 }

@@ -5,6 +5,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from streamlit_ui.utils.api_client import APIClient
+from app.scoring.position_factor import PositionFactorCalculator
 
 st.set_page_config(page_title="H^R Calculator", page_icon="🏭", layout="wide")
 
@@ -29,19 +30,16 @@ FALLBACK_HR_BASE = {
     "services": 47.0,
 }
 
-# mirrors PositionFactorCalculator.SECTOR_AVG_VR (+ aliases for DB sector names)
-SECTOR_AVG_VR = {
-    "technology": 65.0,
-    "financial_services": 55.0,
-    "financial": 55.0,
-    "healthcare": 52.0,
-    "business_services": 50.0,
-    "professional_services": 50.0,
-    "retail": 48.0,
-    "manufacturing": 45.0,
-    "energy": 45.0,
-    "industrials": 45.0,
-    "services": 48.0,
+# Single source of truth: read directly from the backend class.
+# Add aliases for extended sector name variants that appear in the DB.
+_base_sector_avg = PositionFactorCalculator.SECTOR_AVG_VR
+SECTOR_AVG_VR: dict = {
+    **_base_sector_avg,
+    "financial_services":    _base_sector_avg.get("financial",     50.0),
+    "business_services":     _base_sector_avg.get("services",      50.0),
+    "professional_services": _base_sector_avg.get("services",      50.0),
+    "industrials":           _base_sector_avg.get("manufacturing", 50.0),
+    "energy":                _base_sector_avg.get("manufacturing", 50.0),
 }
 
 # ── Pure-Python helpers (no Snowflake) ────────────────────────────────────────
@@ -177,12 +175,8 @@ with st.expander("📐 Formula Reference", expanded=False):
         """)
         st.dataframe(
             pd.DataFrame([
-                {"Sector": "Technology",    "Avg V^R": 65.0},
-                {"Sector": "Financial",     "Avg V^R": 55.0},
-                {"Sector": "Healthcare",    "Avg V^R": 52.0},
-                {"Sector": "Bus. Services", "Avg V^R": 50.0},
-                {"Sector": "Retail",        "Avg V^R": 48.0},
-                {"Sector": "Manufacturing", "Avg V^R": 45.0},
+                {"Sector": s.replace("_", " ").title(), "Avg V^R": v}
+                for s, v in sorted(PositionFactorCalculator.SECTOR_AVG_VR.items())
             ]),
             hide_index=True,
             use_container_width=True,
