@@ -33,5 +33,5 @@ print(f"   95% CI: [{result['ci_lower']:.1f}, {result['ci_upper']:.1f}]")
 print(f"   ρ:      {result['confidence']:.3f}")
 print(f"   SEM:    {result['sem']:.2f}")
 
-print(f"\nAssessment ID: {result['id']}")
+print(f"\nCompany ID: {result['company_id']}")
 print("="*70)

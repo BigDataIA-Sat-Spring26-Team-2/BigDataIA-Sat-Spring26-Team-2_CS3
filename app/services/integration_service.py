@@ -14,6 +14,7 @@ Evidence flow:
 """
 
 import json
+import httpx
 import structlog
 from typing import Dict, Any, List
 from decimal import Decimal
@@ -40,11 +41,6 @@ logger = structlog.get_logger()
 
 
 class ScoringIntegrationService:
-    """
-    Full pipeline: CS1/CS2 data → Org-AI-R score.
-    CS3 Task 6.0b implementation.
-    """
-
 
     def __init__(
         self,
@@ -64,9 +60,10 @@ class ScoringIntegrationService:
         self.ci_calculator = ConfidenceCalculator()
         self.glassdoor_collector = GlassdoorCultureCollector()
         self.board_analyzer = BoardCompositionAnalyzer()
+        self.http = httpx.Client(timeout=30.0)
 
 
-    def score_company(self, ticker: str) -> Dict[str, Any]:
+    def score_company(self, ticker: str,  market_cap_percentile: float = 0.5) -> Dict[str, Any]:
         """
         Run the full Org-AI-R scoring pipeline for a ticker.
 
@@ -84,7 +81,6 @@ class ScoringIntegrationService:
         company_id = company["id"]
         industry_id = company.get("industry_id")
         sector = self._get_sector_from_db(company_id)
-        market_cap_percentile = float(company.get("market_cap_percentile", 0.5))
 
         logger.info(
             "company_fetched",
@@ -196,7 +192,7 @@ class ScoringIntegrationService:
         position_factor_decimal = self.pf_calculator.calculate_position_factor(
             vr_score=float(vr_result.vr_score),
             sector=sector,
-            market_cap_percentile=market_cap_percentile,  # ✅ Use user input
+            market_cap_percentile=market_cap_percentile,
         )
         position_factor = float(position_factor_decimal)
 
@@ -273,11 +269,13 @@ class ScoringIntegrationService:
             "alignment": alignment,
             "talent_concentration": tc,
             "position_factor": position_factor,
+            "market_cap_percentile": market_cap_percentile,
 
             # Confidence interval
             "ci_lower": float(ci_result.ci_lower),
             "ci_upper": float(ci_result.ci_upper),
             "confidence": float(ci_result.confidence),
+            "sem": float(ci_result.sem),
 
             # Dimension detail
             "dimension_scores": dimension_scores,
@@ -471,7 +469,6 @@ class ScoringIntegrationService:
             "confidence": 0.5,
         }
 
-        # --- Primary: read from EXTERNAL_SIGNALS table ---
         try:
             settings = get_settings()
             conn = get_connection()
@@ -527,7 +524,6 @@ class ScoringIntegrationService:
                 error=str(exc),
             )
 
-        # --- Secondary: try S3 via GlassdoorCollectionPipeline ---
         try:
             pipeline = GlassdoorCollectionPipeline()
             signal = pipeline.collect_and_analyze(company_id, ticker)

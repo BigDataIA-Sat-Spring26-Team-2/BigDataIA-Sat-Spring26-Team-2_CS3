@@ -499,7 +499,6 @@ def get_evidence_breakdown(company_id: UUID) -> Dict[str, Dict]:
                 WHERE company_id = %s
                 GROUP BY category
             )
-            ORDER BY evidence_count DESC
         """
         
         cur.execute(sql, (str(company_id), str(company_id)))
