@@ -1,0 +1,112 @@
+{
+  "company_id": "59068817-621e-4edd-99c3-c79b2f4ac3b7",
+  "ticker": "GE",
+  "sector": "manufacturing",
+  "vr_score": 35.9144246834505,
+  "hr_score": 44.53425,
+  "synergy_score": 14.6123226774,
+  "org_air_score": 36.39235095414986,
+  "final_score": 36.39235095414986,
+  "alignment": 0.913801746834505,
+  "talent_concentration": 0.2554,
+  "position_factor": -0.06902,
+  "market_cap_percentile": 0.4,
+  "ci_lower": 33.9792,
+  "ci_upper": 38.8008,
+  "confidence": 0.9922566371681416,
+  "sem": 1.23,
+  "dimension_scores": {
+    "data_infrastructure": 54.6,
+    "ai_governance": 43.91,
+    "technology_stack": 37.13,
+    "talent": 29.34,
+    "leadership": 27.8,
+    "use_case_portfolio": 24.19,
+    "culture": 23.2
+  },
+  "vr_weighted_mean": 38.7615,
+  "vr_cv": 0.2908,
+  "vr_cv_penalty_amount": 2.81796105,
+  "vr_tc_penalty_amount": 0.0291142665495,
+  "path_a_scores": {
+    "data_infrastructure": 49.728257456828885,
+    "ai_governance": 66.5158371040724,
+    "technology_stack": 55.219856459330146,
+    "talent": 42.23045822102426,
+    "leadership": 39.66470884376573,
+    "use_case_portfolio": 33.65141187925998,
+    "culture": 31.99511106387501
+  },
+  "path_b_scores": {
+    "data_infrastructure": {
+      "score": 61.9,
+      "level": "ScoreLevel.LEVEL_4",
+      "rationale": "Matched 2/20 keywords at Good level"
+    },
+    "ai_governance": {
+      "score": 10.0,
+      "level": "ScoreLevel.LEVEL_1",
+      "rationale": "No rubric criteria met"
+    },
+    "technology_stack": {
+      "score": 10.0,
+      "level": "ScoreLevel.LEVEL_1",
+      "rationale": "No rubric criteria met"
+    },
+    "talent": {
+      "score": 10.0,
+      "level": "ScoreLevel.LEVEL_1",
+      "rationale": "No rubric criteria met"
+    },
+    "leadership": {
+      "score": 10.0,
+      "level": "ScoreLevel.LEVEL_1",
+      "rationale": "No rubric criteria met"
+    },
+    "use_case_portfolio": {
+      "score": 10.0,
+      "level": "ScoreLevel.LEVEL_1",
+      "rationale": "No rubric criteria met"
+    },
+    "culture": {
+      "score": 10.0,
+      "level": "ScoreLevel.LEVEL_1",
+      "rationale": "No rubric criteria met"
+    }
+  },
+  "evidence_count": 69,
+  "evidence_breakdown": {
+    "technology_hiring": 24,
+    "innovation_activity": 27,
+    "digital_presence": 2,
+    "use_case_portfolio": 1,
+    "ai_governance": 1,
+    "culture": 12,
+    "leadership_signals": 2
+  },
+  "glassdoor_review_count": 12,
+  "board_governance_score": 75.0,
+  "vr_components": {
+    "weighted_mean": 38.7615,
+    "cv": 0.2908,
+    "cv_penalty": 0.9273,
+    "cv_penalty_amount": 2.81796105,
+    "tc": 0.2554,
+    "tc_penalty": 0.99919,
+    "tc_penalty_amount": 0.0291142665495
+  },
+  "hr_components": {
+    "hr_base": 45.0,
+    "position_adjustment": 0.98965
+  },
+  "synergy_components": {
+    "base_synergy": 15.990723,
+    "alignment": 0.9138,
+    "timing_factor": 1.0
+  },
+  "formula_constants": {
+    "alpha": 0.6,
+    "beta": 0.12
+  },
+  "generated_at": "2026-02-20T08:33:14.820988+00:00"
+}

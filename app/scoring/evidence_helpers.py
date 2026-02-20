@@ -551,6 +551,14 @@ def get_culture_evidence(company_id: UUID, ticker: str) -> Tuple[str, Dict[str, 
                 for kws in kw_matched.values():
                     if isinstance(kws, list):
                         evidence_parts.extend(kws)
+                
+                positive_kws = metadata.get("positive_keywords", [])
+                if isinstance(positive_kws, list):
+                    evidence_parts.extend(positive_kws)
+
+                negative_kws = metadata.get("negative_keywords", [])
+                if isinstance(negative_kws, list):
+                    evidence_parts.extend(negative_kws)
 
                 avg_rating = metadata.get("avg_rating", 0)
                 if avg_rating and float(avg_rating) >= 4.0:

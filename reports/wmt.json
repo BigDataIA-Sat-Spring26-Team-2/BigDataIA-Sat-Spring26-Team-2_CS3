@@ -1,0 +1,112 @@
+{
+  "company_id": "b639dc1f-eb62-424e-b850-7abf05b093d8",
+  "ticker": "WMT",
+  "sector": "retail",
+  "vr_score": 53.76656864950875,
+  "hr_score": 71.9446,
+  "synergy_score": 31.6497253116,
+  "org_air_score": 57.51121448433262,
+  "final_score": 57.51121448433262,
+  "alignment": 0.8182196864950876,
+  "talent_concentration": 0.2515,
+  "position_factor": 0.18518,
+  "market_cap_percentile": 0.6,
+  "ci_lower": 56.3536,
+  "ci_upper": 58.6664,
+  "confidence": 0.9982083439979524,
+  "sem": 0.59,
+  "dimension_scores": {
+    "data_infrastructure": 66.49,
+    "ai_governance": 49.18,
+    "technology_stack": 75.58,
+    "talent": 85.38,
+    "leadership": 56.81,
+    "use_case_portfolio": 24.19,
+    "culture": 27.33
+  },
+  "vr_weighted_mean": 58.8195,
+  "vr_cv": 0.3428,
+  "vr_cv_penalty_amount": 5.04083115,
+  "vr_tc_penalty_amount": 0.01210020049125,
+  "path_a_scores": {
+    "data_infrastructure": 67.01812235475182,
+    "ai_governance": 75.30035026269702,
+    "technology_stack": 69.29779454439931,
+    "talent": 85.2998836532868,
+    "leadership": 50.813807175650396,
+    "use_case_portfolio": 33.65141187925998,
+    "culture": 38.87796006810091
+  },
+  "path_b_scores": {
+    "data_infrastructure": {
+      "score": 65.7,
+      "level": "ScoreLevel.LEVEL_4",
+      "rationale": "Matched 6/20 keywords at Good level"
+    },
+    "ai_governance": {
+      "score": 10.0,
+      "level": "ScoreLevel.LEVEL_1",
+      "rationale": "No rubric criteria met"
+    },
+    "technology_stack": {
+      "score": 85.0,
+      "level": "ScoreLevel.LEVEL_5",
+      "rationale": "Matched 3/12 keywords at Excellent level"
+    },
+    "talent": {
+      "score": 85.5,
+      "level": "ScoreLevel.LEVEL_5",
+      "rationale": "Matched 6/22 keywords at Excellent level"
+    },
+    "leadership": {
+      "score": 65.8,
+      "level": "ScoreLevel.LEVEL_4",
+      "rationale": "Matched 4/13 keywords at Good level"
+    },
+    "use_case_portfolio": {
+      "score": 10.0,
+      "level": "ScoreLevel.LEVEL_1",
+      "rationale": "No rubric criteria met"
+    },
+    "culture": {
+      "score": 10.0,
+      "level": "ScoreLevel.LEVEL_1",
+      "rationale": "No rubric criteria met"
+    }
+  },
+  "evidence_count": 300,
+  "evidence_breakdown": {
+    "technology_hiring": 128,
+    "digital_presence": 4,
+    "innovation_activity": 65,
+    "use_case_portfolio": 1,
+    "ai_governance": 1,
+    "leadership_signals": 1,
+    "culture": 100
+  },
+  "glassdoor_review_count": 2,
+  "board_governance_score": 85.0,
+  "vr_components": {
+    "weighted_mean": 58.8195,
+    "cv": 0.3428,
+    "cv_penalty": 0.9143,
+    "cv_penalty_amount": 5.04083115,
+    "tc": 0.2515,
+    "tc_penalty": 0.999775,
+    "tc_penalty_amount": 0.01210020049125
+  },
+  "hr_components": {
+    "hr_base": 70.0,
+    "position_adjustment": 1.02778
+  },
+  "synergy_components": {
+    "base_synergy": 38.682138,
+    "alignment": 0.8182,
+    "timing_factor": 1.0
+  },
+  "formula_constants": {
+    "alpha": 0.6,
+    "beta": 0.12
+  },
+  "generated_at": "2026-02-20T08:32:46.095903+00:00"
+}
