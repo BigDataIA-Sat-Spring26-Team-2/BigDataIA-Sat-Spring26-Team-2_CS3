@@ -228,78 +228,109 @@ class GlassdoorScraper:
 class GlassdoorCultureCollector:
     
     INNOVATION_POSITIVE = [
-        "innovative", "cutting-edge", "forward-thinking",
-        "encourages new ideas", "experimental", "creative freedom",
-        "startup mentality", "move fast", "disruptive",
-        "innovation", "pioneering", "leading edge"
+        "innovative", "cutting-edge", "forward-thinking", "encourages new ideas", "experimental", "creative freedom",
+        "startup mentality", "move fast", "disruptive","innovation", "pioneering", "leading edge",
+        "thought leader", "first mover", "visionary","groundbreaking", "state of the art", "next generation", "trailblazing", "ahead of the curve", "bleeding edge",
+        "bold ideas", "out of the box", "innovation culture","encourages experimentation", "embraces innovation",
+        "celebrates creativity", "invests in innovation","hackathon", "idea generation", "open to new ideas",
+        "encourages risk taking", "fosters creativity","rewards innovation", "innovation lab", "r&d culture",
+        "future focused", "technology first", "digital first",
     ]
-    
+
     INNOVATION_NEGATIVE = [
-        "bureaucratic", "slow to change", "resistant",
-        "outdated", "stuck in old ways", "red tape",
-        "politics", "siloed", "hierarchical",
-        "legacy mindset", "conservative", "risk-averse"
+        "bureaucratic", "slow to change", "resistant","outdated", "stuck in old ways", "red tape",
+        "politics", "siloed", "hierarchical","legacy mindset", "conservative", "risk-averse",
+        "too many approvals", "approval process","micromanagement", "micromanage",
+        "no innovation", "discourages ideas","punishes failure", "fear of failure",
+        "old fashioned", "behind the times","not agile", "waterfall only",
+        "change is hard", "resistant to change","top down", "command and control",
+        "no autonomy", "no ownership","death by committee", "too much process",
+        "overly cautious", "analysis paralysis","not forward thinking", "stuck in past",
+        "no investment in tech", "penny pinching on tech",
     ]
-    
+
     DATA_DRIVEN_KEYWORDS = [
-        "data-driven", "metrics", "evidence-based",
-        "analytical", "kpis", "dashboards", "data culture",
-        "measurement", "quantitative", "analytics",
-        "data informed", "metrics driven"
+        "data-driven", "metrics", "evidence-based","analytical", "kpis", "dashboards", "data culture",
+        "measurement", "quantitative", "analytics","data informed", "metrics driven",
+        "data first", "data obsessed","data literacy", "data fluency",
+        "decisions based on data", "fact based","ab testing", "a/b testing", "experimentation",
+        "hypothesis driven", "test and learn","performance metrics", "okrs", "scorecards",
+        "business intelligence", "reporting culture","real time data", "data transparency",
+        "data democratization", "self serve analytics","insight driven", "outcome driven",
+        "measure everything", "data accountability","data quality", "single source of truth",
+        "data strategy", "data governance",
     ]
-    
+
     AI_AWARENESS_KEYWORDS = [
-        "ai", "artificial intelligence", "machine learning",
-        "automation", "data science", "ml", "algorithms",
-        "predictive", "neural network", "deep learning",
-        "nlp", "computer vision"
+        "ai", "artificial intelligence", "machine learning","automation", "data science", "ml", "algorithms",
+        "predictive", "neural network", "deep learning","nlp", "computer vision",
+        "generative ai", "gen ai", "llm","large language model", "chatgpt", "copilot",
+        "ai tools", "ai powered", "ai driven","ai strategy", "ai roadmap", "ai initiative",
+        "ai first", "ai transformation","prompt engineering", "rag", "embeddings",
+        "pytorch", "tensorflow", "hugging face","model training", "model deployment",
+        "mlops", "ai platform", "ai infrastructure","recommendation system", "predictive model",
+        "intelligent automation", "cognitive automation","robotic process automation", "rpa",
+        "natural language processing", "speech recognition","image recognition", "anomaly detection",
+        "ai research", "applied ai", "ai lab",
     ]
-    
+
     CHANGE_POSITIVE = [
-        "agile", "adaptive", "fast-paced", "embraces change",
-        "continuous improvement", "growth mindset",
-        "flexible", "dynamic", "responsive"
+        "agile", "adaptive", "fast-paced", "embraces change", "continuous improvement", "growth mindset",
+        "flexible", "dynamic", "responsive","lean", "iterative", "scrum",
+        "quick to adapt", "pivots quickly","open minded", "learning culture",
+        "feedback culture", "fail fast", "fail forward", "learning from failure",
+        "psychological safety", "safe to fail","transparent", "open communication",
+        "flat structure", "flat hierarchy", "employee empowerment", "ownership culture",
+        "bias for action", "move quickly","always improving", "kaizen",
+        "welcomes feedback", "open to feedback","collaborative", "cross functional",
+        "embraces technology", "tech savvy","modernizing", "transformation mindset",
     ]
-    
+
     CHANGE_NEGATIVE = [
         "rigid", "traditional", "slow", "risk-averse",
         "change resistant", "old school", "inflexible",
-        "status quo", "stagnant"
+        "status quo", "stagnant",
+        "no feedback", "feedback ignored",
+        "ideas go nowhere", "no follow through",
+        "slow decision making", "slow to decide",
+        "too many layers", "too much bureaucracy",
+        "fear driven", "blame culture",
+        "no psychological safety", "punitive",
+        "not collaborative", "territorial",
+        "siloed teams", "no cross team",
+        "fiefdoms", "empire building",
+        "resistant to feedback", "dismissive",
+        "no room for growth", "no career path",
+        "outdated processes", "manual processes",
+        "no automation", "still using legacy",
+        "cant move fast", "slow execution",
+        "overly hierarchical", "need approval for everything",
     ]
-    
+
     TECH_ROLE_KEYWORDS = [
-        # Core tech roles
-        'software engineer', 'data scientist', 'data engineer', 
-        'machine learning', 'ml engineer', 'ai engineer',
-        'data analyst', 'business intelligence', 'analytics',
-        
-        # Leadership
-        'cto', 'cio', 'chief technology', 'chief information',
-        'chief data', 'vp technology', 'vp engineering',
-        'director of engineering', 'director of data',
-        'engineering director', 'data director',
-        
-        # Specialized
-        'devops', 'mlops', 'site reliability', 'sre',
-        'cloud engineer', 'platform engineer', 'infrastructure',
-        'database', 'architect', 'tech lead', 'engineering manager',
-        
-        # Data roles
-        'data science', 'analytics manager', 'bi analyst',
-        'quantitative analyst', 'research scientist',
-        'statistician', 'data manager',
-        
-        # Development
-        'developer', 'programmer', 'backend', 'frontend',
-        'full stack', 'web developer', 'mobile developer',
-        
-        # QA/Test
-        'qa engineer', 'test engineer', 'automation engineer',
-        'quality assurance',
-        
-        # Product/PM (tech-adjacent)
-        'product manager', 'technical product', 'program manager',
-        'scrum master', 'agile coach'
+        'software engineer', 'data scientist', 'data engineer','machine learning', 'ml engineer', 'ai engineer',
+        'data analyst', 'business intelligence', 'analytics','cto', 'cio', 'chief technology', 'chief information',
+        'chief data', 'vp technology', 'vp engineering','director of engineering', 'director of data',
+        'engineering director', 'data director','devops', 'mlops', 'site reliability', 'sre',
+        'cloud engineer', 'platform engineer', 'infrastructure','database', 'architect', 'tech lead', 'engineering manager',
+        'data science', 'analytics manager', 'bi analyst','quantitative analyst', 'research scientist',
+        'statistician', 'data manager','developer', 'programmer', 'backend', 'frontend',
+        'full stack', 'web developer', 'mobile developer','qa engineer', 'test engineer', 'automation engineer',
+        'quality assurance','product manager', 'technical product', 'program manager',
+        'scrum master', 'agile coach','ai researcher', 'ml researcher', 'applied scientist',
+        'research engineer', 'nlp engineer', 'computer vision engineer','deep learning engineer', 'llm engineer', 'ai scientist',
+        'chief ai officer', 'caio', 'head of ai', 'vp of ai','ai product manager', 'ml product manager',
+        'ml platform engineer', 'ai infrastructure engineer','prompt engineer', 'ai ops', 'model engineer',
+        'cloud architect', 'solutions architect', 'enterprise architect','aws engineer', 'azure engineer', 'gcp engineer',
+        'kubernetes engineer', 'docker', 'devsecops','network engineer', 'security engineer', 'cybersecurity',
+        'information security', 'cloud operations','analytics engineer', 'data platform engineer',
+        'data infrastructure', 'data operations', 'dataops', 'etl developer', 'pipeline engineer', 'spark engineer',
+        'hadoop engineer', 'kafka engineer', 'snowflake engineer','databricks engineer', 'dbt engineer',
+        'chief digital officer', 'chief analytics officer','head of data', 'head of engineering', 'head of machine learning',
+        'vp data science', 'vp analytics', 'vp data engineering','director of ai', 'director of machine learning',
+        'director of analytics', 'director of data science','generative ai', 'responsible ai', 'ai ethics',
+        'ml operations', 'feature engineer', 'data labeler','annotation engineer', 'ai trainer', 'rlhf engineer',
+        'vector database', 'embedding engineer','digital transformation', 'innovation engineer',
     ]
 
     def __init__(self):
@@ -575,15 +606,15 @@ class GlassdoorCultureCollector:
         return CultureSignal(
             company_id=company_id,
             ticker=ticker,
-            innovation_score=Decimal("50.0"),
-            data_driven_score=Decimal("50.0"),
-            change_readiness_score=Decimal("50.0"),
-            ai_awareness_score=Decimal("50.0"),
-            overall_score=Decimal("50.0"),
+            innovation_score=Decimal("10.0"),
+            data_driven_score=Decimal("10.0"),
+            change_readiness_score=Decimal("10.0"),
+            ai_awareness_score=Decimal("10.0"),
+            overall_score=Decimal("10.0"),
             review_count=0,
             avg_rating=Decimal("0"),
             current_employee_ratio=Decimal("0"),
-            confidence=Decimal("0.50"),
+            confidence=Decimal("0.10"),
         )
 
 
@@ -672,177 +703,177 @@ def batch_analyze_glassdoor(
     return results
 
 
-def example_single_company():
-    """
-    Example: Collect and store Glassdoor signal for NVIDIA.
-    """
-    from app.services.snowflake import get_connection
+# def example_single_company():
+#     """
+#     Example: Collect and store Glassdoor signal for NVIDIA.
+#     """
+#     from app.services.snowflake import get_connection
     
-    print("=" * 70)
-    print("EXAMPLE: Collect Glassdoor Signal for NVIDIA")
-    print("=" * 70)
+#     print("=" * 70)
+#     print("EXAMPLE: Collect Glassdoor Signal for NVIDIA")
+#     print("=" * 70)
     
-    # Step 1: Get company_id from database
-    print("\nStep 1: Getting company_id...")
+#     # Step 1: Get company_id from database
+#     print("\nStep 1: Getting company_id...")
     
-    settings = get_settings()
-    conn = get_connection()
-    cur = conn.cursor()
+#     settings = get_settings()
+#     conn = get_connection()
+#     cur = conn.cursor()
     
-    cur.execute(f"""
-        SELECT id, name, ticker
-        FROM {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.companies
-        WHERE ticker = 'WMT'
-        LIMIT 1
-    """)
+#     cur.execute(f"""
+#         SELECT id, name, ticker
+#         FROM {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.companies
+#         WHERE ticker = 'WMT'
+#         LIMIT 1
+#     """)
     
-    row = cur.fetchone()
+#     row = cur.fetchone()
     
-    if not row:
-        print("✗ NVDA not found in database")
-        cur.close()
-        conn.close()
-        return
+#     if not row:
+#         print("✗ NVDA not found in database")
+#         cur.close()
+#         conn.close()
+#         return
     
-    company_id = row[0]
-    company_name = row[1]
-    ticker = row[2]
+#     company_id = row[0]
+#     company_name = row[1]
+#     ticker = row[2]
     
-    print(f"✓ Found: {company_name} (ID: {company_id})")
+#     print(f"✓ Found: {company_name} (ID: {company_id})")
     
-    cur.close()
-    conn.close()
+#     cur.close()
+#     conn.close()
     
-    # Step 2: Run Glassdoor pipeline
-    print("\nStep 2: Running Glassdoor collection pipeline...")
+#     # Step 2: Run Glassdoor pipeline
+#     print("\nStep 2: Running Glassdoor collection pipeline...")
     
-    pipeline = GlassdoorCollectionPipeline()
+#     pipeline = GlassdoorCollectionPipeline()
     
-    culture_signal = pipeline.collect_and_analyze(
-        company_id=company_id,
-        ticker=ticker,
-        filter_tech_roles=True
-    )
+#     culture_signal = pipeline.collect_and_analyze(
+#         company_id=company_id,
+#         ticker=ticker,
+#         filter_tech_roles=False
+#     )
     
-    # Step 3: Display results
-    print("\n" + "=" * 70)
-    print("RESULTS")
-    print("=" * 70)
+#     # Step 3: Display results
+#     print("\n" + "=" * 70)
+#     print("RESULTS")
+#     print("=" * 70)
     
-    print(f"\n📊 Culture Scores:")
-    print(f"   Overall:          {culture_signal.overall_score:.1f}/100")
-    print(f"   Innovation:       {culture_signal.innovation_score:.1f}/100")
-    print(f"   Data-Driven:      {culture_signal.data_driven_score:.1f}/100")
-    print(f"   AI Awareness:     {culture_signal.ai_awareness_score:.1f}/100")
-    print(f"   Change Readiness: {culture_signal.change_readiness_score:.1f}/100")
+#     print(f"\n📊 Culture Scores:")
+#     print(f"   Overall:          {culture_signal.overall_score:.1f}/100")
+#     print(f"   Innovation:       {culture_signal.innovation_score:.1f}/100")
+#     print(f"   Data-Driven:      {culture_signal.data_driven_score:.1f}/100")
+#     print(f"   AI Awareness:     {culture_signal.ai_awareness_score:.1f}/100")
+#     print(f"   Change Readiness: {culture_signal.change_readiness_score:.1f}/100")
     
-    print(f"\n📝 Review Info:")
-    print(f"   Reviews Analyzed: {culture_signal.review_count}")
-    print(f"   Average Rating:   {culture_signal.avg_rating:.1f}/5.0")
-    print(f"   Confidence:       {culture_signal.confidence:.2f}")
+#     print(f"\n📝 Review Info:")
+#     print(f"   Reviews Analyzed: {culture_signal.review_count}")
+#     print(f"   Average Rating:   {culture_signal.avg_rating:.1f}/5.0")
+#     print(f"   Confidence:       {culture_signal.confidence:.2f}")
     
-    # Step 4: Verify it's stored
-    print("\n" + "=" * 70)
-    print("VERIFICATION")
-    print("=" * 70)
+#     # Step 4: Verify it's stored
+#     print("\n" + "=" * 70)
+#     print("VERIFICATION")
+#     print("=" * 70)
     
-    conn = get_connection()
-    cur = conn.cursor()
+#     conn = get_connection()
+#     cur = conn.cursor()
     
-    cur.execute(f"""
-        SELECT id, category, source, normalized_score, confidence, created_at
-        FROM {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.external_signals
-        WHERE company_id = %s AND category = 'culture'
-        ORDER BY created_at DESC
-        LIMIT 1
-    """, (company_id,))
+#     cur.execute(f"""
+#         SELECT id, category, source, normalized_score, confidence, created_at
+#         FROM {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.external_signals
+#         WHERE company_id = %s AND category = 'culture'
+#         ORDER BY created_at DESC
+#         LIMIT 1
+#     """, (company_id,))
     
-    row = cur.fetchone()
+#     row = cur.fetchone()
     
-    if row:
-        print(f"\n✓ Signal stored in external_signals table")
-        print(f"  Signal ID:  {row[0]}")
-        print(f"  Category:   {row[1]}")
-        print(f"  Source:     {row[2]}")
-        print(f"  Score:      {row[3]:.1f}/100")
-        print(f"  Confidence: {row[4]:.2f}")
-        print(f"  Created:    {row[5]}")
-    else:
-        print(f"\n⚠ Signal NOT found in database - check for errors above")
+#     if row:
+#         print(f"\n✓ Signal stored in external_signals table")
+#         print(f"  Signal ID:  {row[0]}")
+#         print(f"  Category:   {row[1]}")
+#         print(f"  Source:     {row[2]}")
+#         print(f"  Score:      {row[3]:.1f}/100")
+#         print(f"  Confidence: {row[4]:.2f}")
+#         print(f"  Created:    {row[5]}")
+#     else:
+#         print(f"\n⚠ Signal NOT found in database - check for errors above")
     
-    cur.close()
-    conn.close()
+#     cur.close()
+#     conn.close()
     
-    print("\n" + "=" * 70)
-    print("✅ EXAMPLE COMPLETE")
-    print("=" * 70)
+#     print("\n" + "=" * 70)
+#     print("✅ EXAMPLE COMPLETE")
+#     print("=" * 70)
 
 
-def example_batch_companies():
-    """
-    Example: Collect and store Glassdoor signals for all CS3 companies.
-    """
-    print("=" * 70)
-    print("EXAMPLE: Batch Collect All CS3 Companies")
-    print("=" * 70)
+# def example_batch_companies():
+#     """
+#     Example: Collect and store Glassdoor signals for all CS3 companies.
+#     """
+#     print("=" * 70)
+#     print("EXAMPLE: Batch Collect All CS3 Companies")
+#     print("=" * 70)
     
-    # CS3 portfolio companies
-    tickers = ["NVDA", "JPM", "WMT", "GE", "DG"]
+#     # CS3 portfolio companies
+#     tickers = ["NVDA", "JPM", "WMT", "GE", "DG"]
     
-    from app.services.snowflake import get_connection
-    settings = get_settings()
+#     from app.services.snowflake import get_connection
+#     settings = get_settings()
     
-    for ticker in tickers:
-        print(f"\n{'─'*70}")
-        print(f"Processing: {ticker}")
-        print('─'*70)
+#     for ticker in tickers:
+#         print(f"\n{'─'*70}")
+#         print(f"Processing: {ticker}")
+#         print('─'*70)
         
-        try:
-            # Get company_id
-            conn = get_connection()
-            cur = conn.cursor()
+#         try:
+#             # Get company_id
+#             conn = get_connection()
+#             cur = conn.cursor()
             
-            cur.execute(f"""
-                SELECT id, name
-                FROM {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.companies
-                WHERE ticker = %s
-            """, (ticker,))
+#             cur.execute(f"""
+#                 SELECT id, name
+#                 FROM {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.companies
+#                 WHERE ticker = %s
+#             """, (ticker,))
             
-            row = cur.fetchone()
+#             row = cur.fetchone()
             
-            if not row:
-                print(f"✗ {ticker} not found in database - skipping")
-                cur.close()
-                conn.close()
-                continue
+#             if not row:
+#                 print(f"✗ {ticker} not found in database - skipping")
+#                 cur.close()
+#                 conn.close()
+#                 continue
             
-            company_id = row[0]
-            company_name = row[1]
+#             company_id = row[0]
+#             company_name = row[1]
             
-            cur.close()
-            conn.close()
+#             cur.close()
+#             conn.close()
             
-            print(f"✓ Found: {company_name}")
+#             print(f"✓ Found: {company_name}")
             
-            # Run pipeline
-            pipeline = GlassdoorCollectionPipeline()
-            culture_signal = pipeline.collect_and_analyze(
-                company_id=company_id,
-                ticker=ticker,
-                filter_tech_roles=True
-            )
+#             # Run pipeline
+#             pipeline = GlassdoorCollectionPipeline()
+#             culture_signal = pipeline.collect_and_analyze(
+#                 company_id=company_id,
+#                 ticker=ticker,
+#                 filter_tech_roles=True
+#             )
             
-            print(f"✓ Score: {culture_signal.overall_score:.1f}/100 ({culture_signal.review_count} reviews)")
+#             print(f"✓ Score: {culture_signal.overall_score:.1f}/100 ({culture_signal.review_count} reviews)")
             
-        except Exception as e:
-            print(f"✗ Failed: {str(e)}")
+#         except Exception as e:
+#             print(f"✗ Failed: {str(e)}")
     
-    print("\n" + "=" * 70)
-    print("BATCH COMPLETE")
-    print("=" * 70)
+#     print("\n" + "=" * 70)
+#     print("BATCH COMPLETE")
+#     print("=" * 70)
 
 
-if __name__ == "__main__":
-    # Run single company example
-    #example_single_company()
-    example_batch_companies()
+# if __name__ == "__main__":
+#     # Run single company example
+#     example_single_company()
+#     #example_batch_companies()

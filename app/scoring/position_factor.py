@@ -10,12 +10,12 @@ logger = structlog.get_logger()
 class PositionFactorCalculator:
 
     SECTOR_AVG_VR: Dict[str, float] = {
-        "technology": 65.0,
-        "financial_services": 55.0,
-        "healthcare": 52.0,
-        "business_services": 50.0,
-        "retail": 48.0,
-        "manufacturing": 45.0,
+        "technology": 40.0,
+        "financial": 45.0,
+        "healthcare": 50.0,
+        "services": 50.0,
+        "retail": 45.0,
+        "manufacturing": 35.0
     }
     
     # Weights for components
@@ -36,6 +36,12 @@ class PositionFactorCalculator:
             market_cap_percentile=market_cap_percentile
         )
         
+        if market_cap_percentile is None:
+            raise ValueError(
+                "market_cap_percentile cannot be None. "
+                "Resolve it in integration_service before calling this method."
+            )
+    
         if not (0 <= vr_score <= 100):
             raise ValueError(f"V^R score must be in [0, 100], got {vr_score}")
         

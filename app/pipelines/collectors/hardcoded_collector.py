@@ -50,6 +50,31 @@ def get_hardcoded_executives(ticker: str):
             ("Tom Hammond", "Chief Information Officer"),
             ("Michael Gioja", "SVP of IT Operations and Service Delivery"),
         ],
+
+        "NVDA": [
+            ("Jensen Huang", "Chief Executive Officer and Co-Founder"),
+            ("Colette Kress", "Executive Vice President and Chief Financial Officer"),
+            ("Debora Shoquist", "Executive Vice President of Operations"),
+            ("Tim Teter", "Executive Vice President, General Counsel and Secretary"),
+            ("Jay Puri", "Executive Vice President, Worldwide Field Operations"),
+            ("Bill Dally", "Chief Scientist and Senior Vice President of Research"),
+        ],
+
+        "GE": [
+            ("H. Lawrence Culp Jr.", "Chairman and Chief Executive Officer"),
+            ("Carolina Dybeck Happe", "Senior Vice President and Chief Financial Officer"),
+            ("Mohamed Ali", "Senior Vice President and Chief Technology Officer"),
+            ("Russell Stokes", "President and CEO, Commercial Engines and Services"),
+            ("Rahul Ghai", "Chief Information Officer and Senior Vice President, Digital Technology"),
+        ],
+
+        "DG": [
+            ("Todd Vasos", "Chief Executive Officer"),
+            ("Kelly Dilts", "Executive Vice President and Chief Financial Officer"),
+            ("Rhonda Taylor", "Executive Vice President and General Counsel"),
+            ("Emily Taylor", "Executive Vice President and Chief Merchandising Officer"),
+            ("Jeff Nally", "Senior Vice President and Chief Information Officer"),
+        ],
     }
     
     # Get data for this ticker
