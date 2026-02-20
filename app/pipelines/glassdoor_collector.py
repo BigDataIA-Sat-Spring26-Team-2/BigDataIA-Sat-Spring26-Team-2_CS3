@@ -228,78 +228,109 @@ class GlassdoorScraper:
 class GlassdoorCultureCollector:
     
     INNOVATION_POSITIVE = [
-        "innovative", "cutting-edge", "forward-thinking",
-        "encourages new ideas", "experimental", "creative freedom",
-        "startup mentality", "move fast", "disruptive",
-        "innovation", "pioneering", "leading edge"
+        "innovative", "cutting-edge", "forward-thinking", "encourages new ideas", "experimental", "creative freedom",
+        "startup mentality", "move fast", "disruptive","innovation", "pioneering", "leading edge",
+        "thought leader", "first mover", "visionary","groundbreaking", "state of the art", "next generation", "trailblazing", "ahead of the curve", "bleeding edge",
+        "bold ideas", "out of the box", "innovation culture","encourages experimentation", "embraces innovation",
+        "celebrates creativity", "invests in innovation","hackathon", "idea generation", "open to new ideas",
+        "encourages risk taking", "fosters creativity","rewards innovation", "innovation lab", "r&d culture",
+        "future focused", "technology first", "digital first",
     ]
-    
+
     INNOVATION_NEGATIVE = [
-        "bureaucratic", "slow to change", "resistant",
-        "outdated", "stuck in old ways", "red tape",
-        "politics", "siloed", "hierarchical",
-        "legacy mindset", "conservative", "risk-averse"
+        "bureaucratic", "slow to change", "resistant","outdated", "stuck in old ways", "red tape",
+        "politics", "siloed", "hierarchical","legacy mindset", "conservative", "risk-averse",
+        "too many approvals", "approval process","micromanagement", "micromanage",
+        "no innovation", "discourages ideas","punishes failure", "fear of failure",
+        "old fashioned", "behind the times","not agile", "waterfall only",
+        "change is hard", "resistant to change","top down", "command and control",
+        "no autonomy", "no ownership","death by committee", "too much process",
+        "overly cautious", "analysis paralysis","not forward thinking", "stuck in past",
+        "no investment in tech", "penny pinching on tech",
     ]
-    
+
     DATA_DRIVEN_KEYWORDS = [
-        "data-driven", "metrics", "evidence-based",
-        "analytical", "kpis", "dashboards", "data culture",
-        "measurement", "quantitative", "analytics",
-        "data informed", "metrics driven"
+        "data-driven", "metrics", "evidence-based","analytical", "kpis", "dashboards", "data culture",
+        "measurement", "quantitative", "analytics","data informed", "metrics driven",
+        "data first", "data obsessed","data literacy", "data fluency",
+        "decisions based on data", "fact based","ab testing", "a/b testing", "experimentation",
+        "hypothesis driven", "test and learn","performance metrics", "okrs", "scorecards",
+        "business intelligence", "reporting culture","real time data", "data transparency",
+        "data democratization", "self serve analytics","insight driven", "outcome driven",
+        "measure everything", "data accountability","data quality", "single source of truth",
+        "data strategy", "data governance",
     ]
-    
+
     AI_AWARENESS_KEYWORDS = [
-        "ai", "artificial intelligence", "machine learning",
-        "automation", "data science", "ml", "algorithms",
-        "predictive", "neural network", "deep learning",
-        "nlp", "computer vision"
+        "ai", "artificial intelligence", "machine learning","automation", "data science", "ml", "algorithms",
+        "predictive", "neural network", "deep learning","nlp", "computer vision",
+        "generative ai", "gen ai", "llm","large language model", "chatgpt", "copilot",
+        "ai tools", "ai powered", "ai driven","ai strategy", "ai roadmap", "ai initiative",
+        "ai first", "ai transformation","prompt engineering", "rag", "embeddings",
+        "pytorch", "tensorflow", "hugging face","model training", "model deployment",
+        "mlops", "ai platform", "ai infrastructure","recommendation system", "predictive model",
+        "intelligent automation", "cognitive automation","robotic process automation", "rpa",
+        "natural language processing", "speech recognition","image recognition", "anomaly detection",
+        "ai research", "applied ai", "ai lab",
     ]
-    
+
     CHANGE_POSITIVE = [
-        "agile", "adaptive", "fast-paced", "embraces change",
-        "continuous improvement", "growth mindset",
-        "flexible", "dynamic", "responsive"
+        "agile", "adaptive", "fast-paced", "embraces change", "continuous improvement", "growth mindset",
+        "flexible", "dynamic", "responsive","lean", "iterative", "scrum",
+        "quick to adapt", "pivots quickly","open minded", "learning culture",
+        "feedback culture", "fail fast", "fail forward", "learning from failure",
+        "psychological safety", "safe to fail","transparent", "open communication",
+        "flat structure", "flat hierarchy", "employee empowerment", "ownership culture",
+        "bias for action", "move quickly","always improving", "kaizen",
+        "welcomes feedback", "open to feedback","collaborative", "cross functional",
+        "embraces technology", "tech savvy","modernizing", "transformation mindset",
     ]
-    
+
     CHANGE_NEGATIVE = [
         "rigid", "traditional", "slow", "risk-averse",
         "change resistant", "old school", "inflexible",
-        "status quo", "stagnant"
+        "status quo", "stagnant",
+        "no feedback", "feedback ignored",
+        "ideas go nowhere", "no follow through",
+        "slow decision making", "slow to decide",
+        "too many layers", "too much bureaucracy",
+        "fear driven", "blame culture",
+        "no psychological safety", "punitive",
+        "not collaborative", "territorial",
+        "siloed teams", "no cross team",
+        "fiefdoms", "empire building",
+        "resistant to feedback", "dismissive",
+        "no room for growth", "no career path",
+        "outdated processes", "manual processes",
+        "no automation", "still using legacy",
+        "cant move fast", "slow execution",
+        "overly hierarchical", "need approval for everything",
     ]
-    
+
     TECH_ROLE_KEYWORDS = [
-        # Core tech roles
-        'software engineer', 'data scientist', 'data engineer', 
-        'machine learning', 'ml engineer', 'ai engineer',
-        'data analyst', 'business intelligence', 'analytics',
-        
-        # Leadership
-        'cto', 'cio', 'chief technology', 'chief information',
-        'chief data', 'vp technology', 'vp engineering',
-        'director of engineering', 'director of data',
-        'engineering director', 'data director',
-        
-        # Specialized
-        'devops', 'mlops', 'site reliability', 'sre',
-        'cloud engineer', 'platform engineer', 'infrastructure',
-        'database', 'architect', 'tech lead', 'engineering manager',
-        
-        # Data roles
-        'data science', 'analytics manager', 'bi analyst',
-        'quantitative analyst', 'research scientist',
-        'statistician', 'data manager',
-        
-        # Development
-        'developer', 'programmer', 'backend', 'frontend',
-        'full stack', 'web developer', 'mobile developer',
-        
-        # QA/Test
-        'qa engineer', 'test engineer', 'automation engineer',
-        'quality assurance',
-        
-        # Product/PM (tech-adjacent)
-        'product manager', 'technical product', 'program manager',
-        'scrum master', 'agile coach'
+        'software engineer', 'data scientist', 'data engineer','machine learning', 'ml engineer', 'ai engineer',
+        'data analyst', 'business intelligence', 'analytics','cto', 'cio', 'chief technology', 'chief information',
+        'chief data', 'vp technology', 'vp engineering','director of engineering', 'director of data',
+        'engineering director', 'data director','devops', 'mlops', 'site reliability', 'sre',
+        'cloud engineer', 'platform engineer', 'infrastructure','database', 'architect', 'tech lead', 'engineering manager',
+        'data science', 'analytics manager', 'bi analyst','quantitative analyst', 'research scientist',
+        'statistician', 'data manager','developer', 'programmer', 'backend', 'frontend',
+        'full stack', 'web developer', 'mobile developer','qa engineer', 'test engineer', 'automation engineer',
+        'quality assurance','product manager', 'technical product', 'program manager',
+        'scrum master', 'agile coach','ai researcher', 'ml researcher', 'applied scientist',
+        'research engineer', 'nlp engineer', 'computer vision engineer','deep learning engineer', 'llm engineer', 'ai scientist',
+        'chief ai officer', 'caio', 'head of ai', 'vp of ai','ai product manager', 'ml product manager',
+        'ml platform engineer', 'ai infrastructure engineer','prompt engineer', 'ai ops', 'model engineer',
+        'cloud architect', 'solutions architect', 'enterprise architect','aws engineer', 'azure engineer', 'gcp engineer',
+        'kubernetes engineer', 'docker', 'devsecops','network engineer', 'security engineer', 'cybersecurity',
+        'information security', 'cloud operations','analytics engineer', 'data platform engineer',
+        'data infrastructure', 'data operations', 'dataops', 'etl developer', 'pipeline engineer', 'spark engineer',
+        'hadoop engineer', 'kafka engineer', 'snowflake engineer','databricks engineer', 'dbt engineer',
+        'chief digital officer', 'chief analytics officer','head of data', 'head of engineering', 'head of machine learning',
+        'vp data science', 'vp analytics', 'vp data engineering','director of ai', 'director of machine learning',
+        'director of analytics', 'director of data science','generative ai', 'responsible ai', 'ai ethics',
+        'ml operations', 'feature engineer', 'data labeler','annotation engineer', 'ai trainer', 'rlhf engineer',
+        'vector database', 'embedding engineer','digital transformation', 'innovation engineer',
     ]
 
     def __init__(self):
@@ -692,7 +723,7 @@ def batch_analyze_glassdoor(
 #     cur.execute(f"""
 #         SELECT id, name, ticker
 #         FROM {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.companies
-#         WHERE ticker = 'CAT'
+#         WHERE ticker = 'WMT'
 #         LIMIT 1
 #     """)
     
@@ -721,7 +752,7 @@ def batch_analyze_glassdoor(
 #     culture_signal = pipeline.collect_and_analyze(
 #         company_id=company_id,
 #         ticker=ticker,
-#         filter_tech_roles=True
+#         filter_tech_roles=False
 #     )
     
 #     # Step 3: Display results
