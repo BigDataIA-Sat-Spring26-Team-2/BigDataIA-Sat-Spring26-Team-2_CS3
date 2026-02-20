@@ -13,19 +13,7 @@ st.set_page_config(page_title="Scoring & Memo", page_icon="📈", layout="wide")
 
 api = APIClient()
 
-# ── Target companies (shared with collection_dashboard) ──
-TARGET_COMPANIES = {
-    "CAT": {"name": "Caterpillar Inc.", "sector": "Manufacturing"},
-    "DE": {"name": "Deere & Company", "sector": "Manufacturing"},
-    "UNH": {"name": "UnitedHealth Group", "sector": "Healthcare"},
-    "HCA": {"name": "HCA Healthcare", "sector": "Healthcare"},
-    "ADP": {"name": "Automatic Data Processing", "sector": "Services"},
-    "PAYX": {"name": "Paychex Inc.", "sector": "Services"},
-    "WMT": {"name": "Walmart Inc.", "sector": "Retail"},
-    "TGT": {"name": "Target Corporation", "sector": "Retail"},
-    "JPM": {"name": "JPMorgan Chase", "sector": "Financial"},
-    "GS": {"name": "Goldman Sachs", "sector": "Financial"},
-}
+
 
 DIMENSION_LABELS = {
     "data_infrastructure": "Data Infrastructure",
@@ -38,22 +26,35 @@ DIMENSION_LABELS = {
 }
 
 
-st.title("AI Readiness Scoring & Investment Memo")
-st.caption("Calculate V^R scores and generate PE-style investment memos")
+st.title("AI Readiness Scoring & Investment Recommendation memo")
+st.caption("Show the final scores for a company along with a generated PE-style investment memo")
 
 st.divider()
 
 # ── Company selection ──
 col_select, col_btn = st.columns([3, 1])
 
-company_options = {
-    f"{tkr} - {info['name']}": tkr
-    for tkr, info in TARGET_COMPANIES.items()
-}
+with st.spinner("Loading companies..."):
+    co_data = api.get_companies(page_size=100)
+    companies = co_data.get("items", [])
 
-with col_select:
-    selected_label = st.selectbox("Select a company", list(company_options.keys()))
-    selected_ticker = company_options[selected_label]
+if not companies:
+    st.warning("No companies found. Add companies first.")
+    st.stop()
+
+def _co_label(c: dict) -> str:
+    return f"{c['ticker']} — {c['name']}"
+
+selected_co = st.selectbox(
+    "Select a company",
+    options=companies,
+    format_func=_co_label,
+)
+
+selected_ticker = selected_co["ticker"]
+company_id = selected_co["id"]
+company_name = selected_co["name"]
+
 
 with col_btn:
     st.write("")  # spacer
@@ -61,23 +62,16 @@ with col_btn:
 
 # ── Resolve company_id and fetch scores on click ──
 if calculate_clicked:
-    try:
-        company = api.get_company_by_ticker(selected_ticker)
-    except Exception:
-        company = None
+    st.session_state["score_company_id"] = company_id
+    st.session_state["score_ticker"] = selected_ticker
+    st.session_state["score_company_name"] = company_name
 
-    if company:
-        st.session_state["score_company_id"] = company["id"]
-        st.session_state["score_ticker"] = selected_ticker
-        st.session_state["score_company_name"] = company["name"]
-        # Clear previous memo and cached scores when switching company
-        st.session_state.pop("memo_result", None)
-        st.session_state.pop("cached_vr", None)
-        st.session_state.pop("cached_dims", None)
-        st.session_state.pop("cached_org_air", None)
-    else:
-        st.error(f"Company **{selected_ticker}** not found in the database. Run the Collection Dashboard first to register it.")
-        st.stop()
+    # Clear previous memo and cached scores
+    st.session_state.pop("memo_result", None)
+    st.session_state.pop("cached_vr", None)
+    st.session_state.pop("cached_dims", None)
+    st.session_state.pop("cached_org_air", None)
+
 
 # ── Guard: need scores loaded ──
 if "score_company_id" not in st.session_state:
@@ -131,73 +125,101 @@ dim_result = st.session_state["cached_dims"]
 st.divider()
 
 # ── Tabs ──
-tab_overview, tab_memo, tab_compare = st.tabs(["Score Overview", "Investment Memo", "Company Comparison"])
-
-# ═══════════════════════════════════════════
-#  TAB 1: Score Overview
-# ═══════════════════════════════════════════
+tab_overview, tab_memo = st.tabs(["Score Overview", "Investment Memo"])
 with tab_overview:
     st.subheader(f"Scores for {company_name} ({ticker})")
 
-    # Row 1 — Key metrics
+    org_air_data = st.session_state.get("cached_org_air", {})
     vr_score = vr_result.get("vr_score", 0)
     vr_comp = vr_result.get("vr_components", {})
 
-    m1, m2, m3 = st.columns(3)
-    m1.metric("V^R Score", f"{vr_score:.1f} / 100")
-    m2.metric("CV Penalty", f"-{vr_comp.get('cv_penalty_amount', 0):.1f} pts")
-    m3.metric("TC Penalty", f"-{vr_comp.get('tc_penalty_amount', 0):.1f} pts")
+    # ======================================================
+    # ROW 1 — FINAL AI READINESS SCORE (PERFECT CENTERED)
+    # ======================================================
 
-    # Show Org-AI-R / HR / alignment if available
-    org_air_data = st.session_state.get("cached_org_air", {})
-    org_air = org_air_data.get("org_air_score")
+    final_score = org_air_data.get("org_air_score", vr_score)
+
+    c_left, c_center, c_right = st.columns([1, 2, 1])
+
+    with c_center:
+        st.markdown(
+            "<h3 style='text-align:center;'> Final AI Readiness Score</h3>",
+            unsafe_allow_html=True
+        )
+        st.markdown(
+            f"<h1 style='text-align:center; font-size:56px; margin-top:0;'>"
+            f"{final_score:.1f} / 100"
+            f"</h1>",
+            unsafe_allow_html=True
+        )
+
+    st.markdown("---")
+
+    # ======================================================
+    # ROW 2 — V^R STRUCTURAL BREAKDOWN
+    # ======================================================
+
+    st.markdown("### V^R Structural Breakdown")
+
+    col1, col2, col3 = st.columns(3)
+
+    col1.metric("V^R Score", f"{vr_score:.1f}")
+    col2.metric("CV Penalty", f"-{vr_comp.get('cv_penalty_amount', 0):.1f} pts")
+    col3.metric("TC Penalty", f"-{vr_comp.get('tc_penalty_amount', 0):.1f} pts")
+
+    st.markdown("---")
+
+    # ======================================================
+    # ROW 3 — HR STRUCTURAL BREAKDOWN 
+    # ======================================================
+
+    st.markdown("### H^R Structural Breakdown")
+
+    #org_air = org_air_data.get("org_air_score")
     hr = org_air_data.get("hr_score")
     alignment_val = org_air_data.get("alignment")
-    board_gov = org_air_data.get("board_governance_score")
     ci_lower = org_air_data.get("ci_lower")
     ci_upper = org_air_data.get("ci_upper")
+    synergy = org_air_data.get("synergy_score")
+    tc = org_air_data.get("talent_concentration")
+    pf = org_air_data.get("position_factor")
 
-    if org_air is not None or hr is not None:
-        st.divider()
-        st.markdown("#### Full Org-AI-R Context")
-        o1, o2, o3, o4 = st.columns(4)
-        o1.metric(
-            "Org-AI-R Score",
-            f"{org_air:.1f} / 100" if isinstance(org_air, (int, float)) else "N/A",
-        )
-        o2.metric(
-            "H^R (Industry Baseline)",
-            f"{hr:.1f} / 100" if isinstance(hr, (int, float)) else "N/A",
-        )
-        if isinstance(alignment_val, (int, float)):
-            o3.metric("Alignment", f"{alignment_val:.2f}")
-        if isinstance(board_gov, (int, float)):
-            o4.metric("Board Governance", f"{board_gov:.1f} / 100")
+    # --- Row 3A (Primary context)
+    r3a1, r3a2, r3a3 = st.columns(3)
 
-        # Second row: confidence interval + extra details
-        if ci_lower is not None and ci_upper is not None:
-            c1, c2, c3, c4 = st.columns(4)
-            c1.metric(
-                "Confidence Interval",
-                f"[{ci_lower:.1f}, {ci_upper:.1f}]",
-            )
-            synergy = org_air_data.get("synergy_score")
-            if isinstance(synergy, (int, float)):
-                c2.metric("Synergy Score", f"{synergy:.1f}")
-            tc = org_air_data.get("talent_concentration")
-            if isinstance(tc, (int, float)):
-                c3.metric("Talent Concentration", f"{tc:.3f}")
-            pf = org_air_data.get("position_factor")
-            if isinstance(pf, (int, float)):
-                c4.metric("Position Factor", f"{pf:.3f}")
-    else:
-        st.caption("Org-AI-R scores could not be loaded. Check that the integration service dependencies are available.")
+    
 
-    st.divider()
+    r3a1.metric("H^R (Industry Baseline)",
+                f"{hr:.1f} / 100" if isinstance(hr, (int, float)) else "N/A")
 
-    # Row 2 — Horizontal bar chart for 7 dimensions
+    r3a2.metric("Alignment",
+                f"{alignment_val:.2f}" if isinstance(alignment_val, (int, float)) else "N/A")
+    r3a3.metric("Position Factor",
+                f"{pf:.3f}" if isinstance(pf, (int, float)) else "N/A")
+
+    # --- Row 3B (Supporting diagnostics)
+    r3b1, r3b2, r3b3= st.columns(3)
+
+    r3b1.metric("Confidence Interval",
+                f"[{ci_lower:.1f}, {ci_upper:.1f}]"
+                if isinstance(ci_lower, (int, float)) and isinstance(ci_upper, (int, float))
+                else "N/A")
+
+    r3b2.metric("Synergy Score",
+                f"{synergy:.1f}" if isinstance(synergy, (int, float)) else "N/A")
+
+    r3b3.metric("Talent Concentration",
+                f"{tc:.3f}" if isinstance(tc, (int, float)) else "N/A")
+
+    
+
+    st.markdown("---")
+
+    # ======================================================
+    # ROW 4 — DIMENSION BAR CHART
+    # ======================================================
+
     dim_scores = dim_result.get("dimension_scores", {})
-    vr_dim_scores = vr_result.get("dimension_scores", {})
 
     chart_data = []
     for dim_key, label in DIMENSION_LABELS.items():
@@ -230,6 +252,7 @@ with tab_overview:
             textposition="outside",
         )
     )
+
     fig.update_layout(
         title="Seven-Dimension Scores",
         xaxis_title="Score (0-100)",
@@ -238,66 +261,53 @@ with tab_overview:
         height=400,
         margin=dict(l=10, r=10, t=40, b=10),
     )
+
     st.plotly_chart(fig, use_container_width=True)
+    # # Row 3 — Detailed scores table with Path A scores from VR + dimension endpoint
+    # st.subheader("Detailed Dimension Breakdown")
 
-    st.divider()
+    # # Get rubric details from audit trail if available
+    # audit = dim_result.get("audit_trail", {})
+    # rubric_details = audit.get("rubric_details", {})
 
-    # Row 3 — Detailed scores table with Path A scores from VR + dimension endpoint
-    st.subheader("Detailed Dimension Breakdown")
+    # table_rows = []
+    # for dim_key, label in DIMENSION_LABELS.items():
+    #     score_data = dim_scores.get(dim_key, {})
+    #     vr_dim = vr_dim_scores.get(dim_key, None)
 
-    # Get rubric details from audit trail if available
-    audit = dim_result.get("audit_trail", {})
-    rubric_details = audit.get("rubric_details", {})
+    #     # Path A (quantitative) score
+    #     if isinstance(score_data, dict):
+    #         path_a = score_data.get("score", 0)
+    #         confidence = score_data.get("confidence", 0)
+    #     else:
+    #         path_a = float(score_data) if score_data else 0
+    #         confidence = None
 
-    table_rows = []
-    for dim_key, label in DIMENSION_LABELS.items():
-        score_data = dim_scores.get(dim_key, {})
-        vr_dim = vr_dim_scores.get(dim_key, None)
+    #     # Path B (qualitative) score from rubric
+    #     rb = rubric_details.get(dim_key, {})
+    #     path_b = rb.get("score", None) if isinstance(rb, dict) else None
 
-        # Path A (quantitative) score
-        if isinstance(score_data, dict):
-            path_a = score_data.get("score", 0)
-            confidence = score_data.get("confidence", 0)
-        else:
-            path_a = float(score_data) if score_data else 0
-            confidence = None
+    #     # Combined = 0.6 * Path A + 0.4 * Path B (consistent blending)
+    #     if path_b is not None:
+    #         combined = round(path_a * 0.6 + path_b * 0.4, 1)
+    #     else:
+    #         combined = path_a
 
-        # Path B (qualitative) score from rubric
-        rb = rubric_details.get(dim_key, {})
-        path_b = rb.get("score", None) if isinstance(rb, dict) else None
+    #     delta = abs(path_a - path_b) if path_b is not None else None
 
-        # Combined = 0.6 * Path A + 0.4 * Path B (consistent blending)
-        if path_b is not None:
-            combined = round(path_a * 0.6 + path_b * 0.4, 1)
-        else:
-            combined = path_a
+    #     table_rows.append({
+    #         "Dimension": label,
+    #         "Path A (Quantitative)": f"{path_a:.1f}",
+    #         "Path B (Qualitative)": f"{path_b:.1f}" if path_b is not None else "N/A",
+    #         "Combined (0.6A+0.4B)": f"{combined:.1f}",
+    #         "Delta": f"{delta:.1f}" if delta is not None else "N/A",
+    #         "Confidence": f"{confidence:.2f}" if confidence is not None else "N/A",
+    #     })
 
-        delta = abs(path_a - path_b) if path_b is not None else None
+    # table_df = pd.DataFrame(table_rows)
+    # st.dataframe(table_df, use_container_width=True, hide_index=True)
 
-        table_rows.append({
-            "Dimension": label,
-            "Path A (Quantitative)": f"{path_a:.1f}",
-            "Path B (Qualitative)": f"{path_b:.1f}" if path_b is not None else "N/A",
-            "Combined (0.6A+0.4B)": f"{combined:.1f}",
-            "Delta": f"{delta:.1f}" if delta is not None else "N/A",
-            "Confidence": f"{confidence:.2f}" if confidence is not None else "N/A",
-        })
-
-    table_df = pd.DataFrame(table_rows)
-    st.dataframe(table_df, use_container_width=True, hide_index=True)
-
-    # V^R components detail
-    with st.expander("V^R Calculation Details"):
-        detail_cols = st.columns(2)
-        with detail_cols[0]:
-            st.markdown(f"**Base Score (weighted mean):** {vr_comp.get('base_score', 'N/A')}")
-            st.markdown(f"**Coefficient of Variation (CV):** {vr_comp.get('cv', 'N/A')}")
-            st.markdown(f"**CV Penalty Factor:** {vr_comp.get('cv_penalty', 'N/A')}")
-        with detail_cols[1]:
-            st.markdown(f"**Talent Concentration (TC):** {vr_comp.get('talent_concentration', 'N/A')}")
-            st.markdown(f"**TC Risk Adjustment:** {vr_comp.get('talent_risk_adj', 'N/A')}")
-            st.markdown(f"**Sector:** {vr_result.get('sector', 'N/A')}")
-
+    
 
 # ═══════════════════════════════════════════
 #  TAB 2: Investment Memo
@@ -421,102 +431,102 @@ with tab_memo:
 # ═══════════════════════════════════════════
 #  TAB 3: Company Comparison
 # ═══════════════════════════════════════════
-with tab_compare:
-    st.subheader("Compare V^R Scores Across Companies")
+# with tab_compare:
+#     st.subheader("Compare V^R Scores Across Companies")
 
-    compare_options = [
-        f"{tkr} - {info['name']}" for tkr, info in TARGET_COMPANIES.items()
-    ]
+#     compare_options = [
+#     f"{c['ticker']} — {c['name']}" for c in companies
+# ]
 
-    selected_compare = st.multiselect(
-        "Select 2-4 companies to compare",
-        compare_options,
-        default=[compare_options[0], compare_options[1]] if len(compare_options) >= 2 else [],
-        max_selections=4,
-    )
+#     selected_compare = st.multiselect(
+#         "Select 2-4 companies to compare",
+#         compare_options,
+#         default=[compare_options[0], compare_options[1]] if len(compare_options) >= 2 else [],
+#         max_selections=4,
+#     )
 
-    if st.button("Compare", type="primary") and len(selected_compare) >= 2:
-        compare_tickers = [opt.split(" - ")[0] for opt in selected_compare]
+#     if st.button("Compare", type="primary") and len(selected_compare) >= 2:
+#         compare_tickers = [opt.split(" — ")[0] for opt in selected_compare]
 
-        # Resolve company IDs
-        compare_ids = []
-        missing_tickers = []
-        for tkr in compare_tickers:
-            try:
-                c = api.get_company_by_ticker(tkr)
-            except Exception:
-                c = None
-            if c:
-                compare_ids.append(c["id"])
-            else:
-                missing_tickers.append(tkr)
+#         # Resolve company IDs
+#         compare_ids = []
+#         missing_tickers = []
+#         for tkr in compare_tickers:
+#             try:
+#                 c = api.get_company_by_ticker(tkr)
+#             except Exception:
+#                 c = None
+#             if c:
+#                 compare_ids.append(c["id"])
+#             else:
+#                 missing_tickers.append(tkr)
 
-        if missing_tickers:
-            st.warning(f"Companies not found in database: **{', '.join(missing_tickers)}**. Run Collection Dashboard first.")
+#         if missing_tickers:
+#             st.warning(f"Companies not found in database: **{', '.join(missing_tickers)}**. Run Collection Dashboard first.")
 
-        if len(compare_ids) < 2:
-            st.error("Need at least 2 companies in the database to compare.")
-        else:
-            with st.spinner("Calculating V^R for selected companies..."):
-                try:
-                    comparison = api.compare_vr_scores(compare_ids)
-                except Exception as e:
-                    comparison = None
-                    st.error(f"Comparison failed: {e}")
+#         if len(compare_ids) < 2:
+#             st.error("Need at least 2 companies in the database to compare.")
+#         else:
+#             with st.spinner("Calculating V^R for selected companies..."):
+#                 try:
+#                     comparison = api.compare_vr_scores(compare_ids)
+#                 except Exception as e:
+#                     comparison = None
+#                     st.error(f"Comparison failed: {e}")
 
-            if comparison and "companies" in comparison:
-                companies_data = comparison["companies"]
+#             if comparison and "companies" in comparison:
+#                 companies_data = comparison["companies"]
 
-                # Bar chart
-                bar_data = []
-                for tkr_key, data in companies_data.items():
-                    bar_data.append({
-                        "Company": f"{data['company_name']} ({tkr_key})",
-                        "V^R Score": data["vr_score"],
-                    })
+#                 # Bar chart
+#                 bar_data = []
+#                 for tkr_key, data in companies_data.items():
+#                     bar_data.append({
+#                         "Company": f"{data['company_name']} ({tkr_key})",
+#                         "V^R Score": data["vr_score"],
+#                     })
 
-                bar_df = pd.DataFrame(bar_data).sort_values("V^R Score", ascending=False)
+#                 bar_df = pd.DataFrame(bar_data).sort_values("V^R Score", ascending=False)
 
-                fig = px.bar(
-                    bar_df,
-                    x="V^R Score",
-                    y="Company",
-                    orientation="h",
-                    title="V^R Score Comparison",
-                    text="V^R Score",
-                    color="V^R Score",
-                    color_continuous_scale=["#d32f2f", "#ff9800", "#4caf50"],
-                )
-                fig.update_traces(texttemplate="%{text:.1f}", textposition="outside")
-                fig.update_layout(
-                    yaxis=dict(categoryorder="total ascending"),
-                    xaxis_range=[0, 100],
-                    height=300 + len(bar_data) * 50,
-                    showlegend=False,
-                )
-                st.plotly_chart(fig, use_container_width=True)
+#                 fig = px.bar(
+#                     bar_df,
+#                     x="V^R Score",
+#                     y="Company",
+#                     orientation="h",
+#                     title="V^R Score Comparison",
+#                     text="V^R Score",
+#                     color="V^R Score",
+#                     color_continuous_scale=["#d32f2f", "#ff9800", "#4caf50"],
+#                 )
+#                 fig.update_traces(texttemplate="%{text:.1f}", textposition="outside")
+#                 fig.update_layout(
+#                     yaxis=dict(categoryorder="total ascending"),
+#                     xaxis_range=[0, 100],
+#                     height=300 + len(bar_data) * 50,
+#                     showlegend=False,
+#                 )
+#                 st.plotly_chart(fig, use_container_width=True)
 
-                st.divider()
+#                 st.divider()
 
-                # Comparison table
-                st.subheader("Detailed Comparison")
-                comp_rows = []
-                for tkr_key, data in companies_data.items():
-                    comp_rows.append({
-                        "Ticker": tkr_key,
-                        "Company": data["company_name"],
-                        "V^R Score": f"{data['vr_score']:.1f}",
-                        "Base Score": f"{data['base_score']:.1f}",
-                        "CV": f"{data['cv']:.3f}",
-                        "CV Penalty": f"{data['cv_penalty']:.3f}",
-                        "TC": f"{data['talent_concentration']:.3f}",
-                        "Sector": data["sector"],
-                    })
+#                 # Comparison table
+#                 st.subheader("Detailed Comparison")
+#                 comp_rows = []
+#                 for tkr_key, data in companies_data.items():
+#                     comp_rows.append({
+#                         "Ticker": tkr_key,
+#                         "Company": data["company_name"],
+#                         "V^R Score": f"{data['vr_score']:.1f}",
+#                         "Base Score": f"{data['base_score']:.1f}",
+#                         "CV": f"{data['cv']:.3f}",
+#                         "CV Penalty": f"{data['cv_penalty']:.3f}",
+#                         "TC": f"{data['talent_concentration']:.3f}",
+#                         "Sector": data["sector"],
+#                     })
 
-                comp_df = pd.DataFrame(comp_rows)
-                st.dataframe(comp_df, use_container_width=True, hide_index=True)
-            elif comparison is not None:
-                st.error("Comparison returned no results. Some companies may not have enough evidence data.")
+#                 comp_df = pd.DataFrame(comp_rows)
+#                 st.dataframe(comp_df, use_container_width=True, hide_index=True)
+#             elif comparison is not None:
+#                 st.error("Comparison returned no results. Some companies may not have enough evidence data.")
 
-    elif len(selected_compare) < 2:
-        st.info("Select at least 2 companies to compare.")
+#     elif len(selected_compare) < 2:
+#         st.info("Select at least 2 companies to compare.")
