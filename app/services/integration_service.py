@@ -527,6 +527,11 @@ class ScoringIntegrationService:
                 company_id=company_id,
                 error=str(exc),
             )
+        logger.info(
+            "glassdoor_not_in_db_running_pipeline",
+            company_id=company_id,
+            ticker=ticker
+        )
 
         try:
             pipeline = GlassdoorCollectionPipeline()
