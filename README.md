@@ -3,7 +3,7 @@
 > **Private Equity AI Readiness Assessment Platform**
 > Quantifying the Say-Do Gap Between AI Claims and AI Investment
 
-**Authors:** Prachi Pradhan · Samiksh Gupta · Siddharth Shukla
+**Authors:** Prachi Pradhan · Samiksha Gupta · Siddharth Shukla
 **Course:** Big Data and Intelligent Analytics — Northeastern University, Spring 2026
 **Instructor:** Sri Krishnamurthy
 

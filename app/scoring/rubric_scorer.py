@@ -303,7 +303,7 @@ class RubricScorer:
                     "documented policies", "risk assessment",
                     "vp ai", "ai governance", "model governance",
                     "data governance", "compliance framework",
-                    "board governance", "tech committee"
+                    "board governance", "tech committee", "chief data"
                 ],
                 min_keyword_matches=2,
                 quantitative_threshold=0.0,
@@ -316,7 +316,7 @@ class RubricScorer:
                     "policy exists", "it-led governance",
                     "governance", "committee"
                 ],
-                min_keyword_matches=2,
+                min_keyword_matches=1,
                 quantitative_threshold=0.0,
             ),
             ScoreLevel.LEVEL_2: RubricCriteria(
@@ -658,7 +658,7 @@ class RubricScorer:
                         "machine learning"
                     ],
                     min_keyword_matches=2,
-                    quantitative_threshold=1.0,  # 1-2 use cases
+                    quantitative_threshold=0.0,  # keyword matches alone qualify
                 ),
                 ScoreLevel.LEVEL_2: RubricCriteria(
                     level=ScoreLevel.LEVEL_2,

@@ -213,8 +213,12 @@ class ScoringService:
         
         logger.debug("dimension_scores_extracted", scores=dimension_scores)
         
-        # Step 4: Calculate TC
-        tc = self._calculate_talent_concentration(company_id)
+        # Step 4: Calculate TC — default to 0.0 if no job data is available
+        try:
+            tc = self._calculate_talent_concentration(company_id)
+        except ValueError as e:
+            logger.warning("tc_calculation_skipped", company_id=str(company_id), reason=str(e))
+            tc = 0.0
         logger.debug("tc_calculated", tc=tc)
         
         # Step 5: Get sector
@@ -476,14 +480,14 @@ class ScoringService:
                     f"TC calculation requires job posting data."
                 )
             
-            # ⭐ THE FIX: Parse JSON string to dict
+          
             metadata_raw = row[0]
             
             if isinstance(metadata_raw, str):
-                # It's a JSON string - parse it!
+           
                 metadata = json.loads(metadata_raw)
             elif isinstance(metadata_raw, dict):
-                # Already a dict - use as-is
+           
                 metadata = metadata_raw
             else:
                 raise ValueError(

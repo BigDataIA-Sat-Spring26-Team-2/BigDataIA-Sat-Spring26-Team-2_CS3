@@ -2,32 +2,32 @@
   "company_id": "e547fc53-a9f5-4319-8e3f-e73fd7364abb",
   "ticker": "DG",
   "sector": "retail",
-  "vr_score": 14.2758800390625,
-  "hr_score": 66.96865,
-  "synergy_score": 4.5244047996,
-  "org_air_score": 31.653558036577,
-  "final_score": 31.653558036577,
-  "alignment": 0.473072300390625,
+  "vr_score": 15.806998008516,
+  "hr_score": 67.16185,
+  "synergy_score": 5.165655054,
+  "org_air_score": 32.606944754976446,
+  "final_score": 32.606944754976446,
+  "alignment": 0.48645148008516004,
   "talent_concentration": 0.5004,
-  "position_factor": -0.2887,
+  "position_factor": -0.27034,
   "market_cap_percentile": 0.6,
-  "ci_lower": 27.3184,
-  "ci_upper": 35.9816,
+  "ci_lower": 28.2784,
+  "ci_upper": 36.9416,
   "confidence": 0.975,
   "sem": 2.21,
   "dimension_scores": {
     "data_infrastructure": 6.27,
-    "ai_governance": 50.15,
+    "ai_governance": 71.31,
     "technology_stack": 5.003389830508475,
     "talent": 23.43,
     "leadership": 33.63,
     "use_case_portfolio": 4.0,
     "culture": 34.90234375
   },
-  "vr_weighted_mean": 19.0625,
-  "vr_cv": 0.8875,
-  "vr_cv_penalty_amount": 4.2294921875,
-  "vr_tc_penalty_amount": 0.5571277734375,
+  "vr_weighted_mean": 22.2365,
+  "vr_cv": 1.0456,
+  "vr_cv_penalty_amount": 5.8126211,
+  "vr_tc_penalty_amount": 0.616880891484,
   "path_a_scores": {
     "data_infrastructure": 3.776884205999355,
     "ai_governance": 76.92015209125475,
@@ -44,9 +44,9 @@
       "rationale": "No rubric criteria met"
     },
     "ai_governance": {
-      "score": 10.0,
-      "level": "ScoreLevel.LEVEL_1",
-      "rationale": "No rubric criteria met"
+      "score": 62.9,
+      "level": "ScoreLevel.LEVEL_4",
+      "rationale": "Matched 2/13 keywords at Good level"
     },
     "talent": {
       "score": 10.0,
@@ -76,26 +76,26 @@
   "glassdoor_review_count": 0,
   "board_governance_score": 85.0,
   "vr_components": {
-    "weighted_mean": 19.0625,
-    "cv": 0.8875,
-    "cv_penalty": 0.778125,
-    "cv_penalty_amount": 4.2294921875,
+    "weighted_mean": 22.2365,
+    "cv": 1.0456,
+    "cv_penalty": 0.7386,
+    "cv_penalty_amount": 5.8126211,
     "tc": 0.5004,
     "tc_penalty": 0.96244,
-    "tc_penalty_amount": 0.5571277734375
+    "tc_penalty_amount": 0.616880891484
   },
   "hr_components": {
     "hr_base": 70.0,
-    "position_adjustment": 0.956695
+    "position_adjustment": 0.959455
   },
   "synergy_components": {
-    "base_synergy": 9.563316,
-    "alignment": 0.4731,
+    "base_synergy": 10.617996,
+    "alignment": 0.4865,
     "timing_factor": 1.0
   },
   "formula_constants": {
     "alpha": 0.6,
     "beta": 0.12
   },
-  "generated_at": "2026-02-20T08:33:41.083015+00:00"
+  "generated_at": "2026-02-20T16:53:45.527400+00:00"
 }
