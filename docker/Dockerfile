@@ -19,7 +19,10 @@ COPY pyproject.toml poetry.lock ./
 RUN poetry config virtualenvs.create false \
  && poetry install --no-interaction --no-ansi --no-root
 
-# 5. Copy application code
+# 5a. Install Playwright Chromium browser + its system dependencies
+RUN playwright install chromium --with-deps
+
+# 6. Copy application code
 COPY app ./app
 
 # 6. Tell Docker the app uses port 8000
