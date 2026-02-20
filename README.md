@@ -29,11 +29,12 @@
 - [API Documentation](#api-documentation)
 - [Scoring Pipeline](#scoring-pipeline)
 - [Evidence Collection](#evidence-collection)
-- [Key Findings](#key-findings)
 - [Testing](#testing)
 - [Deployment](#deployment)
+- [Known Limitations](#known-limitations)
 - [AI Tools Disclosure](#ai-tools-disclosure)
 - [Team Contributions](#team-contributions)
+- [Resources](#resources)
 
 ---
 
@@ -94,30 +95,7 @@ H^R = H^R_base × (1 + 0.15 × PositionFactor)
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    Streamlit UI                          │
-│  Home | Collection | Scoring | H^R | V^R | Memo         │
-└────────────────────────┬────────────────────────────────┘
-                         │
-┌────────────────────────▼────────────────────────────────┐
-│                  FastAPI Application                      │
-│  ┌────────────┐  ┌────────────┐  ┌───────────────────┐  │
-│  │  Routers   │  │  Services  │  │     Pipelines     │  │
-│  │ (Endpoints)│  │ (Business) │  │ (Evidence Collect)│  │
-│  └────────────┘  └────────────┘  └───────────────────┘  │
-│  ┌────────────────────────────────────────────────────┐  │
-│  │              CS3 Scoring Engine                    │  │
-│  │  EvidenceMapper → VRCalculator → HRCalculator      │  │
-│  │  RubricScorer  → SynergyCalc  → ConfidenceCalc     │  │
-│  │  TalentConcentration → PositionFactor → OrgAIR     │  │
-│  └────────────────────────────────────────────────────┘  │
-└──────────┬──────────────────┬──────────────┬────────────┘
-           │                  │              │
-    ┌──────▼──────┐   ┌───────▼──────┐  ┌───▼────┐
-    │  Snowflake  │   │    Redis     │  │   S3   │
-    │  (Primary)  │   │   (Cache)    │  │ (Docs) │
-    └─────────────┘   └──────────────┘  └────────┘
-```
+Diagram: https://drive.google.com/file/d/1Lf1HIuNp9F5kZNLsNwiyC-fTdwWLm-es/view?usp=sharing 
 
 ---
 
@@ -284,7 +262,7 @@ pe-org-air-platform/
 | SEC EDGAR Pipeline | Download, parse, and chunk 10-K, 10-Q, 8-K, DEF 14A filings |
 | Job Signal Collector | LinkedIn + Indeed AI/ML job posting analysis |
 | Patent Signal Collector | Google Patents CPC G06N filtering via Playwright |
-| Tech Stack Collector | Company website + GitHub tech detection |
+| Tech Stack Collector | Company website + GitHub technology detection |
 | Leadership Collector | Executive AI background scoring |
 | Say Score Analyzer | AI keyword density measurement in SEC filings |
 
@@ -306,7 +284,7 @@ pe-org-air-platform/
 | 6.2 | Confidence Calculator | SEM-based 95% confidence intervals |
 | 6.3 | Synergy Calculator | Alignment × timing factor synergy score |
 | 6.4 | Org-AI-R Calculator | Final weighted composite score |
-| 6.5 | Portfolio Results | 5-company scored portfolio |
+| 6.5 | Portfolio Results | 13-company scored portfolio |
 
 ---
 
@@ -316,14 +294,17 @@ pe-org-air-platform/
 |---|:---:|---|
 | Manufacturing | CAT | Caterpillar Inc. |
 | Manufacturing | DE | Deere & Company |
+| Manufacturing | GE | General Electric Co. |
 | Healthcare | UNH | UnitedHealth Group |
 | Healthcare | HCA | HCA Healthcare |
 | Services | ADP | Automatic Data Processing |
 | Services | PAYX | Paychex Inc. |
 | Retail | WMT | Walmart Inc. |
 | Retail | TGT | Target Corporation |
+| Retail | DG | Dollar General Corp. |
 | Financial | JPM | JPMorgan Chase |
 | Financial | GS | Goldman Sachs |
+| Technology | NVDA | NVIDIA Corporation |
 
 ---
 
@@ -663,6 +644,12 @@ SEM = σ × √(1 − ρ)
 | Innovation Activity | Google Patents | 25% | CPC G06N AI patent filings |
 | Digital Presence | Tech blogs + GitHub | 25% | AI technology stack detection |
 | Leadership Signals | Company websites | 20% | Executive AI backgrounds |
+| Board Governance | DEF 14A Proxy Statements | — | Board AI expertise, tech committee presence, data officer roles |
+| SEC Item 1 | 10-K Business Section | — | AI use case mentions, production deployments, product diversity |
+| SEC Item 1A | 10-K Risk Factors | — | AI risk disclosure, cybersecurity, regulatory compliance |
+| SEC Item 7 | 10-K / 10-Q MD&A | — | AI strategy discussion, technology investment, executive priorities |
+| Culture Signals | Glassdoor Reviews (S3) | — | Innovation culture, data-driven mindset, change readiness |
+
 
 ### Say Score Calculation
 
@@ -672,62 +659,6 @@ Measures AI rhetoric density across ~90 weighted keywords in SEC filings:
 mention_density = weighted_mentions / total_words × 1000
 say_score       = min(√(mention_density) × 95, 100)
 ```
-
----
-
-## Key Findings
-
-*(From February 2026 analysis of 10 portfolio companies)*
-
-### Evidence Statistics
-
-| Metric | Value |
-|---|---:|
-| Companies Tracked | 10 |
-| Total Documents | 53 |
-| Total Chunks | 2,602 |
-| Total Words | 2,587,824 |
-| Total Signals | 38 |
-
-### Documents by Company
-
-| Ticker | Company | 10-K | 10-Q | 8-K | DEF 14A | Total |
-|:---:|---|:---:|:---:|:---:|:---:|:---:|
-| JPM | JPMorgan Chase | 2 | 1 | 1 | 1 | 5 |
-| DE | Deere & Company | 2 | 2 | 2 | 2 | 8 |
-| GS | Goldman Sachs | 2 | 1 | 1 | 1 | 5 |
-| CAT | Caterpillar Inc. | 2 | 1 | 1 | 1 | 5 |
-| HCA | HCA Healthcare | 2 | 1 | 1 | 1 | 5 |
-| WMT | Walmart Inc. | 2 | 1 | 1 | 1 | 5 |
-| UNH | UnitedHealth Group | 2 | 1 | 1 | 1 | 5 |
-| ADP | ADP | 2 | 1 | 1 | 1 | 5 |
-| TGT | Target Corporation | 2 | 1 | 1 | 1 | 5 |
-| PAYX | Paychex Inc. | 2 | 1 | 1 | 1 | 5 |
-
-### Say vs. Do Score Comparison
-
-| Rank | Ticker | Say Score | Do Score | Gap | Assessment |
-|:---:|:---:|:---:|:---:|:---:|---|
-| 1 | ADP | 100.0 | 31.8 | +68.2 | Overstating AI |
-| 2 | PAYX | 93.7 | 28.4 | +65.3 | Overstating AI |
-| 3 | HCA | 76.1 | 40.2 | +35.8 | Overstating AI |
-| 4 | UNH | 93.1 | 66.3 | +26.8 | Overstating AI |
-| 5 | TGT | 60.0 | 33.4 | +26.6 | Overstating AI |
-| 6 | CAT | 58.6 | 37.5 | +21.1 | Overstating AI |
-| 7 | GS | 67.8 | 57.0 | +10.8 | More talk than action |
-| 8 | DE | 47.1 | 43.9 | +3.2 | Balanced |
-| 9 | JPM | 44.9 | 48.5 | -3.6 | Balanced |
-| 10 | WMT | 60.3 | 68.2 | -7.9 | Quiet builder |
-
-### Sector Analysis
-
-| Sector | Avg Hiring | Avg Innovation | Avg Digital | Avg Leadership | Avg Composite |
-|---|:---:|:---:|:---:|:---:|:---:|
-| Healthcare | 87.0 | 40.0 | 27.5 | 51.5 | 53.3 |
-| Retail | 74.7 | 40.0 | 48.8 | 31.1 | 50.8 |
-| Financial | 84.8 | 35.0 | 38.8 | 44.3 | 52.8 |
-| Manufacturing | 54.6 | 80.0 | 11.3 | 7.5 | 40.7 |
-| Services | 69.4 | 7.5 | 11.3 | 23.1 | 30.1 |
 
 ---
 
@@ -859,9 +790,9 @@ All code was reviewed, understood, and tested by team members before inclusion.
 
 | Name | Email | Contributions |
 |---|---|---|
-| Prachi Pradhan | pradhanprac@northeastern.edu | SEC EDGAR pipeline, document parser, chunking, S3 storage, Snowflake schema, Say Score analyzer, leadership signals, Redis caching, CS3 scoring engine (evidence mapper, rubric scorer, VR/HR/synergy calculators, confidence CI, integration service), investment memo generator, documentation |
-| Samiksh Gupta | gupta.samik@northeastern.edu | Job signal pipeline, evidence collection script, Streamlit signal analysis page, Docker setup, UI improvements, Snowflake setup, S3 setup |
-| Siddharth Shukla | shukla.sid@northeastern.edu | FastAPI endpoints, Pydantic models, Redis caching, assessment state machine, health check, Streamlit company reports, tech signal pipeline, patent signal pipeline, signal scoring |
+| Prachi Pradhan | pradhanprac@northeastern.edu | SEC EDGAR pipeline, document parser, chunking, S3 storage, Snowflake schema, Say Score analyzer, leadership signals, Redis caching, CS3 scoring engine (evidence mapper, rubric scorer, VR calculator),Board analyer composition, investment memo generator using claude anthropic, documentation |
+| Samiksh Gupta | gupta.samik@northeastern.edu | Job signal pipeline, evidence collection script, Streamlit signal analysis page, Docker setup, UI improvements, Snowflake setup, S3 setup,HR/synergy calculators, confidence CI,glassdoor reviews collection, ruberics scorer, integration service|
+| Siddharth Shukla | shukla.sid@northeastern.edu | FastAPI endpoints, Pydantic models, Redis caching, assessment state machine, health check, Streamlit company reports, tech signal pipeline, patent signal pipeline, signal scoring,HR/synergy calculators, confidence CI , talent concentration, ruberic scorer,integration service, Airflow implementation for sec edgar pipeline|
 
 ---
 
@@ -880,4 +811,3 @@ All code was reviewed, understood, and tested by team members before inclusion.
 
 ---
 
-*Copyright © 2025-2026 Team 2 — Big Data and Intelligent Analytics, Northeastern University*
