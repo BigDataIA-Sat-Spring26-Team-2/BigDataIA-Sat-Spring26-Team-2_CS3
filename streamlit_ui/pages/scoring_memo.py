@@ -25,6 +25,9 @@ TARGET_COMPANIES = {
     "TGT": {"name": "Target Corporation", "sector": "Retail"},
     "JPM": {"name": "JPMorgan Chase", "sector": "Financial"},
     "GS": {"name": "Goldman Sachs", "sector": "Financial"},
+    "NVDA": {"name": "NVIDIA Corporation",   "sector": "Technology"},
+    "DG":   {"name": "Dollar General Corp",  "sector": "Retail"},
+    "GE":   {"name": "General Electric Co",  "sector": "Manufacturing"},
 }
 
 DIMENSION_LABELS = {
