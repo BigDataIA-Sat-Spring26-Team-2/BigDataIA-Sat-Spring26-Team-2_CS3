@@ -91,12 +91,10 @@ with tab_co:
         # Build display DataFrame
         rows = []
         for c in filtered:
-            pf = float(c.get("position_factor", 0.0))
             rows.append({
                 "Name": c["name"],
                 "Ticker": c["ticker"],
                 "Industry": ind_map.get(c["industry_id"], "Unknown"),
-                "Position Factor": f"{pf:+.1f}",
                 "Created": str(c.get("created_at", ""))[:10],
             })
 
@@ -104,21 +102,12 @@ with tab_co:
             pd.DataFrame(rows)
             if rows
             else pd.DataFrame(
-                columns=["Name", "Ticker", "Industry", "Position Factor", "Created"]
+                columns=["Name", "Ticker", "Industry", "Created"]
             )
         )
 
-        def style_pf(val):
-            raw = float(val)
-            if raw > 0:
-                return "background-color: #d4edda; color: #155724"
-            if raw < 0:
-                return "background-color: #f8d7da; color: #721c24"
-            return "background-color: #e2e3e5; color: #383d41"
-
         if not df.empty:
-            styled = df.style.applymap(style_pf, subset=["Position Factor"])
-            st.dataframe(styled, use_container_width=True, hide_index=True)
+            st.dataframe(df, use_container_width=True, hide_index=True)
         else:
             st.info("No companies match the current filters.")
 
@@ -148,13 +137,6 @@ with tab_co:
                     options=list(ind_options.keys()),
                     format_func=lambda x: ind_options[x],
                 )
-                pf = st.slider("Position Factor", -1.0, 1.0, 0.0, 0.1)
-                label = (
-                    "🟢 Industry Leader"
-                    if pf > 0.3
-                    else ("🔴 Industry Laggard" if pf < -0.3 else "⚪ Average Position")
-                )
-                st.caption(label)
                 submitted = st.form_submit_button(
                     "Create Company", use_container_width=True, type="primary"
                 )
@@ -163,7 +145,7 @@ with tab_co:
                         st.error("Name and ticker are required.")
                     else:
                         result = api.create_company(
-                            name.strip(), ticker.strip().upper(), ind_id, pf
+                            name.strip(), ticker.strip().upper(), ind_id, 0.0
                         )
                         if result:
                             st.success(
@@ -190,7 +172,6 @@ with tab_co:
                     if current_ind_id in ind_keys
                     else 0
                 )
-                current_pf = round(float(selected_co.get("position_factor", 0.0)), 1)
 
                 with st.form("edit_company_form"):
                     st.subheader("Edit Company")
@@ -208,22 +189,6 @@ with tab_co:
                         format_func=lambda x: ind_options[x],
                         index=ind_idx,
                     )
-                    pf = st.slider(
-                        "Position Factor",
-                        -1.0,
-                        1.0,
-                        current_pf,
-                        0.1,
-                        key=f"edit_pf_{selected_co['id']}",
-                    )
-                    label = (
-                        "🟢 Industry Leader"
-                        if pf > 0.3
-                        else (
-                            "🔴 Industry Laggard" if pf < -0.3 else "⚪ Average Position"
-                        )
-                    )
-                    st.caption(label)
                     submitted = st.form_submit_button(
                         "Save Changes", use_container_width=True, type="primary"
                     )
@@ -236,7 +201,7 @@ with tab_co:
                                 name.strip(),
                                 ticker.strip().upper(),
                                 ind_id,
-                                pf,
+                                0.0,
                             )
                             if result:
                                 st.success(
@@ -257,8 +222,7 @@ with tab_co:
                 )
                 st.warning(
                     f"**{selected_del_co['name']}** ({selected_del_co['ticker']})  \n"
-                    f"Industry: {ind_map.get(selected_del_co['industry_id'], 'Unknown')}  \n"
-                    f"Position Factor: {float(selected_del_co.get('position_factor', 0)):+.2f}"
+                    f"Industry: {ind_map.get(selected_del_co['industry_id'], 'Unknown')}"
                 )
 
                 delete_mode = st.radio(
