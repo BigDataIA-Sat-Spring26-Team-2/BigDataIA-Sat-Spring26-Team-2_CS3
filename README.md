@@ -58,7 +58,7 @@ The PE Org-AI-R platform helps private equity firms assess the **AI readiness** 
 |---|---|
 | Live Application | https://pe-orgair-ui.onrender.com |
 | Swagger API | https://pe-orgair-api.onrender.com/docs |
-| Codelab | https://codelabs-preview.appspot.com/?file_id=1M1qy9K_uIb4iEWX_q6jUartn6D3v5NVLpBwZ-TPpm9c#10 |
+| Codelab | https://codelabs-preview.appspot.com/?file_id=1hs58bY0gHoOKD4AJIBdaHVgY-mVyQNgn17k1l-46UXo#0 |
 | Video Presentation | [Watch on SharePoint](https://northeastern-my.sharepoint.com/personal/shukla_sid_northeastern_edu/_layouts/15/stream.aspx?id=%2Fpersonal%2Fshukla%5Fsid%5Fnortheastern%5Fedu%2FDocuments%2FRecordings%2FMeeting%20in%20Big%20Data%2D20260206%5F052700%2DMeeting%20Recording%2Emp4) |
 
 ---
