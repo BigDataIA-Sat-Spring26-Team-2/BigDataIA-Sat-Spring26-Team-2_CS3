@@ -1,6 +1,7 @@
 # streamlit_app.py
 import os
 import json
+import time
 from datetime import date
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -13,20 +14,15 @@ st.set_page_config(page_title="SEC Documents", page_icon="📄", layout="centere
 
 DEFAULT_API_BASE = os.getenv("API_BASE_URL", "http://127.0.0.1:8000/api/v1")
 
+# ── Airflow connection settings ───────────────────────────────────────────────
+AIRFLOW_BASE = os.getenv("AIRFLOW_BASE_URL", "http://localhost:8080")
+AIRFLOW_USER = os.getenv("AIRFLOW_USER", "admin")
+AIRFLOW_PASS = os.getenv("AIRFLOW_PASS", "admin123")
+DAG_ID = "sec_edgar_pipeline"
+
 
 def _pretty(obj: Any) -> str:
     return json.dumps(obj, indent=2, default=str)
-
-
-def api_post(base: str, path: str, params: Optional[dict] = None, body: Any = None) -> Dict[str, Any]:
-    url = f"{base}{path}"
-    r = requests.post(url, params=params, json=body, timeout=300)
-    if r.status_code >= 400:
-        try:
-            return {"_error": r.json(), "_status": r.status_code}
-        except Exception:
-            return {"_error": r.text, "_status": r.status_code}
-    return r.json()
 
 
 def api_get(base: str, path: str, params: dict) -> requests.Response:
@@ -39,7 +35,50 @@ def valid_cik(v: str) -> bool:
     return v.isdigit() and len(v) == 10
 
 
-st.set_page_config(page_title="SEC EDGAR Downloader", layout="centered")
+# ── Airflow helpers ───────────────────────────────────────────────────────────
+
+def trigger_airflow_dag(conf: dict) -> dict:
+    """Trigger the sec_edgar_pipeline DAG with the given conf dict."""
+    url = f"{AIRFLOW_BASE}/api/v1/dags/{DAG_ID}/dagRuns"
+    try:
+        resp = requests.post(
+            url,
+            json={"conf": conf},
+            auth=(AIRFLOW_USER, AIRFLOW_PASS),
+            timeout=30,
+        )
+        if resp.status_code >= 400:
+            return {"_error": resp.text, "_status": resp.status_code}
+        return resp.json()
+    except requests.exceptions.RequestException as e:
+        return {"_error": str(e), "_status": 0}
+
+
+def get_dag_run_status(run_id: str) -> dict:
+    """Fetch current state of a DAG run."""
+    url = f"{AIRFLOW_BASE}/api/v1/dags/{DAG_ID}/dagRuns/{run_id}"
+    try:
+        resp = requests.get(url, auth=(AIRFLOW_USER, AIRFLOW_PASS), timeout=15)
+        if resp.status_code >= 400:
+            return {"_error": resp.text, "_status": resp.status_code}
+        return resp.json()
+    except requests.exceptions.RequestException as e:
+        return {"_error": str(e)}
+
+
+def get_task_instances(run_id: str) -> list:
+    """Fetch task-level status for a DAG run."""
+    url = f"{AIRFLOW_BASE}/api/v1/dags/{DAG_ID}/dagRuns/{run_id}/taskInstances"
+    try:
+        resp = requests.get(url, auth=(AIRFLOW_USER, AIRFLOW_PASS), timeout=15)
+        if resp.status_code == 200:
+            return resp.json().get("task_instances", [])
+    except Exception:
+        pass
+    return []
+
+
+# ── UI ────────────────────────────────────────────────────────────────────────
 
 st.title("SEC EDGAR Evidence Collector")
 st.caption("Download SEC filings and store them via the FastAPI backend (Case Study 2)")
@@ -109,75 +148,105 @@ if st.button("⬇️ Download SEC Filings", type="primary"):
         st.error("CIK must be exactly 10 digits (including leading zeros).")
         st.stop()
 
-    params = {
+    resolved_ticker = ticker.upper() if ticker else cik
+
+    # Build DAG conf — same params the UI collected
+    dag_conf = {
         "company_id": company_id.strip(),
+        "filing_types": filing_types,
         "after": after_date.isoformat(),
         "limit": int(limit),
-        "filing_types": filing_types,
+        "include_pdf": include_pdf,
     }
-
     if ticker:
-        params["ticker"] = ticker.upper()
-        resolved_ticker = ticker.upper()
-    else:
-        params["cik"] = cik
-        resolved_ticker = cik
+        dag_conf["ticker"] = ticker.upper()
+    if cik:
+        dag_conf["cik"] = cik
 
-    with st.spinner("Downloading + parsing filings… (this can take some time)"):
-        result = api_post(api_base, "/documents/sec-edgar/download", params=params, body=None)
+    # ── Step 1: Trigger the Airflow DAG ──────────────────────────────────────
+    with st.spinner("Triggering Airflow pipeline..."):
+        trigger_result = trigger_airflow_dag(dag_conf)
 
-    if "_error" in result:
-        st.error(f"Request failed ({result.get('_status')})")
-        st.code(_pretty(result["_error"]), language="json")
+    if "_error" in trigger_result:
+        st.error(f"Failed to trigger DAG ({trigger_result.get('_status')})")
+        st.code(trigger_result["_error"])
         st.stop()
 
-    st.success(" Pipeline finished")
+    run_id = trigger_result.get("dag_run_id")
+    st.success(f"Airflow DAG triggered — Run ID: `{run_id}`")
+    st.caption(f"Monitor in Airflow UI: {AIRFLOW_BASE}/dags/{DAG_ID}/grid")
 
-    st.subheader("Summary")
-    st.json({
-        "downloaded_files": result.get("downloaded_files"),
-        "inserted_documents": result.get("inserted_documents"),
-        "inserted_chunks": result.get("inserted_chunks"),
-        "skipped_duplicates": result.get("skipped_duplicates"),
-    })
+    # ── Step 2: Poll for completion ───────────────────────────────────────────
+    POLL_INTERVAL = 10   # seconds between polls
+    MAX_WAIT = 600        # 10 minutes max
 
-    st.subheader("Download All Files")
-    
-    files: List[dict] = result.get("files", [])
-    
-    if files and len(files) > 0:
-        if include_pdf:
-            st.info(f" {len(files)} file(s) ready for download (includes both .txt and .pdf versions)")
-        else:
-            st.info(f" {len(files)} file(s) ready for download (.txt only)")
-        
-        # Display ticker and filing types
-        st.write(f"**Ticker:** {resolved_ticker}")
-        st.write(f"**Filing Types:** {', '.join(filing_types)}")
-        
-        # Fetch ZIP file from backend IMMEDIATELY
+    status_box = st.empty()
+    task_box = st.empty()
+
+    final_state = None
+    elapsed = 0
+
+    TASK_STATE_ICONS = {
+        "success": "✅",
+        "running": "⏳",
+        "failed": "❌",
+        "upstream_failed": "⛔",
+        "skipped": "⏭️",
+        "queued": "🔵",
+        "none": "⬜",
+    }
+
+    while elapsed < MAX_WAIT:
+        time.sleep(POLL_INTERVAL)
+        elapsed += POLL_INTERVAL
+
+        run_info = get_dag_run_status(run_id)
+        state = run_info.get("state", "unknown")
+
+        status_box.info(f"Pipeline state: **{state.upper()}** ({elapsed}s elapsed)")
+
+        # Show per-task status
+        tasks = get_task_instances(run_id)
+        if tasks:
+            task_rows = []
+            for t in tasks:
+                icon = TASK_STATE_ICONS.get(t.get("state", "none"), "⬜")
+                task_rows.append({
+                    "Task": t.get("task_id"),
+                    "State": f"{icon} {t.get('state', 'none')}",
+                    "Duration": f"{t.get('duration') or 0:.0f}s" if t.get("duration") else "-",
+                })
+            import pandas as pd
+            task_box.dataframe(pd.DataFrame(task_rows), hide_index=True, use_container_width=True)
+
+        if state in ("success", "failed", "upstream_failed"):
+            final_state = state
+            break
+
+    status_box.empty()
+
+    # ── Step 3: Show result ───────────────────────────────────────────────────
+    if final_state == "success":
+        st.success("Pipeline finished successfully!")
+
+        st.subheader("Download All Files")
         spinner_text = "Creating ZIP file from S3..."
         if include_pdf:
-            spinner_text += " (generating PDFs, this may take a minute)..."
-        
+            spinner_text += " (includes PDFs)..."
+
         with st.spinner(spinner_text):
-            # Construct query string manually for list parameters
             query_parts = [f"ticker={resolved_ticker}"]
             for ft in filing_types:
                 query_parts.append(f"filing_types={ft}")
-            # ✅ ADD include_pdf PARAMETER
             query_parts.append(f"include_pdf={'true' if include_pdf else 'false'}")
             query_string = "&".join(query_parts)
-            
+
             try:
-                # Make the API call to get the ZIP
                 zip_response = requests.get(
                     f"{api_base}/documents/sec-edgar/download-zip?{query_string}",
-                    timeout=300  # 5 minutes max
+                    timeout=300,
                 )
-                
                 if zip_response.status_code == 200:
-                    # Show download button with the actual ZIP data
                     st.download_button(
                         label="Download ZIP",
                         data=zip_response.content,
@@ -185,49 +254,25 @@ if st.button("⬇️ Download SEC Filings", type="primary"):
                         mime="application/zip",
                         use_container_width=False,
                     )
-                    success_msg = "✅ ZIP file ready for download!"
+                    success_msg = "ZIP file ready for download!"
                     if include_pdf:
                         success_msg += " Each filing includes both .txt and .pdf versions."
                     st.success(success_msg)
                 else:
-                    st.error(f"❌ Failed to create ZIP file (Status: {zip_response.status_code})")
+                    st.error(f"Failed to create ZIP file (Status: {zip_response.status_code})")
                     try:
-                        error_detail = zip_response.json()
-                        st.code(_pretty(error_detail), language="json")
-                    except:
+                        st.code(_pretty(zip_response.json()), language="json")
+                    except Exception:
                         st.code(zip_response.text)
             except requests.exceptions.Timeout:
-                st.error("⏱️ Request timed out.")
-                if include_pdf:
-                    st.info("💡 Try again without PDF generation for faster results.")
-                else:
-                    st.info("💡 Try reducing the limit or selecting fewer filing types.")
+                st.error("ZIP request timed out.")
+                st.info("Try reducing the limit or selecting fewer filing types.")
             except requests.exceptions.RequestException as e:
-                st.error(f"❌ Network error: {str(e)}")
-        
-        # Show file details in expander
-        with st.expander(" View File Details"):
-            if include_pdf:
-                st.caption("Each filing will include both .txt (original) and .pdf (formatted) versions in the ZIP.")
-            else:
-                st.caption("Each filing will include .txt (original) version only.")
-            st.write("")
-            
-            for idx, f in enumerate(files, 1):
-                filing_type = f.get("filing_type", "")
-                accession = f.get("accession_number", "")
-                file_path = f.get("path", "")
-                
-                st.markdown(f"**{idx}. {filing_type}** | {accession}")
-                if file_path:
-                    # Show the S3 path
-                    s3_base = f"s3://your-bucket/sec/{resolved_ticker}/{filing_type}/{accession}/"
-                    if include_pdf:
-                        st.caption(f"Files: `full-submission.txt` and `full-submission.pdf`")
-                    else:
-                        st.caption(f"File: `full-submission.txt`")
-                    st.caption(f"S3 Location: `{s3_base}`")
-                st.write("")
+                st.error(f"Network error: {str(e)}")
+
+    elif final_state is not None:
+        st.error(f"Pipeline ended with state: **{final_state}**")
+        st.info(f"Check the Airflow UI for task logs: {AIRFLOW_BASE}/dags/{DAG_ID}/grid")
     else:
-        st.warning("No files were downloaded. Try adjusting your search parameters.")
-        st.info("Note: Files might have been skipped as duplicates if they were already processed.")
+        st.warning(f"Pipeline still running after {MAX_WAIT}s. Check Airflow UI for status.")
+        st.info(f"{AIRFLOW_BASE}/dags/{DAG_ID}/grid")
