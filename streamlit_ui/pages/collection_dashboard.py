@@ -29,6 +29,9 @@ TARGET_COMPANIES = {
     "TGT": {"name": "Target Corporation", "sector": "Retail", "assignee": "Target Brands, Inc"},
     "JPM": {"name": "JPMorgan Chase", "sector": "Financial", "assignee": "Jp Morgan Chase Bank, N.A."},
     "GS": {"name": "Goldman Sachs", "sector": "Financial", "assignee": "Goldman Sachs & Co"},
+    "NVDA": {"name": "NVIDIA Corporation",   "sector": "Technology",     "assignee": "Nvidia Corp"},
+    "DG":   {"name": "Dollar General Corp",  "sector": "Retail",         "assignee": "Dollar General Corporation"},
+    "GE":   {"name": "General Electric Co",  "sector": "Manufacturing",  "assignee": "General Electric Company"},
 }
 
 st.divider()

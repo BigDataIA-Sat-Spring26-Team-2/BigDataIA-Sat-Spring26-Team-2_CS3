@@ -14,7 +14,6 @@ st.set_page_config(page_title="Scoring & Memo", page_icon="📈", layout="wide")
 api = APIClient()
 
 
-
 DIMENSION_LABELS = {
     "data_infrastructure": "Data Infrastructure",
     "ai_governance": "AI Governance",

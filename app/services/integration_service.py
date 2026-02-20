@@ -14,11 +14,12 @@ Evidence flow:
 """
 
 import json
+import httpx
 import structlog
 from typing import Dict, Any, List
 from decimal import Decimal
 from uuid import UUID, uuid4
-
+from datetime import date, datetime, timezone
 from app.config import get_settings
 from app.services.snowflake import get_connection
 from app.scoring.evidence_mapper import EvidenceMapper, EvidenceScore, SignalSource, Dimension
@@ -32,20 +33,23 @@ from app.scoring.synergy_calculator import SynergyCalculator
 from app.scoring.confidence_calculator import ConfidenceCalculator
 from app.pipelines.glassdoor_collector import GlassdoorCultureCollector, GlassdoorCollectionPipeline
 from app.pipelines.board_analyzer import BoardCompositionAnalyzer
-from app.services.evidence_counter import get_total_evidence_count, get_evidence_breakdown  
-
+from app.services.evidence_counter import get_total_evidence_count, get_evidence_breakdown
+from app.config import get_settings
+from app.services.snowflake import get_connection
 
 logger = structlog.get_logger()
 
 
 class ScoringIntegrationService:
-    """
-    Full pipeline: CS1/CS2 data → Org-AI-R score.
-    CS3 Task 6.0b implementation.
-    """
 
-    def __init__(self):
-        # Confirmed existing components
+    def __init__(
+        self,
+        cs1_api_url: str = "http://localhost:8000"
+    ):
+        self.cs1_url = cs1_api_url
+
+        # Initialize all components
+
         self.evidence_mapper = EvidenceMapper()
         self.rubric_scorer = RubricScorer()
         self.tc_calculator = TalentConcentrationCalculator()
@@ -56,12 +60,10 @@ class ScoringIntegrationService:
         self.ci_calculator = ConfidenceCalculator()
         self.glassdoor_collector = GlassdoorCultureCollector()
         self.board_analyzer = BoardCompositionAnalyzer()
+        self.http = httpx.Client(timeout=30.0)
 
-    # -----------------------------------------------------------------------
-    # Public entry point
-    # -----------------------------------------------------------------------
 
-    def score_company(self, ticker: str) -> Dict[str, Any]:
+    def score_company(self, ticker: str,  market_cap_percentile: float = 0.5) -> Dict[str, Any]:
         """
         Run the full Org-AI-R scoring pipeline for a ticker.
 
@@ -79,7 +81,6 @@ class ScoringIntegrationService:
         company_id = company["id"]
         industry_id = company.get("industry_id")
         sector = self._get_sector_from_db(company_id)
-        market_cap_percentile = float(company.get("market_cap_percentile", 0.5))
 
         logger.info(
             "company_fetched",
@@ -191,7 +192,7 @@ class ScoringIntegrationService:
         position_factor_decimal = self.pf_calculator.calculate_position_factor(
             vr_score=float(vr_result.vr_score),
             sector=sector,
-            market_cap_percentile=market_cap_percentile,  # ✅ Use user input
+            market_cap_percentile=market_cap_percentile,
         )
         position_factor = float(position_factor_decimal)
 
@@ -268,11 +269,13 @@ class ScoringIntegrationService:
             "alignment": alignment,
             "talent_concentration": tc,
             "position_factor": position_factor,
+            "market_cap_percentile": market_cap_percentile,
 
             # Confidence interval
             "ci_lower": float(ci_result.ci_lower),
             "ci_upper": float(ci_result.ci_upper),
             "confidence": float(ci_result.confidence),
+            "sem": float(ci_result.sem),
 
             # Dimension detail
             "dimension_scores": dimension_scores,
@@ -396,6 +399,15 @@ class ScoringIntegrationService:
             conn.close()
 
     def _fetch_cs2_evidence(self, company_id: str) -> Dict[str, Any]:
+        """Step 2: Fetch from CS2 API"""
+        url = f"{self.cs1_url}/api/v1/signals/companies/{company_id}"
+        response = self.http.get(
+            url,
+            params={"limit": 200},
+        )
+        response.raise_for_status()
+        data = response.json()
+
         """
         Step 2: Query Snowflake directly for external signals.
         Returns dict with 'signals' (all items) and 'job_postings'
@@ -457,7 +469,6 @@ class ScoringIntegrationService:
             "confidence": 0.5,
         }
 
-        # --- Primary: read from EXTERNAL_SIGNALS table ---
         try:
             settings = get_settings()
             conn = get_connection()
@@ -513,7 +524,6 @@ class ScoringIntegrationService:
                 error=str(exc),
             )
 
-        # --- Secondary: try S3 via GlassdoorCollectionPipeline ---
         try:
             pipeline = GlassdoorCollectionPipeline()
             signal = pipeline.collect_and_analyze(company_id, ticker)
@@ -639,41 +649,184 @@ class ScoringIntegrationService:
         alignment = 1.0 - abs(vr - hr) / 100.0
         return max(0.0, min(1.0, alignment))
 
-    def _persist_assessment(self, result: Dict[str, Any]) -> None:
-        """
-        Step 13: Insert assessment directly into Snowflake.
-        Logs on failure but does NOT raise — scoring result is still returned.
-        """
+
+    def _persist_assessment(self, result: Dict[str, Any]) -> str:
         settings = get_settings()
-        table = f"{settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.ASSESSMENTS"
-        assessment_id = str(uuid4())
+        conn = None
+        cur = None
+
         try:
             conn = get_connection()
             cur = conn.cursor()
-            try:
-                cur.execute(f"""
-                    INSERT INTO {table} (id, company_id, assessment_type, status, primary_assessor)
-                    VALUES (%s, %s, %s, %s, %s)
-                """, (
-                    assessment_id,
-                    str(result["company_id"]),
-                    "ai_readiness",
-                    "completed",
-                    "CS3_AutoScorer",
-                ))
-                conn.commit()
+            
+            company_id = result["company_id"]
+            
+            # DEDUPLICATION: Check for existing assessment for this company
+            check_sql = f"""
+                SELECT id, created_at
+                FROM {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.assessments
+                WHERE company_id = %s
+                ORDER BY created_at DESC
+                LIMIT 1
+            """
+            
+            cur.execute(check_sql, (company_id,))
+            existing = cur.fetchone()
+            
+            # Build calculation details JSON
+            calculation_details = {
+                "vr_components": result.get("vr_components", {}),
+                "hr_components": result.get("hr_components", {}),
+                "synergy_components": result.get("synergy_components", {}),
+                "evidence_breakdown": result.get("evidence_breakdown", {}),
+                "dimension_scores": result.get("dimension_scores", {}),
+                "formula_constants": result.get("formula_constants", {}),
+            }
+            
+            if existing:
+                # UPDATE existing assessment
+                assessment_id = existing[0]
+                existing_created = existing[1]
+                
                 logger.info(
-                    "assessment_persisted",
-                    company_id=result["company_id"],
+                    "existing_assessment_found",
+                    company_id=company_id,
+                    assessment_id=assessment_id,
+                    existing_created=existing_created,
+                    action="updating"
+                )
+                
+                update_sql = f"""
+                    UPDATE {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.assessments
+                    SET
+                        assessment_date = %s,
+                        v_r_score = %s,
+                        hr_score = %s,
+                        synergy_score = %s,
+                        final_score = %s,
+                        position_factor = %s,
+                        talent_concentration = %s,
+                        market_cap_percentile = %s,
+                        evidence_count = %s,
+                        confidence_level = %s,
+                        sem = %s,
+                        ci_lower = %s,
+                        ci_upper = %s,
+                        calculation_details = PARSE_JSON(%s)
+                    WHERE id = %s
+                """
+                
+                cur.execute(
+                    update_sql,
+                    (
+                        date.today(),
+                        result["vr_score"],
+                        result["hr_score"],
+                        result["synergy_score"],
+                        result["final_score"],
+                        result["position_factor"],
+                        result["talent_concentration"],
+                        result["market_cap_percentile"],
+                        result["evidence_count"],
+                        result["confidence"],
+                        result["sem"],
+                        result["ci_lower"],
+                        result["ci_upper"],
+                        json.dumps(calculation_details),
+                        assessment_id,
+                    ),
+                )
+                
+                logger.info(
+                    "assessment_updated",
                     ticker=result["ticker"],
                     assessment_id=assessment_id,
+                    final_score=result["final_score"]
                 )
-            finally:
-                cur.close()
-                conn.close()
-        except Exception as exc:
+                
+            else:
+                # INSERT new assessment
+                assessment_id = str(uuid4())
+                
+                logger.info(
+                    "no_existing_assessment",
+                    company_id=company_id,
+                    action="inserting_new"
+                )
+                
+                insert_sql = f"""
+                    INSERT INTO {settings.SNOWFLAKE_DATABASE}.{settings.SNOWFLAKE_SCHEMA}.assessments (
+                        id, company_id, assessment_date,
+                        v_r_score, hr_score, synergy_score, final_score,
+                        position_factor, talent_concentration, market_cap_percentile,
+                        evidence_count, confidence_level, sem, ci_lower, ci_upper,
+                        calculation_details,
+                        created_at
+                    )
+                    SELECT
+                        %s, %s, %s, %s,
+                        %s, %s, %s, %s,
+                        %s, %s, %s,
+                        %s, %s, %s, %s,
+                        PARSE_JSON(%s),
+                        %s
+                """
+                
+                cur.execute(
+                    insert_sql,
+                    (
+                        assessment_id,
+                        company_id,
+                        date.today(),
+                        result["vr_score"],
+                        result["hr_score"],
+                        result["synergy_score"],
+                        result["final_score"],
+                        result["position_factor"],
+                        result["talent_concentration"],
+                        result["market_cap_percentile"],
+                        result["evidence_count"],
+                        result["confidence"],
+                        result["sem"],
+                        result["ci_lower"],
+                        result["ci_upper"],
+                        json.dumps(calculation_details),
+                        datetime.now(timezone.utc),
+                    ),
+                )
+                
+                logger.info(
+                    "assessment_inserted",
+                    ticker=result["ticker"],
+                    assessment_id=assessment_id,
+                    final_score=result["final_score"]
+                )
+            
+            conn.commit()
+            
+            logger.info(
+                "assessment_persisted",
+                ticker=result["ticker"],
+                assessment_id=assessment_id,
+                final_score=result["final_score"],
+                evidence_count=result["evidence_count"],
+                was_update=existing is not None
+            )
+            
+            return assessment_id
+            
+        except Exception as e:
+            if conn:
+                conn.rollback()
             logger.error(
                 "assessment_persist_failed",
-                ticker=result["ticker"],
-                error=str(exc),
+                ticker=result.get("ticker"),
+                error=str(e)
             )
+            raise
+            
+        finally:
+            if cur:
+                cur.close()
+            if conn:
+                conn.close()
